@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
-import Login from './components/login'
+import Login from './components/Login'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
