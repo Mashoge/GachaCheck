@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink, useParams } from 'react-router'
 import { findPreset, findServer } from '../data/presets'
-import { meterStates } from '../lib/stamina'
+import { meterStates, type MeterRow, type MeterState } from '../lib/stamina'
 import { dailyPeriod, formatDuration, formatWhen, weeklyPeriod } from '../lib/time'
 import { clockOf, isVisible, taskProgress, useTodayData, type Task, type TodayData } from '../lib/today'
 import { SHORT_NAMES } from '../lib/useGames'
@@ -12,7 +12,7 @@ const startsQuick = () => typeof window !== 'undefined' && !window.matchMedia('(
 
 export default function GamePage() {
   const { presetId } = useParams()
-  const { data, error, loading, addCompletion, removeCompletions } = useTodayData()
+  const { data, error, loading, addCompletion, removeCompletions, setMeterValue } = useTodayData()
   const now = useNow()
   const [quick, setQuick] = useState(startsQuick)
 
@@ -73,6 +73,7 @@ export default function GamePage() {
           quick={quick}
           onTick={(task, periodStart) => void addCompletion(task.id, periodStart)}
           onRemove={(task, ids) => void removeCompletions(task.id, ids)}
+          onSetMeter={(meterId, value) => void setMeterValue(game, meterId, value)}
         />
       )}
     </div>
@@ -86,9 +87,10 @@ type Props = {
   quick: boolean
   onTick: (task: Task, periodStart: Date) => void
   onRemove: (task: Task, ids: string[]) => void
+  onSetMeter: (meterId: string, value: number) => void
 }
 
-function GameDashboard({ game, data, now, quick, onTick, onRemove }: Props) {
+function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter }: Props) {
   const clock = clockOf(game)
   const preset = game.preset_id ? findPreset(game.preset_id) : undefined
   const serverLabel = preset && game.server ? findServer(preset, game.server)?.label : null
@@ -143,27 +145,14 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove }: Props) {
           <h2 className="text-sm font-semibold">Stamina</h2>
           {meters.length === 0 && <p className="text-sm text-muted">This game has no stamina meter.</p>}
           {meters.map((m) => {
-            const parent = byId.get(game.stamina_meters.find((x) => x.id === m.id)?.fills_when_full_of ?? '')
+            const row = byId.get(m.id)!
+            const parent = row.fills_when_full_of ? byId.get(row.fills_when_full_of) : undefined
             const sub = m.full
-              ? 'Full now'
+              ? m.value > m.cap ? 'Above cap · no refill until you spend' : 'Full now'
               : m.fullAt
                 ? `+1 in ${formatDuration(m.nextPointAt!.getTime() - now.getTime())} · full ${formatWhen(m.fullAt, now)}`
                 : `Fills while ${parent?.name ?? 'the main meter'} is full`
-            return (
-              <div key={m.id} className="flex flex-col gap-1.5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-sm text-muted">{m.name}</span>
-                  <span className={`font-display text-xl font-semibold ${m.full ? 'text-urgent' : ''}`}>
-                    {m.value}
-                    <span className="font-sans text-sm font-normal text-muted"> / {m.cap}</span>
-                  </span>
-                </div>
-                <div aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-line">
-                  <div className={`h-full ${m.full ? 'bg-urgent' : 'bg-accent'}`} style={{ width: `${Math.round((m.value / m.cap) * 100)}%` }} />
-                </div>
-                <span className={`text-xs ${m.full ? 'text-urgent' : 'text-muted'}`}>{sub}</span>
-              </div>
-            )
+            return <MeterCard key={m.id} state={m} row={row} sub={sub} onSet={(v) => onSetMeter(m.id, v)} />
           })}
         </div>
 
@@ -339,6 +328,86 @@ function CountedRow({ task, progress, onAdd, onUndo }: { task: Task; progress: {
       >
         +
       </button>
+    </div>
+  )
+}
+
+function MeterCard({ state, row, sub, onSet }: { state: MeterState; row: MeterRow; sub: string; onSet: (value: number) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const spends = row.spend_presets && row.spend_presets.length > 0 ? row.spend_presets : [20, 40, 60]
+  const pct = Math.min(100, Math.round((state.value / state.cap) * 100))
+
+  const save = () => {
+    const v = Number(draft)
+    if (draft.trim() === '' || !Number.isFinite(v) || v < 0) return
+    onSet(v)
+    setEditing(false)
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-sm text-muted">{state.name}</span>
+        <span className={`font-display text-xl font-semibold ${state.full ? 'text-urgent' : ''}`}>
+          {state.value}
+          <span className="font-sans text-sm font-normal text-muted"> / {state.cap}</span>
+        </span>
+      </div>
+      <div aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-line">
+        <div className={`h-full ${state.full ? 'bg-urgent' : 'bg-accent'}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={`text-xs ${state.full ? 'text-urgent' : 'text-muted'}`}>{sub}</span>
+
+      {editing ? (
+        <form
+          className="mt-1 flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            save()
+          }}
+        >
+          <label className="sr-only" htmlFor={`meter-${row.id}`}>{state.name} right now</label>
+          <input
+            id={`meter-${row.id}`}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={`What the game shows (0–${state.cap})`}
+            className="min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-page px-3 text-sm text-ink placeholder:text-muted"
+          />
+          <button type="submit" className="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent">Save</button>
+          <button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg px-2 text-sm text-muted hover:text-ink">Cancel</button>
+        </form>
+      ) : (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          {!state.isOverflow &&
+            spends.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => onSet(Math.max(0, state.value - n))}
+                aria-label={`Spent ${n} ${state.name}`}
+                className="min-h-9 rounded-lg border border-line px-2.5 text-xs font-semibold text-muted hover:text-ink"
+              >
+                −{n}
+              </button>
+            ))}
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(String(state.value))
+              setEditing(true)
+            }}
+            className="min-h-9 rounded-lg border border-line px-2.5 text-xs font-semibold text-muted hover:text-ink"
+          >
+            Set value
+          </button>
+        </div>
+      )}
     </div>
   )
 }

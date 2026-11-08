@@ -133,7 +133,51 @@ export function useTodayData() {
     [patchCompletions, refresh],
   )
 
-  return { data, error, loading: !data && !error, refresh, addCompletion, removeCompletions }
+  // Saves what the game shows right now. Overflow meters (Crystals) are snapshotted first,
+  // because they stop filling once their parent drops below cap.
+  const setMeterValue = useCallback(
+    async (game: Game, meterId: string, value: number) => {
+      const now = new Date()
+      const iso = now.toISOString()
+      const states = meterStates(game.stamina_meters, now)
+      const children = game.stamina_meters.filter((m) => m.fills_when_full_of === meterId)
+      const updates = [
+        ...children.map((c) => ({ id: c.id, current_value: states.find((s) => s.id === c.id)?.value ?? c.current_value })),
+        { id: meterId, current_value: Math.max(0, Math.round(value)) },
+      ]
+      setData((d) =>
+        d && {
+          ...d,
+          games: d.games.map((g) =>
+            g.id !== game.id
+              ? g
+              : {
+                  ...g,
+                  stamina_meters: g.stamina_meters.map((m) => {
+                    const u = updates.find((x) => x.id === m.id)
+                    return u ? { ...m, current_value: u.current_value, value_recorded_at: iso } : m
+                  }),
+                },
+          ),
+        },
+      )
+      try {
+        for (const u of updates) {
+          const { error: err } = await supabase
+            .from('stamina_meters')
+            .update({ current_value: u.current_value, value_recorded_at: iso })
+            .eq('id', u.id)
+          if (err) throw err
+        }
+      } catch (err) {
+        setError(messageOf(err))
+        await refresh()
+      }
+    },
+    [refresh],
+  )
+
+  return { data, error, loading: !data && !error, refresh, addCompletion, removeCompletions, setMeterValue }
 }
 
 // ---- What Today shows ----

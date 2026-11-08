@@ -9,6 +9,7 @@ export type MeterRow = {
   fills_when_full_of: string | null
   current_value: number
   value_recorded_at: string
+  spend_presets?: number[]
 }
 
 export type MeterState = {
@@ -27,7 +28,9 @@ const MIN = 60_000
 function plain(m: MeterRow, now: number) {
   const recorded = new Date(m.value_recorded_at).getTime()
   const step = m.minutes_per_point * MIN
-  const base = Math.min(m.cap, m.current_value)
+  const base = Math.max(0, m.current_value)
+  // Above cap (e.g. after a refill): no regen until it drops below cap again
+  if (base >= m.cap) return { value: base, full: true, fullAt: null, fullSince: recorded, nextPointAt: null }
   const gained = Math.max(0, Math.floor((now - recorded) / step))
   const value = Math.min(m.cap, base + gained)
   const fullAtMs = recorded + (m.cap - base) * step
