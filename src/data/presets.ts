@@ -28,6 +28,7 @@ export interface PresetTask {
   optional?: boolean          // starts hidden; the player can show it
   note?: string
   weeklyTarget?: number       // e.g. 5 days a week
+  targetEditable?: boolean    // player can set their own weekly target (e.g. allowance depends on progress)
   monthlyDay?: number         // for rule 'monthly'
   cycleAnchor?: string        // 'YYYY-MM-DD' server date, for rule 'interval'
   cycleDays?: number          // for rule 'interval'
@@ -39,6 +40,7 @@ export interface GamePreset {
   version: number
   lastChecked: string         // YYYY-MM-DD
   name: string
+  taskExample: string         // placeholder for "Add your own"
   dailyResetTime: string      // 'HH:MM' server time
   weeklyResetDay: number      // 0 = Sunday, 1 = Monday
   defaultServer: string
@@ -69,9 +71,10 @@ const endgame = (key: string, title: string, schedule: Partial<PresetTask>): Pre
 export const PRESETS: GamePreset[] = [
   {
     id: 'genshin',
-    version: 3,
+    version: 5,
     lastChecked: '2026-11-08',
     name: 'Genshin Impact',
+    taskExample: 'e.g. Build Columbina',              // Genshin
     dailyResetTime: '04:00',
     weeklyResetDay: 1,
     defaultServer: 'asia',
@@ -109,6 +112,7 @@ export const PRESETS: GamePreset[] = [
     version: 5,
     lastChecked: '2026-11-08',
     name: 'Wuthering Waves',
+    taskExample: 'e.g. Farm Echoes for my main DPS',  // WuWa
     dailyResetTime: '04:00',
     weeklyResetDay: 1,
     defaultServer: 'sea',
@@ -131,8 +135,10 @@ export const PRESETS: GamePreset[] = [
       daily('mail', 'Check mail', { optional: true }),
       weekly('weekly-bosses', 'Weekly bosses (3 claims)'),
       weekly('weekly-activity', 'Weekly activity points', { note: 'Full Astrite reward at 5,000 · final tier at 6,000' }),
-      weekly('echo-drops', 'Enhanced Echo drops', { note: 'Set your weekly allowance (depends on Data Bank level)' }),
-      weekly('podcast-weekly', 'Pioneer Podcast weeklies'),
+      weekly('echo-drops', 'Enhanced Echo drops', {
+        targetEditable: true,
+        note: 'Set your weekly allowance (depends on Data Bank level)',
+      }),      weekly('podcast-weekly', 'Pioneer Podcast weeklies'),
       weekly('shop', 'Weekly shop exchanges'),
       endgame('tower', 'Tower of Adversity', { rule: 'interval', cycleAnchor: '2026-09-14', cycleDays: 28 }),
       endgame('whimpering', 'Whimpering Wastes', { rule: 'interval', cycleAnchor: '2026-09-28', cycleDays: 28 }),
@@ -144,6 +150,7 @@ export const PRESETS: GamePreset[] = [
     version: 3,
     lastChecked: '2026-11-08',
     name: 'Neverness to Everness',
+    taskExample: 'e.g. Upgrade my Arcs',              // NTE
     dailyResetTime: '05:00',
     weeklyResetDay: 1,
     defaultServer: 'asia',

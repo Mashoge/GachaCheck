@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { PRESETS, findPreset, findServer, type GamePreset } from '../data/presets'
 import { addGameFromPreset, changeServer, deleteGame, loadGames, type GameSummary } from '../lib/games'
 import { messageOf } from '../lib/errors'
+import TaskManager from './TaskManager'
 
 const selectClass =
   'h-9 rounded-lg border border-[#2E3445] bg-[#0D0F14] px-2 text-sm text-[#ECEEF3] outline-none [color-scheme:dark] focus:border-[#8B7CFF] disabled:opacity-50'
@@ -12,6 +13,7 @@ export default function GamesScreen() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [serverChoice, setServerChoice] = useState<Record<string, string>>({})
+  const [openId, setOpenId] = useState<string | null>(null)
 
    useEffect(() => {
     let cancelled = false
@@ -123,7 +125,17 @@ export default function GamesScreen() {
                   })}
                 </ul>
               )}
+             <button
+                type="button"
+                aria-expanded={openId === game.id}
+                onClick={() => setOpenId(openId === game.id ? null : game.id)}
+                className="text-sm font-medium text-[#B9B0FF] hover:text-[#D6D0FF]"
+              >
+                {openId === game.id ? 'Hide tasks' : `Manage tasks (${active.length})`}
+              </button>
+              {openId === game.id && <TaskManager game={game} onChanged={refresh} />}
             </article>
+            
           )
         })}
       </section>

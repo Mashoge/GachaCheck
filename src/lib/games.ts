@@ -5,8 +5,7 @@ import { findPreset, findServer, type GamePreset, type PresetTask } from '../dat
 export function fetchGames() {
   return supabase
     .from('games')
-    .select('id, name, server, daily_reset_time, preset_id, preset_version, tasks(id, title, frequency, category, hidden, optional, archived, preset_key), stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of)')
-    .order('sort_order')
+    .select('id, name, server, daily_reset_time, preset_id, preset_version, tasks(id, title, frequency, category, hidden, optional, archived, preset_key, note, weekly_target, monthly_day, cycle_days, cycle_ends_at, due_at), stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of)')    .order('sort_order')
     .order('created_at')
     .order('sort_order', { referencedTable: 'tasks' })
     .order('sort_order', { referencedTable: 'stamina_meters' })
@@ -202,5 +201,43 @@ export async function changeServer(gameId: string, preset: GamePreset, serverId:
 
 export async function deleteGame(id: string) {
   const { error } = await supabase.from('games').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function setTaskHidden(taskId: string, hidden: boolean) {
+  const { error } = await supabase.from('tasks').update({ hidden }).eq('id', taskId)
+  if (error) throw error
+}
+
+export async function setWeeklyTarget(taskId: string, target: number | null) {
+  const { error } = await supabase.from('tasks').update({ weekly_target: target }).eq('id', taskId)
+  if (error) throw error
+}
+
+export type CustomTaskKind = 'daily' | 'weekly' | 'goal'
+
+export async function addCustomTask(
+  gameId: string,
+  input: { title: string; kind: CustomTaskKind; dueAt: string | null },
+) {
+  const isGoal = input.kind === 'goal'
+  const { error } = await supabase.from('tasks').insert({
+    game_id: gameId,
+    title: input.title,
+    frequency: isGoal ? 'none' : input.kind,
+    category: isGoal ? 'goal' : 'routine',
+    due_at: isGoal ? input.dueAt : null,
+    sort_order: 1000, // after preset tasks
+  })
+  if (error) throw error
+}
+
+/** Only your own tasks can be removed; they're archived so history stays. */
+export async function removeCustomTask(taskId: string) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ archived: true })
+    .eq('id', taskId)
+    .is('preset_key', null)
   if (error) throw error
 }
