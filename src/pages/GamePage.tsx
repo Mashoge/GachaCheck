@@ -152,7 +152,8 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter }:
               : m.fullAt
                 ? `+1 in ${formatDuration(m.nextPointAt!.getTime() - now.getTime())} · full ${formatWhen(m.fullAt, now)}`
                 : `Fills while ${parent?.name ?? 'the main meter'} is full`
-            return <MeterCard key={m.id} state={m} row={row} sub={sub} onSet={(v) => onSetMeter(m.id, v)} />
+            const estimated = !!preset?.meters.find((pm) => pm.key === row.preset_key)?.estimated
+            return <MeterCard key={m.id} state={m} row={row} sub={sub} estimated={estimated} onSet={(v) => onSetMeter(m.id, v)} />
           })}
         </div>
 
@@ -332,7 +333,7 @@ function CountedRow({ task, progress, onAdd, onUndo }: { task: Task; progress: {
   )
 }
 
-function MeterCard({ state, row, sub, onSet }: { state: MeterState; row: MeterRow; sub: string; onSet: (value: number) => void }) {
+function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterState; row: MeterRow & { preset_key?: string | null }; sub: string; estimated: boolean; onSet: (value: number) => void }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const spends = row.spend_presets && row.spend_presets.length > 0 ? row.spend_presets : [20, 40, 60]
@@ -348,7 +349,10 @@ function MeterCard({ state, row, sub, onSet }: { state: MeterState; row: MeterRo
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm text-muted">{state.name}</span>
+        <span className="flex items-center gap-2 text-sm text-muted">
+          {state.name}
+          {estimated && <span className="rounded-full border border-line px-1.5 text-[10px]">estimated</span>}
+        </span>
         <span className={`font-display text-xl font-semibold ${state.full ? 'text-urgent' : ''}`}>
           {state.value}
           <span className="font-sans text-sm font-normal text-muted"> / {state.cap}</span>

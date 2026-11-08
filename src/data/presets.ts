@@ -18,6 +18,7 @@ export interface PresetMeter {
   cap: number
   minutesPerPoint: number
   fillsWhenFullOf?: string // key of the meter that must be full first
+  estimated?: boolean      // cap or refill rate not confirmed yet; the app labels it "estimated"
 }
 
 export interface PresetTask {
@@ -109,8 +110,8 @@ export const PRESETS: GamePreset[] = [
   },
   {
     id: 'wuwa',
-    version: 5,
-    lastChecked: '2026-11-08',
+    version: 6,
+    lastChecked: '2026-11-09',
     name: 'Wuthering Waves',
     taskExample: 'e.g. Farm Echoes for my main DPS',  // WuWa
     dailyResetTime: '04:00',
@@ -138,17 +139,19 @@ export const PRESETS: GamePreset[] = [
       weekly('echo-drops', 'Enhanced Echo drops', {
         targetEditable: true,
         note: 'Set your weekly allowance (depends on Data Bank level)',
-      }),      weekly('podcast-weekly', 'Pioneer Podcast weeklies'),
+      }),
+      weekly('podcast-weekly', 'Pioneer Podcast weeklies'),
       weekly('shop', 'Weekly shop exchanges'),
       endgame('tower', 'Tower of Adversity', { rule: 'interval', cycleAnchor: '2026-09-14', cycleDays: 28 }),
       endgame('whimpering', 'Whimpering Wastes', { rule: 'interval', cycleAnchor: '2026-09-28', cycleDays: 28 }),
-      endgame('endstate', 'Endstate Matrix', { note: 'Cycle length to be confirmed' }),
+      // Seen in game on Nov 9: current cycle ends Nov 12, 04:00. Next dates once the cycle length is confirmed.
+      endgame('endstate', 'Endstate Matrix', { cycleEndsAt: '2026-11-12T04:00', note: 'Cycle length to be confirmed' }),
     ],
   },
   {
     id: 'nte',
-    version: 3,
-    lastChecked: '2026-11-08',
+    version: 4,
+    lastChecked: '2026-11-09',
     name: 'Neverness to Everness',
     taskExample: 'e.g. Upgrade my Arcs',              // NTE
     dailyResetTime: '05:00',
@@ -160,7 +163,8 @@ export const PRESETS: GamePreset[] = [
       { id: 'america', label: 'America (US Eastern)', timezone: 'America/New_York', note: UNVERIFIED },
       { id: 'europe', label: 'Europe (UTC+1)', timezone: UTC_PLUS_1, note: UNVERIFIED },
     ],
-    meters: [{ key: 'pixels', name: 'Character Pixels', cap: 240, minutesPerPoint: 6 }],
+    // Cap seen in game on Nov 9 (360/360). Refill rate still to be confirmed.
+    meters: [{ key: 'pixels', name: 'Character Pixels', cap: 360, minutesPerPoint: 6, estimated: true }],
     tasks: [
       daily('commissions', 'Daily commissions (Exploration Guide)'),
       daily('spend-pixels', 'Spend Character Pixels'),
@@ -177,7 +181,8 @@ export const PRESETS: GamePreset[] = [
       weekly('special-delivery', 'Special Delivery Commissions'),
       weekly('bp-weekly', 'Battle Pass weeklies'),
       monthly('monthly-shop', 'Monthly shop refresh', 1),
-      endgame('beyond-rails', 'Beyond the Rails', { note: 'Every 2 weeks; start date to be confirmed' }),
+      // In game: "Special Routes typically reset every 14 days"; current route ends Nov 19, 05:00.
+      endgame('beyond-rails', 'Beyond the Rails', { rule: 'interval', cycleAnchor: '2026-11-05', cycleDays: 14 }),
     ],
   },
 ]
