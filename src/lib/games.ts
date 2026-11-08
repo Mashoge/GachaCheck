@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { GamePreset } from '../data/presets'
+import { findServer, type GamePreset } from '../data/presets'
 
 export function fetchGames() {
   return supabase
@@ -13,13 +13,16 @@ export function fetchGames() {
 
 export type GameSummary = NonNullable<Awaited<ReturnType<typeof fetchGames>>['data']>[number]
 
-export async function addGameFromPreset(preset: GamePreset, sortOrder: number) {
+export async function addGameFromPreset(preset: GamePreset, serverId: string, sortOrder: number) {
+  const server = findServer(preset, serverId)
+  if (!server) throw new Error(`Unknown server "${serverId}" for ${preset.name}`)
+
   const { data: game, error } = await supabase
     .from('games')
     .insert({
       name: preset.name,
-      server: preset.server,
-      timezone: preset.timezone,
+      server: server.id,
+      timezone: server.timezone,
       daily_reset_time: preset.dailyResetTime,
       weekly_reset_day: preset.weeklyResetDay,
       preset_id: preset.id,
@@ -70,6 +73,21 @@ export async function addGameFromPreset(preset: GamePreset, sortOrder: number) {
     await supabase.from('games').delete().eq('id', game.id)
     throw err
   }
+}
+
+export async function changeServer(gameId: string, preset: GamePreset, serverId: string) {
+  const server = findServer(preset, serverId)
+  if (!server) throw new Error(`Unknown server "${serverId}" for ${preset.name}`)
+  const { error } = await supabase
+    .from('games')
+    .update({
+      server: server.id,
+      timezone: server.timezone,
+      daily_reset_time: preset.dailyResetTime,
+      weekly_reset_day: preset.weeklyResetDay,
+    })
+    .eq('id', gameId)
+  if (error) throw error
 }
 
 export async function deleteGame(id: string) {

@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
-import { PRESETS, type GamePreset } from '../data/presets'
-import { addGameFromPreset, deleteGame, fetchGames, type GameSummary } from '../lib/games'
+import { PRESETS, findPreset, findServer, type GamePreset } from '../data/presets'
+import { addGameFromPreset, changeServer, deleteGame, fetchGames, type GameSummary } from '../lib/games'
+import { messageOf } from '../lib/errors'
 
-function messageOf(err: unknown) {
-  return (err as { message?: string })?.message ?? 'Something went wrong'
-}
+const selectClass =
+  'h-9 rounded-lg border border-[#2E3445] bg-[#0D0F14] px-2 text-sm text-[#ECEEF3] outline-none [color-scheme:dark] focus:border-[#8B7CFF] disabled:opacity-50'
 
 export default function GamesScreen() {
   const [games, setGames] = useState<GameSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [serverChoice, setServerChoice] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -31,11 +32,11 @@ export default function GamesScreen() {
     else setGames(data)
   }
 
-  async function handleAdd(preset: GamePreset) {
-    setBusyId(preset.id)
+  async function run(id: string, action: () => Promise<void>) {
+    setBusyId(id)
     setError(null)
     try {
-      await addGameFromPreset(preset, games.length)
+      await action()
       await refresh()
     } catch (err) {
       setError(messageOf(err))
@@ -44,18 +45,14 @@ export default function GamesScreen() {
     }
   }
 
-  async function handleDelete(game: GameSummary) {
+  function handleAdd(preset: GamePreset) {
+    const serverId = serverChoice[preset.id] ?? preset.defaultServer
+    void run(preset.id, () => addGameFromPreset(preset, serverId, games.length))
+  }
+
+  function handleDelete(game: GameSummary) {
     if (!window.confirm(`Delete ${game.name}? Its tasks and history are removed too.`)) return
-    setBusyId(game.id)
-    setError(null)
-    try {
-      await deleteGame(game.id)
-      await refresh()
-    } catch (err) {
-      setError(messageOf(err))
-    } finally {
-      setBusyId(null)
-    }
+    void run(game.id, () => deleteGame(game.id))
   }
 
   const addedPresetIds = new Set(games.map((g) => g.preset_id))
@@ -66,10 +63,12 @@ export default function GamesScreen() {
         <h2 className="text-lg font-semibold">My games</h2>
         {loading && <p className="text-sm text-[#9AA1B2]">Loading…</p>}
         {!loading && games.length === 0 && (
-          <p className="text-sm text-[#9AA1B2]">No games yet. Add one from the presets below.</p>
+          <p className="text-sm text-[#9AA1B2]">No games yet. Add one below.</p>
         )}
 
         {games.map((game) => {
+          const preset = findPreset(game.preset_id)
+          const server = findServer(preset, game.server)
           const activeTasks = game.tasks.filter((t) => !t.archived)
           const daily = activeTasks.filter((t) => t.frequency === 'daily').length
           const weekly = activeTasks.length - daily
@@ -79,19 +78,31 @@ export default function GamesScreen() {
                 <div className="space-y-1">
                   <h3 className="font-semibold">{game.name}</h3>
                   <p className="text-xs text-[#9AA1B2]">
-                    {game.server ?? 'No server'} · resets {game.daily_reset_time.slice(0, 5)} · {daily} daily,{' '}
-                    {weekly} weekly tasks
+                    Resets {game.daily_reset_time.slice(0, 5)} server time · {daily} daily, {weekly} weekly tasks
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(game)}
-                  disabled={busyId !== null}
-                  className="h-9 rounded-lg border border-[#3A4052] px-3 text-sm text-[#FF8A8A] disabled:opacity-50"
-                >
+                <button type="button" onClick={() => handleDelete(game)} disabled={busyId !== null}
+                  className="h-9 rounded-lg border border-[#3A4052] px-3 text-sm text-[#FF8A8A] disabled:opacity-50">
                   Delete
                 </button>
               </div>
+
+              {preset ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm text-[#C9CDD8]">
+                  <label htmlFor={`server-${game.id}`}>Server</label>
+                  <select id={`server-${game.id}`} value={game.server ?? ''} disabled={busyId !== null}
+                    onChange={(e) => void run(game.id, () => changeServer(game.id, preset, e.target.value))}
+                    className={selectClass}>
+                    {!server && <option value={game.server ?? ''}>{game.server ?? 'Choose…'}</option>}
+                    {preset.servers.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="text-sm text-[#C9CDD8]">Server: {game.server ?? 'None'}</p>
+              )}
+              {server?.note && <p className="text-xs text-[#FFC56B]">{server.note}</p>}
 
               {game.stamina_meters.length > 0 && (
                 <ul className="space-y-1 text-sm text-[#C9CDD8]">
@@ -100,7 +111,7 @@ export default function GamesScreen() {
                     return (
                       <li key={meter.id}>
                         {meter.name}: cap {meter.cap}, 1 per {meter.minutes_per_point} min
-                        {parent && <span className="text-[#9AA1B2]"> · overflow from {parent.name} is full</span>}
+                        {parent && <span className="text-[#9AA1B2]"> · overflow from {parent.name}</span>}
                       </li>
                     )
                   })}
@@ -112,37 +123,45 @@ export default function GamesScreen() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Add from preset</h2>
+        <h2 className="text-lg font-semibold">Add a game</h2>
         <div className="grid gap-3 sm:grid-cols-3">
           {PRESETS.map((preset) => {
             const added = addedPresetIds.has(preset.id)
+            const chosen = serverChoice[preset.id] ?? preset.defaultServer
             return (
-              <button
-                key={preset.id}
-                type="button"
-                disabled={added || busyId !== null}
-                onClick={() => void handleAdd(preset)}
-                className="flex min-h-11 flex-col items-start gap-1 rounded-2xl border border-[#262B39] bg-[#161922] p-4 text-left hover:border-[#8B7CFF] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <span className="font-semibold">{preset.name}</span>
-                <span className="text-xs text-[#9AA1B2]">
-                  {added
-                    ? 'Added'
-                    : busyId === preset.id
-                      ? 'Adding…'
-                      : `${preset.meters.length} meter${preset.meters.length === 1 ? '' : 's'} · ${preset.tasks.length} tasks`}
-                </span>
-              </button>
+              <article key={preset.id}
+                className={`flex flex-col gap-3 rounded-2xl border border-[#262B39] bg-[#161922] p-4 ${added ? 'opacity-50' : ''}`}>
+                <div className="space-y-1">
+                  <h3 className="font-semibold">{preset.name}</h3>
+                  <p className="text-xs text-[#9AA1B2]">
+                    {preset.meters.length} meter{preset.meters.length === 1 ? '' : 's'} · {preset.tasks.length} tasks
+                  </p>
+                </div>
+                {added ? (
+                  <p className="text-sm text-[#9AA1B2]">Added</p>
+                ) : (
+                  <>
+                    <label className="sr-only" htmlFor={`new-server-${preset.id}`}>Server for {preset.name}</label>
+                    <select id={`new-server-${preset.id}`} value={chosen} disabled={busyId !== null}
+                      onChange={(e) => setServerChoice((prev) => ({ ...prev, [preset.id]: e.target.value }))}
+                      className={selectClass}>
+                      {preset.servers.map((s) => (
+                        <option key={s.id} value={s.id}>{s.label}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => handleAdd(preset)} disabled={busyId !== null}
+                      className="h-10 rounded-xl bg-[#8B7CFF] text-sm font-semibold text-[#0D0F14] disabled:opacity-60">
+                      {busyId === preset.id ? 'Adding…' : 'Add'}
+                    </button>
+                  </>
+                )}
+              </article>
             )
           })}
         </div>
       </section>
 
-      {error && (
-        <p role="alert" className="text-sm text-[#FF8A8A]">
-          {error}
-        </p>
-      )}
+      {error && <p role="alert" className="text-sm text-[#FF8A8A]">{error}</p>}
     </div>
   )
 }
