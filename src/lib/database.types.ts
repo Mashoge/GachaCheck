@@ -41,6 +41,7 @@ export type Database = {
     Tables: {
       completions: {
         Row: {
+          amount: number
           completed_at: string
           id: string
           period_start: string
@@ -48,6 +49,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          amount?: number
           completed_at?: string
           id?: string
           period_start: string
@@ -55,6 +57,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          amount?: number
           completed_at?: string
           id?: string
           period_start?: string
@@ -200,6 +203,7 @@ export type Database = {
           id: string
           minutes_per_point: number
           name: string
+          preset_key: string | null
           sort_order: number
           spend_presets: number[]
           user_id: string
@@ -215,6 +219,7 @@ export type Database = {
           id?: string
           minutes_per_point: number
           name: string
+          preset_key?: string | null
           sort_order?: number
           spend_presets?: number[]
           user_id?: string
@@ -230,6 +235,7 @@ export type Database = {
           id?: string
           minutes_per_point?: number
           name?: string
+          preset_key?: string | null
           sort_order?: number
           spend_presets?: number[]
           user_id?: string
@@ -256,33 +262,66 @@ export type Database = {
       tasks: {
         Row: {
           archived: boolean
+          category: string
           created_at: string
+          cycle_anchor: string | null
+          cycle_days: number | null
+          cycle_ends_at: string | null
+          due_at: string | null
           frequency: string
           game_id: string
+          hidden: boolean
           id: string
+          monthly_day: number | null
+          note: string | null
+          optional: boolean
+          preset_key: string | null
           sort_order: number
           title: string
           user_id: string
+          weekly_target: number | null
         }
         Insert: {
           archived?: boolean
+          category?: string
           created_at?: string
+          cycle_anchor?: string | null
+          cycle_days?: number | null
+          cycle_ends_at?: string | null
+          due_at?: string | null
           frequency?: string
           game_id: string
+          hidden?: boolean
           id?: string
+          monthly_day?: number | null
+          note?: string | null
+          optional?: boolean
+          preset_key?: string | null
           sort_order?: number
           title: string
           user_id?: string
+          weekly_target?: number | null
         }
         Update: {
           archived?: boolean
+          category?: string
           created_at?: string
+          cycle_anchor?: string | null
+          cycle_days?: number | null
+          cycle_ends_at?: string | null
+          due_at?: string | null
           frequency?: string
           game_id?: string
+          hidden?: boolean
           id?: string
+          monthly_day?: number | null
+          note?: string | null
+          optional?: boolean
+          preset_key?: string | null
           sort_order?: number
           title?: string
           user_id?: string
+          weekly_target?: number | null
         }
         Relationships: [
           {
