@@ -3,15 +3,37 @@ import { supabase } from './supabase'
 import { loadGames, type GameSummary } from './games'
 import { messageOf } from './errors'
 import { meterStates, type MeterState } from './stamina'
-import { dailyPeriod, formatWhen, isDoneIn, taskPeriod } from './time'
+import { countIn, dailyPeriod, formatWhen, taskPeriod, weeklyPeriod, type ResetClock } from './time'
 
-type Task = GameSummary['tasks'][number]
+export type Game = GameSummary
+export type Task = GameSummary['tasks'][number]
 export type EventRow = { id: string; game_id: string; name: string; ends_at: string }
+export type Completion = { id: string; at: string }
 
 export type TodayData = {
   games: GameSummary[]
-  completions: Map<string, string[]> // task id → completed_at timestamps
+  completions: Map<string, Completion[]> // task id → completions, oldest first
   events: EventRow[]
+}
+
+export const clockOf = (game: Game): ResetClock => ({
+  timezone: game.timezone,
+  daily_reset_time: game.daily_reset_time,
+  weekly_reset_day: game.weekly_reset_day,
+})
+
+// How many times a task was ticked in its current period, and whether that counts as done.
+// Tasks with a weekly target (e.g. "5 days a week") count across the week; a daily one can be ticked once a day.
+export function taskProgress(task: Task, data: TodayData, clock: ResetClock, now: Date) {
+  const ats = (data.completions.get(task.id) ?? []).map((c) => c.at)
+  const counted = task.weekly_target != null
+  const period = counted ? weeklyPeriod(clock, now) : taskPeriod(task, clock, now)
+  const count = period ? countIn(period, ats) : 0
+  const target = task.weekly_target ?? 1
+  const done = count >= target
+  const today = counted && task.frequency === 'daily' ? countIn(dailyPeriod(clock, now), ats) > 0 : false
+  // "done for now": hidden in What's left, counted as done in the group header
+  return { period, count, target, done, today, doneForNow: done || today }
 }
 
 // Loads games (syncing outdated presets), recent completions and upcoming events.
@@ -19,16 +41,16 @@ async function loadToday(): Promise<TodayData> {
   const since = new Date(Date.now() - 62 * 86_400_000).toISOString()
   const [games, completionsRes, eventsRes] = await Promise.all([
     loadGames(),
-    supabase.from('completions').select('task_id, completed_at').gte('completed_at', since),
+    supabase.from('completions').select('id, task_id, completed_at').gte('completed_at', since).order('completed_at'),
     supabase.from('events').select('id, game_id, name, ends_at').gte('ends_at', new Date().toISOString()).order('ends_at'),
   ])
   if (completionsRes.error) throw completionsRes.error
   if (eventsRes.error) throw eventsRes.error
 
-  const completions = new Map<string, string[]>()
+  const completions = new Map<string, Completion[]>()
   for (const c of completionsRes.data) {
     const list = completions.get(c.task_id) ?? []
-    list.push(c.completed_at)
+    list.push({ id: c.id, at: c.completed_at })
     completions.set(c.task_id, list)
   }
   return { games, completions, events: eventsRes.data }
@@ -61,7 +83,57 @@ export function useTodayData() {
     }
   }, [])
 
-  return { data, error, loading: !data && !error, refresh }
+  // Change the local copy right away so ticks feel instant; the server call follows.
+  const patchCompletions = useCallback((taskId: string, change: (list: Completion[]) => Completion[]) => {
+    setData((d) => {
+      if (!d) return d
+      const completions = new Map(d.completions)
+      completions.set(taskId, change(d.completions.get(taskId) ?? []))
+      return { ...d, completions }
+    })
+  }, [])
+
+  // Adds one completion for the task's current period (a tick, or +1 on a weekly target).
+  const addCompletion = useCallback(
+    async (taskId: string, periodStart: Date) => {
+      const tempId = `temp-${Date.now()}`
+      patchCompletions(taskId, (list) => [...list, { id: tempId, at: new Date().toISOString() }])
+      try {
+        const { data: session } = await supabase.auth.getSession()
+        const userId = session.session?.user.id
+        if (!userId) throw new Error('Signed out. Please sign in again.')
+        const { data: row, error: err } = await supabase
+          .from('completions')
+          .insert({ task_id: taskId, user_id: userId, period_start: periodStart.toISOString(), amount: 1 })
+          .select('id, completed_at')
+          .single()
+        if (err) throw err
+        patchCompletions(taskId, (list) => list.map((c) => (c.id === tempId ? { id: row.id, at: row.completed_at } : c)))
+      } catch (err) {
+        setError(messageOf(err))
+        await refresh()
+      }
+    },
+    [patchCompletions, refresh],
+  )
+
+  // Removes completions by id (untick removes all in the period; −1 removes the newest).
+  const removeCompletions = useCallback(
+    async (taskId: string, ids: string[]) => {
+      if (ids.length === 0) return
+      patchCompletions(taskId, (list) => list.filter((c) => !ids.includes(c.id)))
+      try {
+        const { error: err } = await supabase.from('completions').delete().in('id', ids)
+        if (err) throw err
+      } catch (err) {
+        setError(messageOf(err))
+        await refresh()
+      }
+    },
+    [patchCompletions, refresh],
+  )
+
+  return { data, error, loading: !data && !error, refresh, addCompletion, removeCompletions }
 }
 
 // ---- What Today shows ----
@@ -87,12 +159,10 @@ export type GameCard = {
 }
 
 const DAY = 86_400_000
-const visible = (t: Task) => !t.archived && !t.hidden
+export const isVisible = (t: Task) => !t.archived && !t.hidden
 
 // Optional tasks (subscriptions, mail) don't count towards "dailies left".
-function counted(t: Task) {
-  return visible(t) && !t.optional
-}
+const counted = (t: Task) => isVisible(t) && !t.optional
 
 export function buildToday(data: TodayData, now: Date) {
   const horizon = now.getTime() + DAY
@@ -101,12 +171,9 @@ export function buildToday(data: TodayData, now: Date) {
 
   for (const game of data.games) {
     const presetId = game.preset_id ?? game.id
-    const clock = { timezone: game.timezone, daily_reset_time: game.daily_reset_time, weekly_reset_day: game.weekly_reset_day }
+    const clock = clockOf(game)
     const day = dailyPeriod(clock, now)
-    const doneFor = (t: Task) => {
-      const period = taskPeriod(t, clock, now)
-      return period ? isDoneIn(period, data.completions.get(t.id) ?? []) : false
-    }
+    const doneFor = (t: Task) => taskProgress(t, data, clock, now).done
 
     // Dailies
     const dailies = game.tasks.filter((t) => t.frequency === 'daily' && counted(t))
@@ -131,10 +198,10 @@ export function buildToday(data: TodayData, now: Date) {
 
     // Endgame not cleared and ending within 24 h; also the soonest one for the card
     let soonest: GameCard['note'] = null
-    for (const t of game.tasks.filter((x) => x.category === 'endgame' && visible(x))) {
-      const period = taskPeriod(t, clock, now)
-      if (!period?.end || doneFor(t)) continue
-      const at = period.end
+    for (const t of game.tasks.filter((x) => x.category === 'endgame' && isVisible(x))) {
+      const progress = taskProgress(t, data, clock, now)
+      if (!progress.period?.end || progress.done) continue
+      const at = progress.period.end
       if (at.getTime() <= horizon) {
         attention.push({ key: t.id, presetId, gameName: game.name, title: `${t.title} not cleared`, at, urgent: true })
       }

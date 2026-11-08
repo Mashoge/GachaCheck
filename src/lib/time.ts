@@ -123,13 +123,14 @@ function parseServerLocal(value: string, tz: string): Date {
   return zonedTime(y, m, d, h || 0, mi || 0, tz)
 }
 
-export function isDoneIn(period: Period, completedAts: string[]): boolean {
+// How many completions fall inside the period.
+export function countIn(period: Period, completedAts: string[]): number {
   const start = period.start.getTime()
   const end = period.end ? period.end.getTime() : Infinity
-  return completedAts.some((iso) => {
+  return completedAts.filter((iso) => {
     const t = new Date(iso).getTime()
     return t >= start && t < end
-  })
+  }).length
 }
 
 // ---- Formatting ----
