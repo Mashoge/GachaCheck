@@ -1,1 +1,25 @@
 @import "tailwindcss";
+
+/* Neutral Phase 2 look. One place for every colour and font.
+   Game themes (Phase 7) will add their own values on top of these. */
+@theme {
+  --color-page: #0d0f14;
+  --color-surface: #151821;
+  --color-raised: #1c202b;
+  --color-line: #262b39;
+  --color-ink: #eceef3;
+  --color-muted: #9aa1b2;
+  --color-accent: #b9b0ff;
+  --color-on-accent: #0d0f14;
+  --color-active: #24214a;
+  --color-urgent: #ffb08a;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-page text-ink font-sans antialiased;
+  }
+}
