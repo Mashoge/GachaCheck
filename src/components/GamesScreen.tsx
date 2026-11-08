@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PRESETS, findPreset, findServer, type GamePreset } from '../data/presets'
-import { addGameFromPreset, changeServer, deleteGame, fetchGames, type GameSummary } from '../lib/games'
+import { addGameFromPreset, changeServer, deleteGame, loadGames, type GameSummary } from '../lib/games'
 import { messageOf } from '../lib/errors'
 
 const selectClass =
@@ -13,23 +13,25 @@ export default function GamesScreen() {
   const [error, setError] = useState<string | null>(null)
   const [serverChoice, setServerChoice] = useState<Record<string, string>>({})
 
-  useEffect(() => {
+   useEffect(() => {
     let cancelled = false
-    fetchGames().then(({ data, error }) => {
-      if (cancelled) return
-      if (error) setError(error.message)
-      else setGames(data)
-      setLoading(false)
-    })
+    loadGames()
+      .then((data) => {
+        if (!cancelled) setGames(data)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(messageOf(err))
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
     return () => {
       cancelled = true
     }
   }, [])
 
   async function refresh() {
-    const { data, error } = await fetchGames()
-    if (error) setError(error.message)
-    else setGames(data)
+    setGames(await loadGames())
   }
 
   async function run(id: string, action: () => Promise<void>) {
@@ -69,16 +71,20 @@ export default function GamesScreen() {
         {games.map((game) => {
           const preset = findPreset(game.preset_id)
           const server = findServer(preset, game.server)
-          const activeTasks = game.tasks.filter((t) => !t.archived)
-          const daily = activeTasks.filter((t) => t.frequency === 'daily').length
-          const weekly = activeTasks.length - daily
+                    const active = game.tasks.filter((t) => !t.archived)
+          const visible = active.filter((t) => !t.hidden)
+          const routine = (rule: string) =>
+            visible.filter((t) => t.category === 'routine' && t.frequency === rule).length
+          const endgameCount = visible.filter((t) => t.category === 'endgame').length
+          const hiddenCount = active.length - visible.length
+          const summary = `${routine('daily')} daily · ${routine('weekly')} weekly · ${routine('monthly')} monthly · ${endgameCount} endgame${hiddenCount ? ` · ${hiddenCount} hidden` : ''}`
           return (
             <article key={game.id} className="space-y-3 rounded-2xl border border-[#262B39] bg-[#161922] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
                   <h3 className="font-semibold">{game.name}</h3>
                   <p className="text-xs text-[#9AA1B2]">
-                    Resets {game.daily_reset_time.slice(0, 5)} server time · {daily} daily, {weekly} weekly tasks
+                    Resets {game.daily_reset_time.slice(0, 5)} server time · {summary}
                   </p>
                 </div>
                 <button type="button" onClick={() => handleDelete(game)} disabled={busyId !== null}
