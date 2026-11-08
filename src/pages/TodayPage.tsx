@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
 import { buildToday, useTodayData } from '../lib/today'
-import { formatClock, formatDuration } from '../lib/time'
+import { formatClock, formatDuration, formatWhen } from '../lib/time'
 import { useNow } from '../lib/useNow'
 
 // Small colour cue per game; the only game-specific colour in the neutral look.
@@ -94,14 +94,18 @@ export default function TodayPage() {
                     </span>
 
                     {card.meter && (
-                      <span className="flex justify-between gap-3 text-sm">
-                        <span className="text-muted">{card.meter.name}</span>
-                        <span className={`font-semibold ${card.meter.full ? 'text-urgent' : ''}`}>
-                          {card.meter.value} / {card.meter.cap}
-                          {card.meter.full ? ' · full' : card.meter.fullAt ? ` · full ${formatClock(card.meter.fullAt)}` : ''}
-                        </span>
-                      </span>
-                    )}
+  <span className="flex flex-col gap-0.5 text-sm">
+    <span className="flex justify-between gap-3">
+      <span className="text-muted">{card.meter.name}</span>
+      <span className={`whitespace-nowrap font-semibold ${card.meter.full ? 'text-urgent' : ''}`}>
+        {card.meter.value} / {card.meter.cap}
+      </span>
+    </span>
+    <span className={`text-right text-xs ${card.meter.full ? 'text-urgent' : 'text-muted'}`}>
+      {card.meter.full ? 'Full now' : card.meter.fullAt ? `Full ${formatWhen(card.meter.fullAt, now)}` : ''}
+    </span>
+  </span>
+)}
 
                     {card.note && (
                       <span className={`text-xs ${card.note.soon ? 'text-urgent' : 'text-muted'}`}>

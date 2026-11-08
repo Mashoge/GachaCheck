@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 import { loadGames, type GameSummary } from './games'
 import { messageOf } from './errors'
 import { meterStates, type MeterState } from './stamina'
-import { dailyPeriod, formatClock, isDoneIn, taskPeriod } from './time'
+import { dailyPeriod, formatWhen, isDoneIn, taskPeriod } from './time'
 
 type Task = GameSummary['tasks'][number]
 export type EventRow = { id: string; game_id: string; name: string; ends_at: string }
@@ -125,7 +125,7 @@ export function buildToday(data: TodayData, now: Date) {
       if (m.full) {
         attention.push({ key: m.id, presetId, gameName: game.name, title: `${m.name} ${m.name.endsWith('s') ? 'are' : 'is'} full`, at: now, urgent: true })
       } else if (m.value >= m.cap * 0.9 && m.fullAt && m.fullAt.getTime() <= horizon) {
-        attention.push({ key: m.id, presetId, gameName: game.name, title: `${m.name} caps at ${formatClock(m.fullAt)}`, at: m.fullAt, urgent: false })
+        attention.push({ key: m.id, presetId, gameName: game.name, title: `${m.name} caps at ${formatWhen(m.fullAt, now)}`, at: m.fullAt, urgent: false })
       }
     }
 

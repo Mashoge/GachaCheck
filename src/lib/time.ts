@@ -149,3 +149,15 @@ export function formatDuration(ms: number): string {
 export function formatClock(date: Date): string {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
+
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+
+// "7:56 AM" today, "tomorrow 7:56 AM", "Wed 7:56 AM" this week, otherwise "Nov 20, 7:56 AM"
+export function formatWhen(date: Date, now: Date): string {
+  const time = formatClock(date)
+  const days = Math.round((startOfDay(date) - startOfDay(now)) / 86_400_000)
+  if (days === 0) return time
+  if (days === 1) return `tomorrow ${time}`
+  if (days > 1 && days < 7) return `${date.toLocaleDateString([], { weekday: 'short' })} ${time}`
+  return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`
+}
