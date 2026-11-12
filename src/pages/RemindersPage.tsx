@@ -11,19 +11,21 @@ type Settings = {
   nudge_time: string
   quiet_start: string | null
   quiet_end: string | null
+  event_reminder_days: number
   last_reminder_run_at: string | null
 }
 
-type GameSwitches = { id: string; name: string; notify_nudge: boolean; notify_stamina: boolean }
+type GameSwitches = { id: string; name: string; notify_nudge: boolean; notify_stamina: boolean; notify_events: boolean }
 
-const SETTINGS_COLUMNS = 'user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, last_reminder_run_at'
+const SETTINGS_COLUMNS = 'user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, event_reminder_days, last_reminder_run_at'
+const EVENT_DAY_CHOICES = [0, 1, 2, 3, 5, 7]
 const STALE_AFTER_MS = 45 * 60_000 // the schedule runs every 15 minutes
 const hhmm = (time: string | null) => (time ?? '').slice(0, 5)
 
 async function load() {
   const [settingsRes, gamesRes] = await Promise.all([
     supabase.from('user_settings').select(SETTINGS_COLUMNS).maybeSingle(),
-    supabase.from('games').select('id, name, notify_nudge, notify_stamina').order('created_at'),
+    supabase.from('games').select('id, name, notify_nudge, notify_stamina, notify_events').order('created_at'),
   ])
   if (settingsRes.error) throw settingsRes.error
   if (gamesRes.error) throw gamesRes.error
@@ -118,7 +120,7 @@ export default function RemindersPage() {
             <div className="flex items-center justify-between gap-4">
               <div className="flex flex-col gap-0.5">
                 <h2 className="text-sm font-semibold">Evening nudge</h2>
-                <p className="text-sm text-muted">One message listing unticked dailies, and endgame that ends within 24 hours.</p>
+                <p className="text-sm text-muted">One message listing unticked dailies, plus endgame and events that end within 24 hours.</p>
               </div>
               <Switch label="Evening nudge" on={settings.nudge_enabled} onChange={(on) => void saveSettings({ nudge_enabled: on })} />
             </div>
@@ -137,7 +139,7 @@ export default function RemindersPage() {
               <div className="flex flex-col gap-0.5">
                 <h2 className="text-sm font-semibold">Quiet hours</h2>
                 <p className="text-sm text-muted">
-                  Stamina pings wait until quiet hours end, then arrive with the current value. The evening nudge is not affected.
+                  Stamina pings and event reminders wait until quiet hours end. The evening nudge is not affected.
                 </p>
               </div>
               <Switch
@@ -154,6 +156,28 @@ export default function RemindersPage() {
             )}
           </section>
 
+          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-5">
+            <div className="flex flex-col gap-0.5">
+              <h2 className="text-sm font-semibold">Event reminder</h2>
+              <p className="text-sm text-muted">One message per event before it ends, with your progress note. Events marked as done are skipped.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <label htmlFor="event-days" className="text-sm text-muted">Remind me</label>
+              <select
+                id="event-days"
+                value={settings.event_reminder_days}
+                onChange={(e) => void saveSettings({ event_reminder_days: Number(e.target.value) })}
+                className="min-h-10 rounded-lg border border-line bg-page px-3 text-sm text-ink"
+              >
+                {(EVENT_DAY_CHOICES.includes(settings.event_reminder_days) ? EVENT_DAY_CHOICES : [...EVENT_DAY_CHOICES, settings.event_reminder_days]).map((n) => (
+                  <option key={n} value={n}>
+                    {n === 0 ? 'Never' : n === 1 ? '1 day before' : `${n} days before`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </section>
+
           <section className="flex flex-col rounded-2xl border border-line bg-surface p-5">
             <h2 className="text-sm font-semibold">Per game</h2>
             <p className="pb-2 text-sm text-muted">Stamina pings are sent once per fill-up, when a meter reaches 90%.</p>
@@ -161,7 +185,7 @@ export default function RemindersPage() {
             {games.map((g) => (
               <div key={g.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line py-3">
                 <span className="text-sm font-medium">{g.name}</span>
-                <div className="flex items-center gap-5">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                   <span className="flex items-center gap-2 text-sm text-muted">
                     Nudge
                     <Switch label={`${g.name} in the evening nudge`} on={g.notify_nudge} onChange={(on) => void saveGame(g.id, { notify_nudge: on })} />
@@ -169,6 +193,10 @@ export default function RemindersPage() {
                   <span className="flex items-center gap-2 text-sm text-muted">
                     Stamina
                     <Switch label={`${g.name} stamina pings`} on={g.notify_stamina} onChange={(on) => void saveGame(g.id, { notify_stamina: on })} />
+                  </span>
+                  <span className="flex items-center gap-2 text-sm text-muted">
+                    Events
+                    <Switch label={`${g.name} event reminders`} on={g.notify_events} onChange={(on) => void saveGame(g.id, { notify_events: on })} />
                   </span>
                 </div>
               </div>

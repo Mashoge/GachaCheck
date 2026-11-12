@@ -7,7 +7,7 @@ import AppShell from './components/AppShell'
 import GamesScreen from './components/GamesScreen'
 import TodayPage from './pages/TodayPage'
 import GamePage from './pages/GamePage'
-import PlaceholderPage from './pages/PlaceholderPage'
+import EventsPage from './pages/EventsPage'
 import RemindersPage from './pages/RemindersPage'
 
 export default function App() {
@@ -39,7 +39,7 @@ export default function App() {
             </div>
           }
         />
-        <Route path="events" element={<PlaceholderPage title="Events" note="Event countdowns arrive in Phase 5." />} />
+        <Route path="events" element={<EventsPage />} />
         <Route path="reminders" element={<RemindersPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

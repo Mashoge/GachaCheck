@@ -22,6 +22,7 @@ export type ReminderGame = {
   weekly_reset_day: number
   notify_nudge: boolean
   notify_stamina: boolean
+  notify_events?: boolean
   skipped_until: string | null
   tasks: ReminderTask[]
   stamina_meters: MeterRow[]
@@ -34,10 +35,22 @@ export type ReminderSettings = {
   nudge_time: string // 'HH:MM' or 'HH:MM:SS' in the user's timezone
   quiet_start?: string | null // stamina pings wait between these two times (user's timezone)
   quiet_end?: string | null
+  event_reminder_days?: number // remind this many days before an event ends (0 = off)
+}
+
+export type ReminderEvent = {
+  id: string
+  game_id: string
+  name: string
+  starts_at: string | null // null = already running
+  ends_at: string
+  note: string | null
+  remind: boolean
+  completed_at: string | null
 }
 
 export type Reminder = {
-  kind: 'stamina' | 'nudge'
+  kind: 'stamina' | 'nudge' | 'event'
   key: string // saved in notify_log so the same reminder is never sent twice
   text: string
 }
@@ -62,6 +75,10 @@ const clockOf = (g: ReminderGame): ResetClock => ({
 })
 
 const isSkipped = (g: ReminderGame, now: Date) => !!g.skipped_until && new Date(g.skipped_until) > now
+
+// Running right now and not marked as done
+const isLive = (e: ReminderEvent, now: Date) =>
+  !e.completed_at && new Date(e.ends_at) > now && (!e.starts_at || new Date(e.starts_at) <= now)
 const isVisible = (t: ReminderTask) => !t.archived && !t.hidden
 
 // Same rules as the app: weekly-target tasks count across the week, and a daily one ticked today is done for now.
@@ -114,9 +131,10 @@ export type GameLeft = {
   resetAt: Date
   dailies: string[]
   endgame: { title: string; endsAt: Date }[]
+  events: { name: string; endsAt: Date }[]
 }
 
-export function whatsLeft(games: ReminderGame[], completions: Completions, now: Date): GameLeft[] {
+export function whatsLeft(games: ReminderGame[], completions: Completions, now: Date, events: ReminderEvent[] = []): GameLeft[] {
   const out: GameLeft[] = []
   for (const game of games) {
     if (!game.notify_nudge || isSkipped(game, now)) continue
@@ -135,8 +153,13 @@ export function whatsLeft(games: ReminderGame[], completions: Completions, now: 
       if (p.period.end.getTime() - now.getTime() <= ENDGAME_HORIZON_MS) endgame.push({ title: t.title, endsAt: p.period.end })
     }
 
-    if (dailies.length > 0 || endgame.length > 0) {
-      out.push({ game: game.name, resetAt: dailyPeriod(clock, now).end!, dailies, endgame })
+    // Events that end within 24 hours and aren't marked as done
+    const ending = events
+      .filter((e) => e.game_id === game.id && isLive(e, now) && new Date(e.ends_at).getTime() - now.getTime() <= ENDGAME_HORIZON_MS)
+      .map((e) => ({ name: e.name, endsAt: new Date(e.ends_at) }))
+
+    if (dailies.length > 0 || endgame.length > 0 || ending.length > 0) {
+      out.push({ game: game.name, resetAt: dailyPeriod(clock, now).end!, dailies, endgame, events: ending })
     }
   }
   return out
@@ -147,12 +170,12 @@ export function lastNudgeTime(settings: ReminderSettings, now: Date): Date {
   return dailyPeriod({ timezone: settings.timezone, daily_reset_time: settings.nudge_time, weekly_reset_day: 1 }, now).start
 }
 
-export function nudgeReminder(settings: ReminderSettings, games: ReminderGame[], completions: Completions, now: Date): Reminder | null {
+export function nudgeReminder(settings: ReminderSettings, games: ReminderGame[], completions: Completions, now: Date, events: ReminderEvent[] = []): Reminder | null {
   if (!settings.nudge_enabled) return null
   const at = lastNudgeTime(settings, now)
   if (now.getTime() - at.getTime() >= NUDGE_WINDOW_MS) return null
 
-  const left = whatsLeft(games, completions, now)
+  const left = whatsLeft(games, completions, now, events)
   if (left.length === 0) return null
 
   const lines = ['**Still to do today**']
@@ -160,15 +183,41 @@ export function nudgeReminder(settings: ReminderSettings, games: ReminderGame[],
     lines.push('', `**${g.game}** (daily reset ${relative(g.resetAt)})`)
     for (const title of g.dailies) lines.push(`- ${title}`)
     for (const e of g.endgame) lines.push(`- ${e.title} not cleared, resets ${relative(e.endsAt)}`)
+    for (const e of g.events) lines.push(`- Event: ${e.name} ends ${relative(e.endsAt)}`)
   }
   return { kind: 'nudge', key: `nudge:${settings.user_id}:${at.toISOString()}`, text: lines.join('\n') }
 }
 
-export function buildReminders(settings: ReminderSettings, games: ReminderGame[], completions: Completions, now: Date): Reminder[] {
-  const nudge = nudgeReminder(settings, games, completions, now)
-  // Held pings are not recorded as sent, so they go out once quiet hours are over.
-  const stamina = inQuietHours(settings, now) ? [] : staminaReminders(games, now)
-  return [...stamina, ...(nudge ? [nudge] : [])]
+// ---- Events: one reminder per event, a set number of days before it ends ----
+
+export function eventReminders(settings: ReminderSettings, games: ReminderGame[], events: ReminderEvent[], now: Date): Reminder[] {
+  const days = settings.event_reminder_days ?? 2
+  if (days <= 0) return []
+  const out: Reminder[] = []
+  for (const e of events) {
+    const game = games.find((g) => g.id === e.game_id)
+    if (!game || game.notify_events === false || isSkipped(game, now)) continue
+    if (!e.remind || !isLive(e, now)) continue
+    const endsAt = new Date(e.ends_at)
+    if (endsAt.getTime() - now.getTime() > days * 24 * HOUR) continue
+    const note = e.note?.trim() ? ` Progress: ${e.note.trim()}` : ''
+    out.push({
+      kind: 'event',
+      // The end time is part of the key, so moving the end date allows a fresh reminder.
+      key: `event:${e.id}:${endsAt.toISOString()}`,
+      text: `**${game.name}**: ${e.name} ends ${relative(endsAt)} (<t:${unix(endsAt)}:f>).${note}`,
+    })
+  }
+  return out
+}
+
+export function buildReminders(settings: ReminderSettings, games: ReminderGame[], completions: Completions, now: Date, events: ReminderEvent[] = []): Reminder[] {
+  const nudge = nudgeReminder(settings, games, completions, now, events)
+  // Held reminders are not recorded as sent, so they go out once quiet hours are over.
+  const held = inQuietHours(settings, now)
+  const stamina = held ? [] : staminaReminders(games, now)
+  const ending = held ? [] : eventReminders(settings, games, events, now)
+  return [...stamina, ...ending, ...(nudge ? [nudge] : [])]
 }
 
 // Discord allows 2,000 characters per message; group reminders into messages under that.

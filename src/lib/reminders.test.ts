@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildReminders, inQuietHours, nudgeReminder, staminaReminders, toMessages, whatsLeft,
-  type Completions, type ReminderGame, type ReminderSettings, type ReminderTask,
+  buildReminders, eventReminders, inQuietHours, nudgeReminder, staminaReminders, toMessages, whatsLeft,
+  type Completions, type ReminderEvent, type ReminderGame, type ReminderSettings, type ReminderTask,
 } from '../../supabase/functions/_shared/reminders.ts'
 
 const at = (iso: string) => new Date(iso)
@@ -105,6 +105,7 @@ describe("what's left", () => {
     const [g] = whatsLeft([game({ tasks: [soon, later] })], ticks({}), NINE_PM)
     expect(g.dailies).toEqual([])
     expect(g.endgame).toEqual([{ title: 'Endstate Matrix', endsAt: at('2026-11-13T04:00:00+08:00') }])
+    expect(g.events).toEqual([])
   })
 
   it('leaves out endgame that is already cleared this cycle', () => {
@@ -189,6 +190,67 @@ describe('quiet hours', () => {
     const early = { ...settings, quiet_start: '20:00', quiet_end: '07:00' }
     const g = game({ tasks: [task('Daily activity')] })
     expect(buildReminders(early, [g], ticks({}), NINE_PM).map((r) => r.kind)).toEqual(['nudge'])
+  })
+})
+
+describe('event reminders', () => {
+  // Ends Nov 20, 3:59 AM. With 2 days' notice the reminder is due from Nov 18, 3:59 AM.
+  const event = (extra: Partial<ReminderEvent> = {}): ReminderEvent => ({
+    id: 'e1', game_id: 'g1', name: 'Overdash Club', starts_at: null, ends_at: '2026-11-20T03:59:00+08:00',
+    note: null, remind: true, completed_at: null, ...extra,
+  })
+  const games = [game()]
+  const twoDays = { ...settings, event_reminder_days: 2 }
+  const BEFORE = at('2026-11-18T03:00:00+08:00')
+  const DUE = at('2026-11-18T04:00:00+08:00')
+
+  it('stays quiet until 2 days before the end, then reminds once with the same key', () => {
+    expect(eventReminders(twoDays, games, [event()], BEFORE)).toEqual([])
+    const [first] = eventReminders(twoDays, games, [event()], DUE)
+    const [later] = eventReminders(twoDays, games, [event()], at('2026-11-19T20:00:00+08:00'))
+    expect(first.kind).toBe('event')
+    expect(first.text).toContain('**Wuthering Waves**: Overdash Club ends')
+    expect(later.key).toBe(first.key)
+  })
+
+  it('includes the progress note', () => {
+    const [r] = eventReminders(twoDays, games, [event({ note: '3 of 5 stages' })], DUE)
+    expect(r.text).toContain('Progress: 3 of 5 stages')
+  })
+
+  it('uses the number of days from settings; 0 turns it off', () => {
+    expect(eventReminders({ ...settings, event_reminder_days: 5 }, games, [event()], at('2026-11-15T04:00:00+08:00'))).toHaveLength(1)
+    expect(eventReminders({ ...settings, event_reminder_days: 0 }, games, [event()], DUE)).toEqual([])
+  })
+
+  it('skips events that are done, ended, not started, or have reminders off', () => {
+    expect(eventReminders(twoDays, games, [event({ completed_at: '2026-11-17T10:00:00+08:00' })], DUE)).toEqual([])
+    expect(eventReminders(twoDays, games, [event()], at('2026-11-20T04:00:00+08:00'))).toEqual([])
+    expect(eventReminders(twoDays, games, [event({ starts_at: '2026-11-19T10:00:00+08:00' })], DUE)).toEqual([])
+    expect(eventReminders(twoDays, games, [event({ remind: false })], DUE)).toEqual([])
+  })
+
+  it('respects the per-game Events switch', () => {
+    expect(eventReminders(twoDays, [game({ notify_events: false })], [event()], DUE)).toEqual([])
+  })
+
+  it('gets a new key when the end date is moved', () => {
+    const [a] = eventReminders(twoDays, games, [event()], DUE)
+    const [b] = eventReminders(twoDays, games, [event({ ends_at: '2026-11-20T10:00:00+08:00' })], at('2026-11-18T12:00:00+08:00'))
+    expect(b.key).not.toBe(a.key)
+  })
+
+  it('is held during quiet hours, like stamina pings', () => {
+    const quiet = { ...twoDays, quiet_start: '23:00', quiet_end: '07:00' }
+    expect(buildReminders(quiet, games, ticks({}), DUE, [event()])).toEqual([])
+    expect(buildReminders(quiet, games, ticks({}), at('2026-11-18T07:00:00+08:00'), [event()]).map((r) => r.kind)).toEqual(['event'])
+  })
+
+  it('adds events ending within 24 hours to the evening nudge', () => {
+    const soon = event({ ends_at: '2026-11-13T03:59:00+08:00' })
+    const [g] = whatsLeft(games, ticks({}), NINE_PM, [soon, event()])
+    expect(g.events).toEqual([{ name: 'Overdash Club', endsAt: at('2026-11-13T03:59:00+08:00') }])
+    expect(nudgeReminder(settings, games, ticks({}), NINE_PM, [soon])!.text).toContain('- Event: Overdash Club ends')
   })
 })
 

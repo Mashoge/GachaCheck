@@ -11,12 +11,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
   buildReminders, inQuietHours, lastNudgeTime, toMessages, whatsLeft,
-  type Completions, type Reminder, type ReminderGame, type ReminderSettings,
+  type Completions, type Reminder, type ReminderEvent, type ReminderGame, type ReminderSettings,
 } from '../_shared/reminders.ts'
 import { meterStates } from '../_shared/stamina.ts'
 
 const GAME_COLUMNS =
-  'id, user_id, name, timezone, daily_reset_time, weekly_reset_day, notify_nudge, notify_stamina, skipped_until, ' +
+  'id, user_id, name, timezone, daily_reset_time, weekly_reset_day, notify_nudge, notify_stamina, notify_events, skipped_until, ' +
   'tasks(id, title, frequency, category, hidden, optional, archived, weekly_target, monthly_day, cycle_anchor, cycle_days, cycle_ends_at), ' +
   'stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at)'
 
@@ -58,14 +58,17 @@ Deno.serve(async (req) => {
   try {
     const db = adminClient()
     const since = new Date(now.getTime() - 62 * 86_400_000).toISOString()
-    const [settingsRes, gamesRes, completionsRes] = await Promise.all([
-      db.from('user_settings').select('user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end'),
+    const [settingsRes, gamesRes, completionsRes, eventsRes] = await Promise.all([
+      db.from('user_settings').select('user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, event_reminder_days'),
       db.from('games').select(GAME_COLUMNS).order('sort_order'),
       db.from('completions').select('task_id, completed_at').gte('completed_at', since),
+      db.from('events').select('id, user_id, game_id, name, starts_at, ends_at, note, remind, completed_at').gt('ends_at', now.toISOString()).is('completed_at', null),
     ])
     if (settingsRes.error) throw settingsRes.error
     if (gamesRes.error) throw gamesRes.error
     if (completionsRes.error) throw completionsRes.error
+    if (eventsRes.error) throw eventsRes.error
+    const allEvents = eventsRes.data as (ReminderEvent & { user_id: string })[]
 
     const allGames = gamesRes.data as unknown as (ReminderGame & { user_id: string })[]
     const completions: Completions = new Map()
@@ -80,7 +83,8 @@ Deno.serve(async (req) => {
       // One user's problem must not stop the others.
       try {
         const games = allGames.filter((g) => g.user_id === settings.user_id)
-        const due = buildReminders(settings, games, completions, now)
+        const events = allEvents.filter((e) => e.user_id === settings.user_id)
+        const due = buildReminders(settings, games, completions, now, events)
 
         if (dry) {
           const sent = new Set<string>()
@@ -99,11 +103,13 @@ Deno.serve(async (req) => {
               meters: games.flatMap((g) =>
                 meterStates(g.stamina_meters, now).filter((m) => !m.isOverflow).map((m) => `${g.name}: ${m.name} ${m.value}/${m.cap}`),
               ),
-              left: whatsLeft(games, completions, now).map((g) => ({
+              left: whatsLeft(games, completions, now, events).map((g) => ({
                 game: g.game,
                 dailies: g.dailies,
                 endgame: g.endgame.map((e) => `${e.title} (ends ${e.endsAt.toISOString()})`),
+                events: g.events.map((e) => `${e.name} (ends ${e.endsAt.toISOString()})`),
               })),
+              openEvents: events.length,
             },
           })
           continue

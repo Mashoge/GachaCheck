@@ -76,6 +76,7 @@ export type Database = {
       }
       events: {
         Row: {
+          completed_at: string | null
           created_at: string
           ends_at: string
           game_id: string
@@ -83,9 +84,11 @@ export type Database = {
           name: string
           note: string | null
           remind: boolean
+          starts_at: string | null
           user_id: string
         }
         Insert: {
+          completed_at?: string | null
           created_at?: string
           ends_at: string
           game_id: string
@@ -93,9 +96,11 @@ export type Database = {
           name: string
           note?: string | null
           remind?: boolean
+          starts_at?: string | null
           user_id?: string
         }
         Update: {
+          completed_at?: string | null
           created_at?: string
           ends_at?: string
           game_id?: string
@@ -103,6 +108,7 @@ export type Database = {
           name?: string
           note?: string | null
           remind?: boolean
+          starts_at?: string | null
           user_id?: string
         }
         Relationships: [
