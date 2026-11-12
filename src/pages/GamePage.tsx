@@ -1,11 +1,12 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
+import SpendPrompt from '../components/SpendPrompt'
 import { Link, NavLink, useParams } from 'react-router'
 import { findPreset, findServer } from '../data/presets'
 import { meterStates, type MeterRow, type MeterState } from '../lib/stamina'
 import { messageOf } from '../lib/errors'
 import { setCycleDates } from '../lib/games'
 import { dailyPeriod, formatDuration, formatWhen, weeklyPeriod, zonedTime } from '../lib/time'
-import { clockOf, isVisible, taskProgress, useTodayData, type Task, type TodayData } from '../lib/today'
+import { clockOf, dailiesLeft, isVisible, periodCompletionIds, taskProgress, useTodayData, type Task, type TodayData } from '../lib/today'
 import { SHORT_NAMES } from '../lib/useGames'
 import { useNow } from '../lib/useNow'
 
@@ -128,16 +129,7 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, o
   const events = data.events.filter((e) => e.game_id === game.id)
 
   const progressOf = (t: Task) => taskProgress(t, data, clock, now)
-  const completionIds = (t: Task) => {
-    const p = progressOf(t).period
-    if (!p) return []
-    const start = p.start.getTime()
-    const end = p.end ? p.end.getTime() : Infinity
-    return (data.completions.get(t.id) ?? []).filter((c) => {
-      const at = new Date(c.at).getTime()
-      return at >= start && at < end
-    }).map((c) => c.id)
-  }
+  const completionIds = (t: Task) => periodCompletionIds(t, data, clock, now)
 
   // A "Spend …" task is linked to a stamina meter in the preset. Ticking it asks what the meter shows now,
   // so reminders keep working from a real value.
@@ -146,6 +138,28 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, o
     const key = preset?.tasks.find((pt) => pt.key === t.preset_key)?.meter
     const row = key ? game.stamina_meters.find((m) => m.preset_key === key) : undefined
     return row ? meters.find((m) => m.id === row.id) : undefined
+  }
+
+  // "All done": ticks every daily left, then asks for the stamina value once. Undo is offered for a minute.
+  const left = dailiesLeft(game, data, now)
+  const [bulk, setBulk] = useState<Task[] | null>(null)
+  useEffect(() => {
+    if (!bulk) return
+    const id = setTimeout(() => setBulk(null), 60_000)
+    return () => clearTimeout(id)
+  }, [bulk])
+  const tickAll = () => {
+    for (const t of left) onTick(t, progressOf(t).period!.start)
+    setBulk(left)
+    const spend = left.find((t) => meterFor(t))
+    if (spend) setAskFor(spend.id)
+  }
+  const bulkSaving = !!bulk && bulk.some((t) => completionIds(t).some((id) => id.startsWith('temp-')))
+  const undoAll = () => {
+    if (!bulk) return
+    for (const t of bulk) onRemove(t, completionIds(t))
+    setBulk(null)
+    setAskFor(null)
   }
 
   const toggle = (t: Task) => {
@@ -197,9 +211,21 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, o
             const shown = quick ? group.items.filter((t) => !progressOf(t).doneForNow || t.id === askFor) : group.items
             return (
               <div key={group.label} className="flex flex-col">
-                <div className="flex items-center justify-between pb-1">
+                <div className="flex min-h-9 items-center justify-between gap-3 pb-1">
                   <h2 className="text-sm font-semibold">{group.label}</h2>
-                  <span className="text-xs text-muted">{done} / {group.items.length} done</span>
+                  <span className="flex items-center gap-3 text-xs text-muted">
+                    {group.label === 'Daily' && bulk && (
+                      <button type="button" onClick={undoAll} disabled={bulkSaving} className="min-h-8 rounded-lg px-2 font-semibold text-accent hover:underline disabled:opacity-50">
+                        {bulkSaving ? 'Saving…' : `Undo (${bulk.length})`}
+                      </button>
+                    )}
+                    {group.label === 'Daily' && !bulk && left.length > 1 && (
+                      <button type="button" onClick={tickAll} className="min-h-8 rounded-lg border border-line px-2.5 font-semibold text-muted hover:text-ink">
+                        All done
+                      </button>
+                    )}
+                    {done} / {group.items.length} done
+                  </span>
                 </div>
                 {shown.map((t) =>
                   t.weekly_target ? (
@@ -394,7 +420,7 @@ function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }: { tas
   if (!editing) {
     return (
       <button type="button" onClick={open} className="min-h-9 self-start px-3 pb-2 text-xs font-semibold text-accent hover:underline">
-        {active ? 'Change end date' : 'Set end date'}
+        {active ? 'Change dates' : 'Set dates'}
       </button>
     )
   }
@@ -430,42 +456,6 @@ function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }: { tas
       <button type="submit" className="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent">Save</button>
       <button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg px-2 text-sm text-muted hover:text-ink">Cancel</button>
       {problem && <p className="w-full text-xs text-urgent">{problem}</p>}
-    </form>
-  )
-}
-
-// Shown under a "Spend …" task right after it is ticked.
-function SpendPrompt({ meter, onSave, onSkip }: { meter: MeterState; onSave: (value: number) => void; onSkip: () => void }) {
-  const [draft, setDraft] = useState('')
-  const id = `spent-${meter.id}`
-  const value = Number(draft)
-  const valid = draft.trim() !== '' && Number.isFinite(value) && value >= 0
-
-  return (
-    <form
-      className="flex flex-wrap items-center gap-2 border-b border-line bg-raised px-3 py-2.5"
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (valid) onSave(value)
-      }}
-    >
-      <label htmlFor={id} className="w-full text-xs text-muted">
-        How much {meter.name} do you have now? This keeps the countdown and reminders right.
-      </label>
-      <input
-        id={id}
-        type="number"
-        inputMode="numeric"
-        min={0}
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder={`0–${meter.cap}`}
-        className="min-h-10 w-28 rounded-lg border border-line bg-page px-3 text-sm text-ink placeholder:text-muted"
-      />
-      <button type="submit" disabled={!valid} className="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent disabled:opacity-40">Save</button>
-      <button type="button" onClick={() => onSave(0)} className="min-h-10 rounded-lg border border-line px-3 text-sm font-semibold text-muted hover:text-ink">None left</button>
-      <button type="button" onClick={onSkip} className="min-h-10 rounded-lg px-2 text-sm text-muted hover:text-ink">Skip</button>
     </form>
   )
 }

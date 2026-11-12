@@ -87,9 +87,10 @@ function progress(task: ReminderTask, ats: string[], clock: ResetClock, now: Dat
   const counted = task.weekly_target != null
   const period = counted ? weeklyPeriod(clock, now) : taskPeriod(task, clock, now)
   const count = period ? countIn(period, ats) : 0
-  const done = count >= (task.weekly_target ?? 1)
+  const target = task.weekly_target ?? 1
+  const done = count >= target
   const today = counted && task.frequency === 'daily' ? countIn(dailyPeriod(clock, now), ats) > 0 : false
-  return { period, doneForNow: done || today }
+  return { period, count, target, doneForNow: done || today }
 }
 
 // ---- Quiet hours: stamina pings are held, then sent on the first run after they end ----
@@ -131,6 +132,7 @@ export type GameLeft = {
   game: string
   resetAt: Date
   dailies: string[]
+  weeklies: string[] // only on the last day before the weekly reset
   endgame: { title: string; endsAt: Date }[]
   events: { name: string; endsAt: Date }[]
 }
@@ -147,6 +149,17 @@ export function whatsLeft(games: ReminderGame[], completions: Completions, now: 
       .filter((t) => !progress(t, ats(t), clock, now).doneForNow)
       .map((t) => t.title)
 
+    // Weeklies, on the last day before the weekly reset (the nudge then says what would be lost)
+    const weeklyEnd = weeklyPeriod(clock, now).end!
+    const lastDay = weeklyEnd.getTime() - now.getTime() <= ENDGAME_HORIZON_MS
+    const weeklies = !lastDay
+      ? []
+      : game.tasks
+          .filter((t) => t.frequency === 'weekly' && t.category !== 'endgame' && isVisible(t) && !t.optional)
+          .map((t) => ({ t, p: progress(t, ats(t), clock, now) }))
+          .filter(({ p }) => !p.doneForNow)
+          .map(({ t, p }) => (p.target > 1 ? `${t.title} (${p.count} of ${p.target})` : t.title))
+
     const endgame: GameLeft['endgame'] = []
     for (const t of game.tasks.filter((x) => x.category === 'endgame' && isVisible(x))) {
       const p = progress(t, ats(t), clock, now)
@@ -159,8 +172,8 @@ export function whatsLeft(games: ReminderGame[], completions: Completions, now: 
       .filter((e) => e.game_id === game.id && isLive(e, now) && new Date(e.ends_at).getTime() - now.getTime() <= ENDGAME_HORIZON_MS)
       .map((e) => ({ name: e.name, endsAt: new Date(e.ends_at) }))
 
-    if (dailies.length > 0 || endgame.length > 0 || ending.length > 0) {
-      out.push({ game: game.name, resetAt: dailyPeriod(clock, now).end!, dailies, endgame, events: ending })
+    if (dailies.length > 0 || weeklies.length > 0 || endgame.length > 0 || ending.length > 0) {
+      out.push({ game: game.name, resetAt: dailyPeriod(clock, now).end!, dailies, weeklies, endgame, events: ending })
     }
   }
   return out
@@ -183,6 +196,7 @@ export function nudgeReminder(settings: ReminderSettings, games: ReminderGame[],
   for (const g of left) {
     lines.push('', `**${g.game}** (daily reset ${relative(g.resetAt)})`)
     for (const title of g.dailies) lines.push(`- ${title}`)
+    for (const title of g.weeklies) lines.push(`- Weekly: ${title}`)
     for (const e of g.endgame) lines.push(`- ${e.title} not cleared, resets ${relative(e.endsAt)}`)
     for (const e of g.events) lines.push(`- Event: ${e.name} ends ${relative(e.endsAt)}`)
   }

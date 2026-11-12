@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { buildToday, useTodayData } from '../lib/today'
-import { formatClock, formatDuration, formatWhen } from '../lib/time'
+import SpendPrompt from '../components/SpendPrompt'
+import { buildToday, clockOf, dailiesLeft, periodCompletionIds, useTodayData, type Task } from '../lib/today'
+import { dailyPeriod, formatClock, formatDuration, formatWhen } from '../lib/time'
 import { useNow } from '../lib/useNow'
 
 // Small colour cue per game; the only game-specific colour in the neutral look.
@@ -8,9 +10,36 @@ const DOT: Record<string, string> = { genshin: 'bg-game-genshin', wuwa: 'bg-game
 const dot = (presetId: string) => DOT[presetId] ?? 'bg-muted'
 
 export default function TodayPage() {
-  const { data, error, loading } = useTodayData()
+  const { data, error, loading, addCompletion, removeCompletions, setMeterValue } = useTodayData()
   const now = useNow()
   const today = data ? buildToday(data, now) : null
+
+  // "All done" on a card: ticks the game's dailies left, then asks for the stamina value once.
+  // Undo is offered for a minute.
+  const [bulk, setBulk] = useState<{ gameId: string; tasks: Task[]; ask: boolean } | null>(null)
+  useEffect(() => {
+    if (!bulk) return
+    const id = setTimeout(() => setBulk(null), 60_000)
+    return () => clearTimeout(id)
+  }, [bulk])
+
+  const tickAll = (gameId: string, hasMeter: boolean) => {
+    const game = data?.games.find((g) => g.id === gameId)
+    if (!game || !data) return
+    const tasks = dailiesLeft(game, data, now)
+    const start = dailyPeriod(clockOf(game), now).start // these are all plain dailies
+    for (const t of tasks) void addCompletion(t.id, start)
+    setBulk({ gameId, tasks, ask: hasMeter })
+  }
+  const idsFor = (t: Task, gameId: string) => {
+    const game = data?.games.find((g) => g.id === gameId)
+    return game && data ? periodCompletionIds(t, data, clockOf(game), now) : []
+  }
+  const undoAll = () => {
+    if (!bulk) return
+    for (const t of bulk.tasks) void removeCompletions(t.id, idsFor(t, bulk.gameId))
+    setBulk(null)
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -69,15 +98,21 @@ export default function TodayPage() {
               {today.cards.map((card) => {
                 const pct = card.dailyTotal ? Math.round((card.dailyDone / card.dailyTotal) * 100) : 0
                 const left = card.dailyTotal - card.dailyDone
+                const game = data?.games.find((g) => g.id === card.id)
+                const toTick = game && data ? dailiesLeft(game, data, now).length : 0
+                const mine = bulk?.gameId === card.id ? bulk : null
+                const saving = !!mine && mine.tasks.some((t) => idsFor(t, card.id).some((id) => id.startsWith('temp-')))
                 return (
-                  <Link
+                  // The whole card opens the game page; the buttons inside sit above that link
+                  <div
                     key={card.id}
-                    to={`/game/${card.presetId}`}
-                    className="flex min-w-0 flex-[1_1_300px] flex-col gap-3 rounded-2xl border border-line bg-surface p-4 hover:border-muted"
+                    className="relative flex min-w-0 flex-[1_1_300px] flex-col gap-3 rounded-2xl border border-line bg-surface p-4 hover:border-muted"
                   >
                     <span className="flex items-center gap-2">
                       <span aria-hidden="true" className={`size-2.5 rounded-[3px] ${dot(card.presetId)}`} />
-                      <span className="flex-1 font-semibold">{card.name}</span>
+                      <Link to={`/game/${card.presetId}`} className="flex-1 font-semibold after:absolute after:inset-0 after:rounded-2xl">
+                        {card.name}
+                      </Link>
                       <span className="text-xs text-muted">Reset in {formatDuration(card.resetAt.getTime() - now.getTime())}</span>
                     </span>
 
@@ -94,18 +129,18 @@ export default function TodayPage() {
                     </span>
 
                     {card.meter && (
-  <span className="flex flex-col gap-0.5 text-sm">
-    <span className="flex justify-between gap-3">
-      <span className="text-muted">{card.meter.name}</span>
-      <span className={`whitespace-nowrap font-semibold ${card.meter.full ? 'text-urgent' : ''}`}>
-        {card.meter.value} / {card.meter.cap}
-      </span>
-    </span>
-    <span className={`text-right text-xs ${card.meter.full ? 'text-urgent' : 'text-muted'}`}>
-      {card.meter.full ? 'Full now' : card.meter.fullAt ? `Full ${formatWhen(card.meter.fullAt, now)}` : ''}
-    </span>
-  </span>
-)}
+                      <span className="flex flex-col gap-0.5 text-sm">
+                        <span className="flex justify-between gap-3">
+                          <span className="text-muted">{card.meter.name}</span>
+                          <span className={`whitespace-nowrap font-semibold ${card.meter.full ? 'text-urgent' : ''}`}>
+                            {card.meter.value} / {card.meter.cap}
+                          </span>
+                        </span>
+                        <span className={`text-right text-xs ${card.meter.full ? 'text-urgent' : 'text-muted'}`}>
+                          {card.meter.full ? 'Full now' : card.meter.fullAt ? `Full ${formatWhen(card.meter.fullAt, now)}` : ''}
+                        </span>
+                      </span>
+                    )}
 
                     {card.note && (
                       <span className={`text-xs ${card.note.soon ? 'text-urgent' : 'text-muted'}`}>
@@ -113,7 +148,38 @@ export default function TodayPage() {
                         {card.note.at ? ` · resets in ${formatDuration(card.note.at.getTime() - now.getTime())}` : ''}
                       </span>
                     )}
-                  </Link>
+
+                    {/* One tap for a quick session: tick the rest, then say how much stamina is left */}
+                    {(toTick > 1 || mine) && (
+                      <div className="relative z-10 flex items-center gap-2">
+                        {mine ? (
+                          <button type="button" onClick={undoAll} disabled={saving} className="min-h-9 rounded-lg px-1 text-xs font-semibold text-accent hover:underline disabled:opacity-50">
+                            {saving ? 'Saving…' : `Undo (${mine.tasks.length})`}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => tickAll(card.id, !!card.meter)}
+                            className="min-h-9 rounded-lg border border-line px-3 text-xs font-semibold text-muted hover:text-ink"
+                          >
+                            All {toTick} dailies done
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {mine?.ask && card.meter && (
+                      <div className="relative z-10 -mx-4 -mb-4 overflow-hidden rounded-b-2xl">
+                        <SpendPrompt
+                          meter={card.meter}
+                          onSave={(v) => {
+                            if (game) void setMeterValue(game, card.meter!.id, v)
+                            setBulk({ ...mine, ask: false })
+                          }}
+                          onSkip={() => setBulk({ ...mine, ask: false })}
+                        />
+                      </div>
+                    )}
+                  </div>
                 )
               })}
             </div>

@@ -106,6 +106,7 @@ describe("what's left", () => {
     expect(g.dailies).toEqual([])
     expect(g.endgame).toEqual([{ title: 'Endstate Matrix', endsAt: at('2026-11-13T04:00:00+08:00') }])
     expect(g.events).toEqual([])
+    expect(g.weeklies).toEqual([])
   })
 
   it('leaves out endgame that is already cleared this cycle', () => {
@@ -274,5 +275,39 @@ describe('endgame that has not opened yet', () => {
     const t = task('Endstate Matrix', { category: 'endgame', frequency: 'dated', cycle_ends_at: '2026-11-20T04:00', cycle_anchor: '2026-11-19' })
     expect(whatsLeft([game({ tasks: [t] })], ticks({}), at('2026-11-19T03:00:00+08:00'))).toEqual([])
     expect(whatsLeft([game({ tasks: [t] })], ticks({}), at('2026-11-19T21:00:00+08:00'))[0].endgame).toHaveLength(1)
+  })
+})
+
+describe('weeklies in the evening nudge', () => {
+  // Weekly reset is Monday 4:00 AM. Sunday Nov 15, 9 PM is the last evening; Thursday Nov 12 is not.
+  const SUNDAY_9PM = at('2026-11-15T21:00:00+08:00')
+  const weeklyTasks = [
+    task('Weekly bosses', { frequency: 'weekly' }),
+    task('Reputation bounties', { frequency: 'weekly' }),
+    task('Enhanced Echo drops', { frequency: 'weekly', weekly_target: 5 }),
+    task('Shop', { frequency: 'weekly', optional: true }),
+    task('Hidden weekly', { frequency: 'weekly', hidden: true }),
+  ]
+
+  it('are not listed earlier in the week', () => {
+    expect(whatsLeft([game({ tasks: weeklyTasks })], ticks({}), NINE_PM)).toEqual([])
+  })
+
+  it('are listed on the last evening, with counts for weekly targets', () => {
+    const done = ticks({ 'Reputation bounties': ['2026-11-10T20:00:00+08:00'], 'Enhanced Echo drops': ['2026-11-10T20:00:00+08:00', '2026-11-11T20:00:00+08:00'] })
+    const [g] = whatsLeft([game({ tasks: weeklyTasks })], done, SUNDAY_9PM)
+    expect(g.weeklies).toEqual(['Weekly bosses', 'Enhanced Echo drops (2 of 5)'])
+  })
+
+  it('a tick from last week does not count', () => {
+    const lastWeek = ticks({ 'Weekly bosses': ['2026-11-08T20:00:00+08:00'] }) // Sunday before the Nov 9 reset
+    const [g] = whatsLeft([game({ tasks: [weeklyTasks[0]] })], lastWeek, SUNDAY_9PM)
+    expect(g.weeklies).toEqual(['Weekly bosses'])
+  })
+
+  it('appear in the nudge text', () => {
+    const r = nudgeReminder(settings, [game({ tasks: weeklyTasks })], ticks({}), SUNDAY_9PM)!
+    expect(r.text).toContain('- Weekly: Weekly bosses')
+    expect(r.text).toContain('- Weekly: Enhanced Echo drops (0 of 5)')
   })
 })

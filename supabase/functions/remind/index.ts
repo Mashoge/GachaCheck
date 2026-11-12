@@ -189,6 +189,7 @@ Deno.serve(async (req) => {
               left: whatsLeft(games, completions, now, events).map((g) => ({
                 game: g.game,
                 dailies: g.dailies,
+                weeklies: g.weeklies,
                 endgame: g.endgame.map((e) => `${e.title} (ends ${e.endsAt.toISOString()})`),
                 events: g.events.map((e) => `${e.name} (ends ${e.endsAt.toISOString()})`),
               })),

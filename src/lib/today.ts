@@ -36,6 +36,31 @@ export function taskProgress(task: Task, data: TodayData, clock: ResetClock, now
   return { period, count, target, done, today, doneForNow: done || today }
 }
 
+// Ids of the task's completions in its current period (what an untick removes)
+export function periodCompletionIds(task: Task, data: TodayData, clock: ResetClock, now: Date): string[] {
+  const p = taskProgress(task, data, clock, now).period
+  if (!p) return []
+  const start = p.start.getTime()
+  const end = p.end ? p.end.getTime() : Infinity
+  return (data.completions.get(task.id) ?? [])
+    .filter((c) => {
+      const at = new Date(c.at).getTime()
+      return at >= start && at < end
+    })
+    .map((c) => c.id)
+}
+
+// What "All done" ticks: the dailies counted on Today (visible, not optional) that aren't done yet.
+// Tasks with a weekly target (+1 once a day) are left for you to count yourself.
+export function dailiesLeft(game: Game, data: TodayData, now: Date): Task[] {
+  const clock = clockOf(game)
+  return game.tasks.filter(
+    (t) =>
+      t.frequency === 'daily' && t.category !== 'endgame' && !t.archived && !t.hidden && !t.optional && t.weekly_target == null &&
+      !taskProgress(t, data, clock, now).doneForNow,
+  )
+}
+
 // Loads games (syncing outdated presets), recent completions and upcoming events.
 async function loadToday(): Promise<TodayData> {
   const since = new Date(Date.now() - 62 * 86_400_000).toISOString()

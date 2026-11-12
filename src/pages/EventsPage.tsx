@@ -284,13 +284,16 @@ function Timeline({ games, events, now, onOpen }: { games: Game[]; events: GameE
         const start = e.starts_at ? new Date(e.starts_at).getTime() : from
         bars.push({ key: e.id, label: e.name, start, end: new Date(e.ends_at).getTime(), openStart: !e.starts_at, event: e })
       }
-      // Endgame cycles come from the reset rules, so they fill in on their own
+      // Events in the order they start (then end), like a schedule
+      bars.sort((a, b) => a.start - b.start || a.end - b.end)
+      // Endgame cycles come from the reset rules, so they fill in on their own; they go first
+      const cycles: typeof bars = []
       for (const t of game.tasks.filter((x) => x.category === 'endgame' && isVisible(x))) {
         const period = taskPeriod(t, clockOf(game), now)
-        if (period?.end) bars.push({ key: t.id, label: t.title, start: period.start.getTime(), end: period.end.getTime() })
+        if (period?.end) cycles.push({ key: t.id, label: t.title, start: period.start.getTime(), end: period.end.getTime() })
       }
-      bars.sort((a, b) => a.end - b.end)
-      return { game, bars: bars.filter((b) => b.end > from && b.start < from + span) }
+      cycles.sort((a, b) => a.end - b.end)
+      return { game, bars: [...cycles, ...bars].filter((b) => b.end > from && b.start < from + span) }
     })
     .filter((g) => g.bars.length > 0)
 
