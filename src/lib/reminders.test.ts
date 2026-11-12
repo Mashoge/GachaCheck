@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildReminders, nudgeReminder, staminaReminders, toMessages, whatsLeft,
+  buildReminders, inQuietHours, nudgeReminder, staminaReminders, toMessages, whatsLeft,
   type Completions, type ReminderGame, type ReminderSettings, type ReminderTask,
 } from '../../supabase/functions/_shared/reminders.ts'
 
@@ -149,6 +149,46 @@ describe('evening nudge', () => {
   it('uses the user timezone for the nudge time', () => {
     const tokyo = { ...settings, timezone: 'Asia/Tokyo' } // 9 PM Tokyo = 8 PM Manila
     expect(nudgeReminder(tokyo, games, ticks({}), at('2026-11-12T20:00:00+08:00'))).not.toBeNull()
+  })
+})
+
+describe('quiet hours', () => {
+  const quiet = { ...settings, quiet_start: '23:00:00', quiet_end: '07:00:00' } // 11 PM to 7 AM, across midnight
+
+  it('are off when no times are set', () => {
+    expect(inQuietHours(settings, at('2026-11-13T02:00:00+08:00'))).toBe(false)
+    expect(inQuietHours({ ...settings, quiet_start: '23:00', quiet_end: null }, at('2026-11-13T02:00:00+08:00'))).toBe(false)
+  })
+
+  it('cover the night across midnight, and stop at the end time', () => {
+    expect(inQuietHours(quiet, at('2026-11-12T22:59:00+08:00'))).toBe(false)
+    expect(inQuietHours(quiet, at('2026-11-12T23:00:00+08:00'))).toBe(true)
+    expect(inQuietHours(quiet, at('2026-11-13T02:00:00+08:00'))).toBe(true)
+    expect(inQuietHours(quiet, at('2026-11-13T06:59:00+08:00'))).toBe(true)
+    expect(inQuietHours(quiet, at('2026-11-13T07:00:00+08:00'))).toBe(false)
+    expect(inQuietHours(quiet, at('2026-11-13T15:00:00+08:00'))).toBe(false)
+  })
+
+  it('also work for a window inside one day', () => {
+    const work = { ...settings, quiet_start: '09:00', quiet_end: '17:00' }
+    expect(inQuietHours(work, at('2026-11-12T08:59:00+08:00'))).toBe(false)
+    expect(inQuietHours(work, at('2026-11-12T12:00:00+08:00'))).toBe(true)
+    expect(inQuietHours(work, at('2026-11-12T17:00:00+08:00'))).toBe(false)
+  })
+
+  it('hold a stamina ping during the night and send it in the morning', () => {
+    // Waveplates fill at 2:00 AM
+    const g = game({ stamina_meters: [waveplates(230, '2026-11-13T01:00:00+08:00')] })
+    expect(buildReminders(quiet, [g], ticks({}), at('2026-11-13T02:00:00+08:00'))).toEqual([])
+    const morning = buildReminders(quiet, [g], ticks({}), at('2026-11-13T07:00:00+08:00'))
+    expect(morning.map((r) => r.kind)).toEqual(['stamina'])
+    expect(morning[0].text).toContain('Waveplates are full (240/240)')
+  })
+
+  it('do not hold the evening nudge', () => {
+    const early = { ...settings, quiet_start: '20:00', quiet_end: '07:00' }
+    const g = game({ tasks: [task('Daily activity')] })
+    expect(buildReminders(early, [g], ticks({}), NINE_PM).map((r) => r.kind)).toEqual(['nudge'])
   })
 })
 

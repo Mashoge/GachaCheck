@@ -6,10 +6,11 @@
 //
 // Every call needs the header  x-cron-secret: <CRON_SECRET>.
 // Secrets (set with `supabase secrets set`, never committed): CRON_SECRET, DISCORD_WEBHOOK_URL.
+// Optional setting: APP_URL (the address of the app) adds an "Open GachaCheck" link to each message.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
-  buildReminders, lastNudgeTime, toMessages, whatsLeft,
+  buildReminders, inQuietHours, lastNudgeTime, toMessages, whatsLeft,
   type Completions, type Reminder, type ReminderGame, type ReminderSettings,
 } from '../_shared/reminders.ts'
 import { meterStates } from '../_shared/stamina.ts'
@@ -20,7 +21,7 @@ const GAME_COLUMNS =
   'stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at)'
 
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body, null, 2), { status, headers: { 'Content-Type': 'application/json' } })
+  new Response(JSON.stringify(body, null, 2), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } })
 
 function adminClient() {
   const url = Deno.env.get('SUPABASE_URL')
@@ -51,13 +52,14 @@ Deno.serve(async (req) => {
   if (Number.isNaN(now.getTime())) return json({ error: 'Bad "at" time' }, 400)
 
   const webhook = Deno.env.get('DISCORD_WEBHOOK_URL')
+  const appUrl = Deno.env.get('APP_URL')?.trim()
   if (!dry && !webhook) return json({ error: 'DISCORD_WEBHOOK_URL is not set' }, 500)
 
   try {
     const db = adminClient()
     const since = new Date(now.getTime() - 62 * 86_400_000).toISOString()
     const [settingsRes, gamesRes, completionsRes] = await Promise.all([
-      db.from('user_settings').select('user_id, timezone, nudge_enabled, nudge_time'),
+      db.from('user_settings').select('user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end'),
       db.from('games').select(GAME_COLUMNS).order('sort_order'),
       db.from('completions').select('task_id, completed_at').gte('completed_at', since),
     ])
@@ -93,6 +95,7 @@ Deno.serve(async (req) => {
             status: {
               lastNudgeTime: lastNudgeTime(settings, now).toISOString(),
               nudgeEnabled: settings.nudge_enabled,
+              quietHoursNow: inQuietHours(settings, now),
               meters: games.flatMap((g) =>
                 meterStates(g.stamina_meters, now).filter((m) => !m.isOverflow).map((m) => `${g.name}: ${m.name} ${m.value}/${m.cap}`),
               ),
@@ -121,7 +124,8 @@ Deno.serve(async (req) => {
         let sentCount = 0
         for (const message of toMessages(fresh)) {
           try {
-            await sendToDiscord(webhook!, message.content)
+            // <…> keeps Discord from adding a large link preview
+            await sendToDiscord(webhook!, appUrl ? `${message.content}\n\n[Open GachaCheck](<${appUrl}>)` : message.content)
             sentCount += message.keys.length
           } catch (err) {
             // Not delivered: release the claim so the next run tries again.
@@ -130,6 +134,10 @@ Deno.serve(async (req) => {
           }
         }
         report.push({ due: due.length, sent: sentCount })
+
+        // Shown on the Reminders page as "Last checked"
+        const { error: stampError } = await db.from('user_settings').update({ last_reminder_run_at: now.toISOString() }).eq('user_id', settings.user_id)
+        if (stampError) console.error('Could not save the last-checked time:', stampError.message)
       } catch (err) {
         console.error('Reminder run failed for one user:', err)
         report.push({ error: err instanceof Error ? err.message : String(err) })

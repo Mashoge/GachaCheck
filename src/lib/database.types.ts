@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -337,8 +337,11 @@ export type Database = {
         Row: {
           created_at: string
           event_reminder_days: number
+          last_reminder_run_at: string | null
           nudge_enabled: boolean
           nudge_time: string
+          quiet_end: string | null
+          quiet_start: string | null
           reset_message_enabled: boolean
           timezone: string
           user_id: string
@@ -346,8 +349,11 @@ export type Database = {
         Insert: {
           created_at?: string
           event_reminder_days?: number
+          last_reminder_run_at?: string | null
           nudge_enabled?: boolean
           nudge_time?: string
+          quiet_end?: string | null
+          quiet_start?: string | null
           reset_message_enabled?: boolean
           timezone?: string
           user_id?: string
@@ -355,8 +361,11 @@ export type Database = {
         Update: {
           created_at?: string
           event_reminder_days?: number
+          last_reminder_run_at?: string | null
           nudge_enabled?: boolean
           nudge_time?: string
+          quiet_end?: string | null
+          quiet_start?: string | null
           reset_message_enabled?: boolean
           timezone?: string
           user_id?: string

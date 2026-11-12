@@ -8,6 +8,7 @@ import GamesScreen from './components/GamesScreen'
 import TodayPage from './pages/TodayPage'
 import GamePage from './pages/GamePage'
 import PlaceholderPage from './pages/PlaceholderPage'
+import RemindersPage from './pages/RemindersPage'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -39,7 +40,7 @@ export default function App() {
           }
         />
         <Route path="events" element={<PlaceholderPage title="Events" note="Event countdowns arrive in Phase 5." />} />
-        <Route path="reminders" element={<PlaceholderPage title="Reminders" note="Discord reminder settings arrive in Phase 4." />} />
+        <Route path="reminders" element={<RemindersPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

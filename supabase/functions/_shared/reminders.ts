@@ -32,6 +32,8 @@ export type ReminderSettings = {
   timezone: string
   nudge_enabled: boolean
   nudge_time: string // 'HH:MM' or 'HH:MM:SS' in the user's timezone
+  quiet_start?: string | null // stamina pings wait between these two times (user's timezone)
+  quiet_end?: string | null
 }
 
 export type Reminder = {
@@ -70,6 +72,18 @@ function progress(task: ReminderTask, ats: string[], clock: ResetClock, now: Dat
   const done = count >= (task.weekly_target ?? 1)
   const today = counted && task.frequency === 'daily' ? countIn(dailyPeriod(clock, now), ats) > 0 : false
   return { period, doneForNow: done || today }
+}
+
+// ---- Quiet hours: stamina pings are held, then sent on the first run after they end ----
+
+export function inQuietHours(settings: ReminderSettings, now: Date): boolean {
+  const { quiet_start: from, quiet_end: to } = settings
+  if (!from || !to || from.slice(0, 5) === to.slice(0, 5)) return false
+  const at = (time: string) => ({ timezone: settings.timezone, daily_reset_time: time, weekly_reset_day: 1 })
+  // The most recent time quiet hours began, and the first time they end after that. Works across midnight.
+  const began = dailyPeriod(at(from), now).start
+  const ends = dailyPeriod(at(to), began).end!
+  return now < ends
 }
 
 // ---- Stamina: one ping per fill-up, when a meter reaches 90% of its cap ----
@@ -152,7 +166,9 @@ export function nudgeReminder(settings: ReminderSettings, games: ReminderGame[],
 
 export function buildReminders(settings: ReminderSettings, games: ReminderGame[], completions: Completions, now: Date): Reminder[] {
   const nudge = nudgeReminder(settings, games, completions, now)
-  return [...staminaReminders(games, now), ...(nudge ? [nudge] : [])]
+  // Held pings are not recorded as sent, so they go out once quiet hours are over.
+  const stamina = inQuietHours(settings, now) ? [] : staminaReminders(games, now)
+  return [...stamina, ...(nudge ? [nudge] : [])]
 }
 
 // Discord allows 2,000 characters per message; group reminders into messages under that.
