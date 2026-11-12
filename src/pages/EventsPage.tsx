@@ -9,6 +9,7 @@ import { clockOf, isVisible, useTodayData, type Game } from '../lib/today'
 import { SHORT_NAMES } from '../lib/useGames'
 import EventImport from './EventImport'
 import { useNow } from '../lib/useNow'
+import { PHONE, useMedia } from '../lib/useMedia'
 
 const DAY = 86_400_000
 const SOON_MS = 3 * DAY
@@ -246,35 +247,41 @@ function EventCard({ event, game, now, onEdit, onDone }: { event: GameEvent; gam
         </div>
       )}
 
-      <p className="text-xs text-muted">
-        {upcoming ? `${formatWhen(start, now)} to ${formatWhen(end, now)}` : `Ends ${formatWhen(end, now)}`}
-        {!event.remind && ' · no reminder'}
-      </p>
+      {/* Date and buttons share a row, so cards stay short on a phone */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <p className="text-xs text-muted">
+          {upcoming ? `${formatWhen(start, now)} to ${formatWhen(end, now)}` : `Ends ${formatWhen(end, now)}`}
+          {!event.remind && ' · no reminder'}
+        </p>
 
-      <div className="mt-1 flex gap-1.5">
-        {!upcoming && (
-          <button type="button" onClick={() => onDone(!isDone)} className="min-h-9 rounded-lg border border-line px-3 text-xs font-semibold text-muted hover:text-ink">
-            {isDone ? 'Not done' : 'Mark done'}
+        <div className="flex gap-1.5">
+          {!upcoming && (
+            <button type="button" onClick={() => onDone(!isDone)} className="min-h-9 rounded-lg border border-line px-3 text-xs font-semibold text-muted hover:text-ink">
+              {isDone ? 'Not done' : 'Mark done'}
+            </button>
+          )}
+          <button type="button" onClick={onEdit} className="min-h-9 rounded-lg border border-line px-3 text-xs font-semibold text-muted hover:text-ink">
+            Edit
           </button>
-        )}
-        <button type="button" onClick={onEdit} className="min-h-9 rounded-lg border border-line px-3 text-xs font-semibold text-muted hover:text-ink">
-          Edit
-        </button>
+        </div>
       </div>
     </article>
   )
 }
 
-// ---- Timeline: one bar per event and per endgame cycle, over the next six weeks ----
-
-const TIMELINE_BEFORE_DAYS = 2
-const TIMELINE_DAYS = 44
+// ---- Timeline: one bar per event and per endgame cycle, over the next six weeks (three on a phone) ----
 
 function Timeline({ games, events, now, onOpen }: { games: Game[]; events: GameEvent[]; now: Date; onOpen: (event: GameEvent) => void }) {
-  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - TIMELINE_BEFORE_DAYS).getTime()
-  const span = TIMELINE_DAYS * DAY
+  // A phone shows fewer weeks so the whole timeline fits the screen without scrolling sideways
+  const phone = useMedia(PHONE)
+  const beforeDays = phone ? 1 : 2
+  const days = phone ? 21 : 44
+  // Bars narrower than this put their name beside the bar instead of inside it
+  const minInside = phone ? 30 : 12
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - beforeDays).getTime()
+  const span = days * DAY
   const percent = (t: number) => Math.min(100, Math.max(0, ((t - from) / span) * 100))
-  const weeks = Array.from({ length: Math.ceil(TIMELINE_DAYS / 7) }, (_, i) => new Date(from + i * 7 * DAY))
+  const weeks = Array.from({ length: Math.ceil(days / 7) }, (_, i) => new Date(from + i * 7 * DAY))
 
   const groups = games
     .map((game) => {
@@ -301,12 +308,12 @@ function Timeline({ games, events, now, onOpen }: { games: Game[]; events: GameE
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold">Timeline</h2>
-        <span className="text-xs text-muted">Next 6 weeks · solid bars are events, outlined bars are endgame cycles, a faded edge means it was already running</span>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+        <h2 className="text-sm font-semibold">Timeline · next {phone ? 3 : 6} weeks</h2>
+        <span className="text-xs text-muted">Solid bars are events, outlined bars are endgame cycles. A faded edge means it was already running.</span>
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
-        <div className="relative min-w-[760px] p-4">
+      <div className="rounded-2xl border border-line bg-surface md:overflow-x-auto">
+        <div className="relative p-3 md:min-w-[760px] md:p-4">
           {/* Week marks */}
           <div className="relative h-5 text-[11px] text-muted">
             {weeks.map((w) => (
@@ -328,27 +335,49 @@ function Timeline({ games, events, now, onOpen }: { games: Game[]; events: GameE
                 </span>
                 {bars.map((bar) => {
                   const left = percent(bar.start)
-                  const style = { left: `${left}%`, width: `${Math.max(2, percent(bar.end) - left)}%` }
+                  const right = percent(bar.end)
+                  const width = Math.max(2, right - left)
+                  const style = { left: `${left}%`, width: `${width}%` }
                   const title = `${bar.label} · ends ${formatWhen(new Date(bar.end), now)}`
+                  // A short bar gets its name beside it, on whichever side has more room
+                  const inside = width >= minInside
+                  const nameOnLeft = left > 100 - right
+                  const outsideStyle = nameOnLeft ? { right: `${100 - left}%`, maxWidth: `${left}%` } : { left: `${right}%`, maxWidth: `${100 - right}%` }
+                  const outsideClass = `absolute inset-y-0 z-10 flex items-center truncate px-2 text-xs ${nameOnLeft ? 'justify-end' : ''}`
                   return (
                     <div key={bar.key} className="relative h-7">
                       {bar.event ? (
-                        <button
-                          type="button"
-                          onClick={() => onOpen(bar.event!)}
-                          title={title}
-                          style={style}
-                          className={`absolute inset-y-0 z-10 truncate px-2 text-left text-xs font-semibold text-on-accent ${gameBg(game)} ${bar.openStart ? 'rounded-r-md pl-6' : 'rounded-md'}`}
-                        >
-                          {bar.openStart && (
-                            <span aria-hidden="true" className="absolute inset-y-0 left-0 w-5" style={{ background: 'linear-gradient(to right, var(--color-surface), transparent)' }} />
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onOpen(bar.event!)}
+                            title={title}
+                            aria-label={inside ? undefined : bar.label}
+                            style={style}
+                            className={`absolute inset-y-0 z-10 truncate px-2 text-left text-xs font-semibold text-on-accent ${gameBg(game)} ${bar.openStart ? 'rounded-r-md pl-6' : 'rounded-md'}`}
+                          >
+                            {bar.openStart && (
+                              <span aria-hidden="true" className="absolute inset-y-0 left-0 w-5" style={{ background: 'linear-gradient(to right, var(--color-surface), transparent)' }} />
+                            )}
+                            {inside && bar.label}
+                          </button>
+                          {!inside && (
+                            <button type="button" tabIndex={-1} aria-hidden="true" onClick={() => onOpen(bar.event!)} style={outsideStyle} className={`${outsideClass} font-semibold text-ink`}>
+                              <span className="truncate">{bar.label}</span>
+                            </button>
                           )}
-                          {bar.label}
-                        </button>
+                        </>
                       ) : (
-                        <span title={title} style={style} className="absolute inset-y-0 z-10 flex items-center truncate rounded-md border border-line bg-raised px-2 text-xs text-muted">
-                          <span className="truncate">{bar.label}</span>
-                        </span>
+                        <>
+                          <span title={title} style={style} className="absolute inset-y-0 z-10 flex items-center truncate rounded-md border border-line bg-raised px-2 text-xs text-muted">
+                            {inside && <span className="truncate">{bar.label}</span>}
+                          </span>
+                          {!inside && (
+                            <span style={outsideStyle} className={`${outsideClass} text-muted`}>
+                              <span className="truncate">{bar.label}</span>
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                   )

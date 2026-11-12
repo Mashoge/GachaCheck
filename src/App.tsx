@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { Navigate, Route, Routes } from 'react-router'
 import { supabase } from './lib/supabase'
 import Login from './components/Login'
 import AppShell from './components/AppShell'
-import GamesScreen from './components/GamesScreen'
-import TodayPage from './pages/TodayPage'
-import GamePage from './pages/GamePage'
-import EventsPage from './pages/EventsPage'
-import RemindersPage from './pages/RemindersPage'
+
+// Each page loads when it's first opened, so the app starts faster on a phone
+const TodayPage = lazy(() => import('./pages/TodayPage'))
+const GamePage = lazy(() => import('./pages/GamePage'))
+const EventsPage = lazy(() => import('./pages/EventsPage'))
+const RemindersPage = lazy(() => import('./pages/RemindersPage'))
+const GamesScreen = lazy(() => import('./components/GamesScreen'))
+
+const page = (element: ReactNode) => <Suspense fallback={<p className="text-muted">Loading…</p>}>{element}</Suspense>
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -29,18 +33,18 @@ export default function App() {
   return (
     <Routes>
       <Route element={<AppShell email={session.user.email ?? ''} />}>
-        <Route index element={<TodayPage />} />
-        <Route path="game/:presetId" element={<GamePage />} />
+        <Route index element={page(<TodayPage />)} />
+        <Route path="game/:presetId" element={page(<GamePage />)} />
         <Route
           path="games"
-          element={
+          element={page(
             <div className="mx-auto max-w-3xl">
               <GamesScreen />
-            </div>
-          }
+            </div>,
+          )}
         />
-        <Route path="events" element={<EventsPage />} />
-        <Route path="reminders" element={<RemindersPage />} />
+        <Route path="events" element={page(<EventsPage />)} />
+        <Route path="reminders" element={page(<RemindersPage />)} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

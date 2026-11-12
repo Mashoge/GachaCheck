@@ -185,16 +185,17 @@ export default function RemindersPage() {
             {games.map((g) => (
               <div key={g.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line py-3">
                 <span className="text-sm font-medium">{g.name}</span>
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                  <span className="flex items-center gap-2 text-sm text-muted">
+                {/* Three even columns on a phone, one row on wider screens */}
+                <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:items-center sm:gap-5">
+                  <span className="flex flex-col items-start gap-1.5 text-sm text-muted sm:flex-row sm:items-center sm:gap-2">
                     Nudge
                     <Switch label={`${g.name} in the evening nudge`} on={g.notify_nudge} onChange={(on) => void saveGame(g.id, { notify_nudge: on })} />
                   </span>
-                  <span className="flex items-center gap-2 text-sm text-muted">
+                  <span className="flex flex-col items-start gap-1.5 text-sm text-muted sm:flex-row sm:items-center sm:gap-2">
                     Stamina
                     <Switch label={`${g.name} stamina pings`} on={g.notify_stamina} onChange={(on) => void saveGame(g.id, { notify_stamina: on })} />
                   </span>
-                  <span className="flex items-center gap-2 text-sm text-muted">
+                  <span className="flex flex-col items-start gap-1.5 text-sm text-muted sm:flex-row sm:items-center sm:gap-2">
                     Events
                     <Switch label={`${g.name} event reminders`} on={g.notify_events} onChange={(on) => void saveGame(g.id, { notify_events: on })} />
                   </span>

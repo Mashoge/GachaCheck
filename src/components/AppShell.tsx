@@ -58,11 +58,12 @@ export default function AppShell({ email }: { email: string }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 md:px-5 md:pb-12">
+      {/* Room for the bottom bar, plus the iPhone home line */}
+      <main className="mx-auto max-w-6xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-6 md:px-5 md:pb-12">
         <Outlet />
       </main>
 
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 grid grid-cols-4 border-t border-line bg-surface px-2 pb-3 pt-1.5 md:hidden">
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-line bg-surface px-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-1.5 md:hidden">
         {NAV.map((item) => (
           <NavLink
             key={item.to}
