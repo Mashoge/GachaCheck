@@ -246,7 +246,7 @@ export function buildToday(data: TodayData, now: Date) {
     let soonest: GameCard['note'] = null
     for (const t of game.tasks.filter((x) => x.category === 'endgame' && isVisible(x))) {
       const progress = taskProgress(t, data, clock, now)
-      if (!progress.period?.end || progress.done) continue
+      if (!progress.period?.end || progress.done || progress.period.start > now) continue
       const at = progress.period.end
       if (at.getTime() <= horizon) {
         attention.push({ key: t.id, presetId, gameName: game.name, title: `${t.title} not cleared`, at, urgent: true })

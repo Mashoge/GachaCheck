@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { findPreset, findServer } from '../data/presets'
 import { messageOf } from '../lib/errors'
-import { addEvent, deleteEvent, fetchEvents, hideEvent, setEventDone, updateEvent, type EventInput, type GameEvent } from '../lib/events'
+import { addEvent, addEvents, deleteEvent, fetchEvents, hideEvent, setEventDone, updateEvent, type EventInput, type GameEvent } from '../lib/events'
 import { minuteBefore, serverParts, toInstant } from '../lib/eventTime'
 import { formatDuration, formatWhen, taskPeriod } from '../lib/time'
 import { clockOf, isVisible, useTodayData, type Game } from '../lib/today'
 import { SHORT_NAMES } from '../lib/useGames'
+import EventImport from './EventImport'
 import { useNow } from '../lib/useNow'
 
 const DAY = 86_400_000
@@ -34,7 +35,7 @@ export default function EventsPage() {
   const [events, setEvents] = useState<GameEvent[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState(readFilter)
-  const [form, setForm] = useState<{ mode: 'add' } | { mode: 'edit'; event: GameEvent } | null>(null)
+  const [form, setForm] = useState<{ mode: 'add' } | { mode: 'import' } | { mode: 'edit'; event: GameEvent } | null>(null)
   const [showDone, setShowDone] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -99,9 +100,14 @@ export default function EventsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-3xl font-bold">Events</h1>
         {games.length > 0 && !form && (
-          <button type="button" onClick={() => setForm({ mode: 'add' })} className="min-h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent">
-            Add event
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setForm({ mode: 'import' })} className="min-h-10 rounded-lg border border-line px-4 text-sm font-semibold text-muted hover:text-ink">
+              Import list
+            </button>
+            <button type="button" onClick={() => setForm({ mode: 'add' })} className="min-h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent">
+              Add event
+            </button>
+          </div>
         )}
       </div>
 
@@ -113,7 +119,22 @@ export default function EventsPage() {
         </p>
       )}
 
-      {form && games.length > 0 && (
+      {form?.mode === 'import' && games.length > 0 && (
+        <EventImport
+          games={games}
+          existing={events ?? []}
+          defaultGameId={activeFilter !== 'all' ? activeFilter : games[0].id}
+          now={now}
+          onCancel={() => setForm(null)}
+          onImport={async (inputs) => {
+            const ok = await run(() => addEvents(inputs))
+            if (ok) setForm(null)
+            return ok
+          }}
+        />
+      )}
+
+      {form && form.mode !== 'import' && games.length > 0 && (
         <EventForm
           key={form.mode === 'edit' ? form.event.id : 'new'}
           games={games}
@@ -257,9 +278,11 @@ function Timeline({ games, events, now, onOpen }: { games: Game[]; events: GameE
 
   const groups = games
     .map((game) => {
-      const bars: { key: string; label: string; start: number; end: number; event?: GameEvent }[] = []
+      const bars: { key: string; label: string; start: number; end: number; openStart?: boolean; event?: GameEvent }[] = []
       for (const e of events.filter((x) => x.game_id === game.id)) {
-        bars.push({ key: e.id, label: e.name, start: e.starts_at ? new Date(e.starts_at).getTime() : from, end: new Date(e.ends_at).getTime(), event: e })
+        // No start date means it's already running; the bar fades in from the left edge
+        const start = e.starts_at ? new Date(e.starts_at).getTime() : from
+        bars.push({ key: e.id, label: e.name, start, end: new Date(e.ends_at).getTime(), openStart: !e.starts_at, event: e })
       }
       // Endgame cycles come from the reset rules, so they fill in on their own
       for (const t of game.tasks.filter((x) => x.category === 'endgame' && isVisible(x))) {
@@ -277,7 +300,7 @@ function Timeline({ games, events, now, onOpen }: { games: Game[]; events: GameE
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-semibold">Timeline</h2>
-        <span className="text-xs text-muted">Next 6 weeks · solid bars are events, outlined bars are endgame cycles</span>
+        <span className="text-xs text-muted">Next 6 weeks · solid bars are events, outlined bars are endgame cycles, a faded edge means it was already running</span>
       </div>
       <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
         <div className="relative min-w-[760px] p-4">
@@ -291,12 +314,12 @@ function Timeline({ games, events, now, onOpen }: { games: Game[]; events: GameE
           </div>
 
           <div className="relative mt-1 flex flex-col gap-4">
-            {/* Today */}
-            <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 z-10 w-px bg-ink/70" style={{ left: `${percent(now.getTime())}%` }} />
+            {/* Today: drawn behind the bars and names */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 z-0 w-px bg-ink/50" style={{ left: `${percent(now.getTime())}%` }} />
 
             {groups.map(({ game, bars }) => (
               <div key={game.id} className="flex flex-col gap-1.5">
-                <span className="flex items-center gap-2 text-xs font-semibold text-muted">
+                <span className="relative z-10 flex w-fit items-center gap-2 bg-surface pr-2 text-xs font-semibold text-muted">
                   <span aria-hidden="true" className={`size-2.5 rounded-sm ${gameBg(game)}`} />
                   {game.name}
                 </span>
@@ -312,12 +335,15 @@ function Timeline({ games, events, now, onOpen }: { games: Game[]; events: GameE
                           onClick={() => onOpen(bar.event!)}
                           title={title}
                           style={style}
-                          className={`absolute inset-y-0 truncate rounded-md px-2 text-left text-xs font-semibold text-on-accent ${gameBg(game)}`}
+                          className={`absolute inset-y-0 z-10 truncate px-2 text-left text-xs font-semibold text-on-accent ${gameBg(game)} ${bar.openStart ? 'rounded-r-md pl-6' : 'rounded-md'}`}
                         >
+                          {bar.openStart && (
+                            <span aria-hidden="true" className="absolute inset-y-0 left-0 w-5" style={{ background: 'linear-gradient(to right, var(--color-surface), transparent)' }} />
+                          )}
                           {bar.label}
                         </button>
                       ) : (
-                        <span title={title} style={style} className="absolute inset-y-0 flex items-center truncate rounded-md border border-line bg-raised px-2 text-xs text-muted">
+                        <span title={title} style={style} className="absolute inset-y-0 z-10 flex items-center truncate rounded-md border border-line bg-raised px-2 text-xs text-muted">
                           <span className="truncate">{bar.label}</span>
                         </span>
                       )}

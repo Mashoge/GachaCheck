@@ -36,6 +36,16 @@ export async function addEvent(input: EventInput) {
   if (error) throw error
 }
 
+/** Adds several events at once (from a pasted list). */
+export async function addEvents(inputs: EventInput[]) {
+  if (inputs.length === 0) return
+  const { data: auth } = await supabase.auth.getSession()
+  const userId = auth.session?.user.id
+  if (!userId) throw new Error('You are signed out. Sign in and try again.')
+  const { error } = await supabase.from('events').insert(inputs.map((input) => ({ ...input, user_id: userId })))
+  if (error) throw error
+}
+
 export async function updateEvent(id: string, input: EventInput) {
   const { error } = await supabase.from('events').update(input).eq('id', id)
   if (error) throw error

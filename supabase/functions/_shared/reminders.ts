@@ -150,7 +150,7 @@ export function whatsLeft(games: ReminderGame[], completions: Completions, now: 
     const endgame: GameLeft['endgame'] = []
     for (const t of game.tasks.filter((x) => x.category === 'endgame' && isVisible(x))) {
       const p = progress(t, ats(t), clock, now)
-      if (!p.period?.end || p.doneForNow) continue
+      if (!p.period?.end || p.doneForNow || p.period.start > now) continue // not open yet
       if (p.period.end.getTime() - now.getTime() <= ENDGAME_HORIZON_MS) endgame.push({ title: t.title, endsAt: p.period.end })
     }
 

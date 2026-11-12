@@ -228,14 +228,14 @@ export async function setWeeklyTarget(taskId: string, target: number | null) {
 }
 
 /**
- * End date of the current cycle for modes without a fixed schedule, in server time ('YYYY-MM-DDTHH:MM').
- * `previousEnd` is the end of the cycle that just finished, if there was one: the new cycle starts there,
- * so a clear from the old cycle isn't counted again.
+ * Dates of the current cycle for modes without a fixed schedule, in server time.
+ * `endsAt` is 'YYYY-MM-DDTHH:MM'. `startDay` ('YYYY-MM-DD') is when the cycle opens: before then the mode shows
+ * "Starts in …", and only clears from that day on count. Null keeps the start already saved.
  */
-export async function setCycleEndsAt(taskId: string, endsAt: string, previousEnd: string | null) {
+export async function setCycleDates(taskId: string, endsAt: string, startDay: string | null) {
   const { error } = await supabase
     .from('tasks')
-    .update({ cycle_ends_at: endsAt, ...(previousEnd ? { cycle_anchor: previousEnd.slice(0, 10) } : {}) })
+    .update({ cycle_ends_at: endsAt, ...(startDay ? { cycle_anchor: startDay } : {}) })
     .eq('id', taskId)
   if (error) throw error
 }

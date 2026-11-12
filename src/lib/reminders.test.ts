@@ -267,3 +267,12 @@ describe('putting it together', () => {
     expect(messages.every((m) => m.content.length <= 1900)).toBe(true)
   })
 })
+
+describe('endgame that has not opened yet', () => {
+  it('is left out of the nudge until it opens', () => {
+    // Endstate Matrix opens Nov 19 and ends Nov 20 at 04:00 (a short cycle, to fall inside 24 hours)
+    const t = task('Endstate Matrix', { category: 'endgame', frequency: 'dated', cycle_ends_at: '2026-11-20T04:00', cycle_anchor: '2026-11-19' })
+    expect(whatsLeft([game({ tasks: [t] })], ticks({}), at('2026-11-19T03:00:00+08:00'))).toEqual([])
+    expect(whatsLeft([game({ tasks: [t] })], ticks({}), at('2026-11-19T21:00:00+08:00'))[0].endgame).toHaveLength(1)
+  })
+})

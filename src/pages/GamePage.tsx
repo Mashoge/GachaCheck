@@ -3,7 +3,7 @@ import { Link, NavLink, useParams } from 'react-router'
 import { findPreset, findServer } from '../data/presets'
 import { meterStates, type MeterRow, type MeterState } from '../lib/stamina'
 import { messageOf } from '../lib/errors'
-import { setCycleEndsAt } from '../lib/games'
+import { setCycleDates } from '../lib/games'
 import { dailyPeriod, formatDuration, formatWhen, weeklyPeriod, zonedTime } from '../lib/time'
 import { clockOf, isVisible, taskProgress, useTodayData, type Task, type TodayData } from '../lib/today'
 import { SHORT_NAMES } from '../lib/useGames'
@@ -19,11 +19,13 @@ export default function GamePage() {
   const [quick, setQuick] = useState(startsQuick)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // `cycleOver` = the old end date has passed, so this starts a new cycle (not a correction of the current one)
-  const saveEndDate = async (task: Task, endsAt: string, cycleOver: boolean) => {
+  // `cycleOver` = the old end date has passed, so this is a new cycle. Without a start date it counts from
+  // where the old one ended, so a clear from the old cycle isn't counted again.
+  const saveEndDate = async (task: Task, endsAt: string, startDay: string | null, cycleOver: boolean) => {
     setSaveError(null)
+    const previousEnd = cycleOver && task.cycle_ends_at ? task.cycle_ends_at.slice(0, 10) : null
     try {
-      await setCycleEndsAt(task.id, endsAt, cycleOver ? task.cycle_ends_at : null)
+      await setCycleDates(task.id, endsAt, startDay ?? previousEnd)
     } catch (err) {
       setSaveError(messageOf(err))
     }
@@ -88,7 +90,7 @@ export default function GamePage() {
           onTick={(task, periodStart) => void addCompletion(task.id, periodStart)}
           onRemove={(task, ids) => void removeCompletions(task.id, ids)}
           onSetMeter={(meterId, value) => void setMeterValue(game, meterId, value)}
-          onSetEndDate={(task, endsAt, cycleOver) => void saveEndDate(task, endsAt, cycleOver)}
+          onSetEndDate={(task, endsAt, startDay, cycleOver) => void saveEndDate(task, endsAt, startDay, cycleOver)}
         />
       )}
     </div>
@@ -103,7 +105,7 @@ type Props = {
   onTick: (task: Task, periodStart: Date) => void
   onRemove: (task: Task, ids: string[]) => void
   onSetMeter: (meterId: string, value: number) => void
-  onSetEndDate: (task: Task, endsAt: string, cycleOver: boolean) => void
+  onSetEndDate: (task: Task, endsAt: string, startDay: string | null, cycleOver: boolean) => void
 }
 
 function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, onSetEndDate }: Props) {
@@ -237,14 +239,15 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, o
                 .filter((t) => !quick || !progressOf(t).done)
                 .map((t) => {
                   const p = progressOf(t)
+                  const notStarted = !!p.period && p.period.start > now // e.g. Endstate Matrix opens 7 days into a version
                   const left = p.period?.end ? p.period.end.getTime() - now.getTime() : null
-                  const soon = left !== null && left < 3 * 86_400_000 && !p.done
+                  const soon = !notStarted && left !== null && left < 3 * 86_400_000 && !p.done
                   return (
                     <div key={t.id} className={`flex flex-col rounded-xl border bg-raised ${soon ? 'border-urgent' : 'border-transparent'}`}>
                       <button
                         type="button"
                         aria-pressed={p.done}
-                        disabled={!p.period}
+                        disabled={!p.period || notStarted}
                         onClick={() => toggle(t)}
                         className="flex min-h-12 items-center gap-3 px-3 py-2 text-left disabled:cursor-default"
                       >
@@ -252,11 +255,17 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, o
                         <span className="flex min-w-0 flex-1 flex-col">
                           <span className="text-sm font-medium">{t.title}</span>
                           <span className={`text-xs ${soon ? 'text-urgent' : 'text-muted'}`}>
-                            {!p.period ? 'Dates not set yet' : p.done ? 'Cleared this cycle' : soon ? 'Not cleared · ending soon' : 'Not cleared'}
+                            {!p.period
+                              ? 'Dates not set yet'
+                              : notStarted
+                                ? `Opens ${formatWhen(p.period.start, now)}`
+                                : p.done ? 'Cleared this cycle' : soon ? 'Not cleared · ending soon' : 'Not cleared'}
                           </span>
                         </span>
                         <span className={`whitespace-nowrap text-xs font-semibold ${soon ? 'text-urgent' : ''}`}>
-                          {left !== null ? `Resets in ${formatDuration(left)}` : '—'}
+                          {notStarted
+                            ? `Starts in ${formatDuration(p.period!.start.getTime() - now.getTime())}`
+                            : left !== null ? `Resets in ${formatDuration(left)}` : '—'}
                         </span>
                       </button>
                       {/* Modes without a fixed schedule: you enter when the current cycle ends */}
@@ -267,7 +276,7 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, o
                           timezone={game.timezone}
                           zoneLabel={serverLabel ?? 'game'}
                           now={now}
-                          onSave={(endsAt) => onSetEndDate(t, endsAt, !p.period)}
+                          onSave={(endsAt, startDay) => onSetEndDate(t, endsAt, startDay, !p.period)}
                         />
                       )}
                     </div>
@@ -284,9 +293,9 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, o
               events.map((ev) => {
                 const left = new Date(ev.ends_at).getTime() - now.getTime()
                 return (
-                  <div key={ev.id} className="flex min-h-10 items-center justify-between gap-3 border-b border-line text-sm">
-                    <span>{ev.name}</span>
-                    <span className={`text-xs font-semibold ${left < 86_400_000 ? 'text-urgent' : 'text-muted'}`}>Ends in {formatDuration(left)}</span>
+                  <div key={ev.id} className="flex min-h-10 items-center justify-between gap-3 border-b border-line py-1.5 text-sm">
+                    <span className="min-w-0">{ev.name}</span>
+                    <span className={`shrink-0 whitespace-nowrap text-xs font-semibold ${left < 86_400_000 ? 'text-urgent' : 'text-muted'}`}>Ends in {formatDuration(left)}</span>
                   </div>
                 )
               })
@@ -352,14 +361,16 @@ function TaskRow({ task, done, onToggle, meta }: { task: Task; done: boolean; on
 }
 
 // "Set end date" for endgame modes whose dates change each cycle. The time is the server's, as the game shows it.
-function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }: { task: Task; active: boolean; timezone: string; zoneLabel: string; now: Date; onSave: (endsAt: string) => void }) {
+function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }: { task: Task; active: boolean; timezone: string; zoneLabel: string; now: Date; onSave: (endsAt: string, startDay: string | null) => void }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  const [startDraft, setStartDraft] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
   const id = `ends-${task.id}`
 
   const open = () => {
     setDraft(active && task.cycle_ends_at ? task.cycle_ends_at.replace(' ', 'T').slice(0, 16) : '')
+    setStartDraft(active && task.cycle_anchor ? task.cycle_anchor.slice(0, 10) : '')
     setProblem(null)
     setEditing(true)
   }
@@ -368,8 +379,15 @@ function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }: { tas
     const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(draft)
     if (!match) return setProblem('Pick a date and a time.')
     const [y, m, d, h, mi] = match.slice(1).map(Number)
-    if (zonedTime(y, m, d, h, mi, timezone) <= now) return setProblem('That time has already passed.')
-    onSave(draft)
+    const end = zonedTime(y, m, d, h, mi, timezone)
+    if (end <= now) return setProblem('That time has already passed.')
+    if (startDraft) {
+      const [sy, sm, sd] = startDraft.split('-').map(Number)
+      const start = zonedTime(sy, sm, sd, 0, 0, timezone)
+      if (start >= end) return setProblem('The start has to be before the end.')
+      if (end.getTime() - start.getTime() > 60 * 86_400_000) return setProblem('A cycle can be at most 60 days long.')
+    }
+    onSave(draft, startDraft || null)
     setEditing(false)
   }
 
@@ -389,9 +407,8 @@ function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }: { tas
         save()
       }}
     >
-      <label htmlFor={id} className="w-full text-xs text-muted">
-        When does the current cycle end? Enter it in {zoneLabel} server time, as the game shows it.
-      </label>
+      <p className="w-full text-xs text-muted">Enter the dates in {zoneLabel} server time, as the game shows them.</p>
+      <label htmlFor={id} className="w-14 text-xs text-muted">Ends</label>
       <input
         id={id}
         type="datetime-local"
@@ -400,6 +417,16 @@ function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }: { tas
         onChange={(e) => setDraft(e.target.value)}
         className="min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-page px-3 text-sm text-ink [color-scheme:dark]"
       />
+      <span className="w-full" />
+      <label htmlFor={`${id}-start`} className="w-14 text-xs text-muted">Starts</label>
+      <input
+        id={`${id}-start`}
+        type="date"
+        value={startDraft}
+        onChange={(e) => setStartDraft(e.target.value)}
+        className="min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-page px-3 text-sm text-ink [color-scheme:dark]"
+      />
+      <p className="w-full text-xs text-muted">Starts is optional. Set it when the mode opens later, like Endstate Matrix 7 days into a version.</p>
       <button type="submit" className="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent">Save</button>
       <button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg px-2 text-sm text-muted hover:text-ink">Cancel</button>
       {problem && <p className="w-full text-xs text-urgent">{problem}</p>}
