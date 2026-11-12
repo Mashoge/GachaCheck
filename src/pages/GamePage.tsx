@@ -2,7 +2,9 @@ import { Fragment, useState } from 'react'
 import { Link, NavLink, useParams } from 'react-router'
 import { findPreset, findServer } from '../data/presets'
 import { meterStates, type MeterRow, type MeterState } from '../lib/stamina'
-import { dailyPeriod, formatDuration, formatWhen, weeklyPeriod } from '../lib/time'
+import { messageOf } from '../lib/errors'
+import { setCycleEndsAt } from '../lib/games'
+import { dailyPeriod, formatDuration, formatWhen, weeklyPeriod, zonedTime } from '../lib/time'
 import { clockOf, isVisible, taskProgress, useTodayData, type Task, type TodayData } from '../lib/today'
 import { SHORT_NAMES } from '../lib/useGames'
 import { useNow } from '../lib/useNow'
@@ -12,9 +14,21 @@ const startsQuick = () => typeof window !== 'undefined' && !window.matchMedia('(
 
 export default function GamePage() {
   const { presetId } = useParams()
-  const { data, error, loading, addCompletion, removeCompletions, setMeterValue } = useTodayData()
+  const { data, error, loading, refresh, addCompletion, removeCompletions, setMeterValue } = useTodayData()
   const now = useNow()
   const [quick, setQuick] = useState(startsQuick)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // `cycleOver` = the old end date has passed, so this starts a new cycle (not a correction of the current one)
+  const saveEndDate = async (task: Task, endsAt: string, cycleOver: boolean) => {
+    setSaveError(null)
+    try {
+      await setCycleEndsAt(task.id, endsAt, cycleOver ? task.cycle_ends_at : null)
+    } catch (err) {
+      setSaveError(messageOf(err))
+    }
+    await refresh()
+  }
 
   const games = data?.games ?? []
   const game = games.find((g) => g.preset_id === presetId)
@@ -58,7 +72,7 @@ export default function GamePage() {
       </div>
 
       {loading && <p className="text-muted">Loading…</p>}
-      {error && <p className="text-urgent">{error}</p>}
+      {(error || saveError) && <p className="text-urgent">{error ?? saveError}</p>}
       {data && !game && (
         <p className="text-muted">
           This game isn't in your list. <Link to="/games" className="text-accent underline">Manage games</Link>
@@ -74,6 +88,7 @@ export default function GamePage() {
           onTick={(task, periodStart) => void addCompletion(task.id, periodStart)}
           onRemove={(task, ids) => void removeCompletions(task.id, ids)}
           onSetMeter={(meterId, value) => void setMeterValue(game, meterId, value)}
+          onSetEndDate={(task, endsAt, cycleOver) => void saveEndDate(task, endsAt, cycleOver)}
         />
       )}
     </div>
@@ -88,9 +103,10 @@ type Props = {
   onTick: (task: Task, periodStart: Date) => void
   onRemove: (task: Task, ids: string[]) => void
   onSetMeter: (meterId: string, value: number) => void
+  onSetEndDate: (task: Task, endsAt: string, cycleOver: boolean) => void
 }
 
-function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter }: Props) {
+function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, onSetEndDate }: Props) {
   const clock = clockOf(game)
   const preset = game.preset_id ? findPreset(game.preset_id) : undefined
   const serverLabel = preset && game.server ? findServer(preset, game.server)?.label : null
@@ -224,25 +240,37 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter }:
                   const left = p.period?.end ? p.period.end.getTime() - now.getTime() : null
                   const soon = left !== null && left < 3 * 86_400_000 && !p.done
                   return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      aria-pressed={p.done}
-                      disabled={!p.period}
-                      onClick={() => toggle(t)}
-                      className={`flex min-h-12 items-center gap-3 rounded-xl border bg-raised px-3 py-2 text-left disabled:cursor-default ${soon ? 'border-urgent' : 'border-transparent'}`}
-                    >
-                      <Check done={p.done} />
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="text-sm font-medium">{t.title}</span>
-                        <span className={`text-xs ${soon ? 'text-urgent' : 'text-muted'}`}>
-                          {!p.period ? 'Dates not set yet' : p.done ? 'Cleared this cycle' : soon ? 'Not cleared · ending soon' : 'Not cleared'}
+                    <div key={t.id} className={`flex flex-col rounded-xl border bg-raised ${soon ? 'border-urgent' : 'border-transparent'}`}>
+                      <button
+                        type="button"
+                        aria-pressed={p.done}
+                        disabled={!p.period}
+                        onClick={() => toggle(t)}
+                        className="flex min-h-12 items-center gap-3 px-3 py-2 text-left disabled:cursor-default"
+                      >
+                        <Check done={p.done} />
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="text-sm font-medium">{t.title}</span>
+                          <span className={`text-xs ${soon ? 'text-urgent' : 'text-muted'}`}>
+                            {!p.period ? 'Dates not set yet' : p.done ? 'Cleared this cycle' : soon ? 'Not cleared · ending soon' : 'Not cleared'}
+                          </span>
                         </span>
-                      </span>
-                      <span className={`whitespace-nowrap text-xs font-semibold ${soon ? 'text-urgent' : ''}`}>
-                        {left !== null ? `Resets in ${formatDuration(left)}` : '—'}
-                      </span>
-                    </button>
+                        <span className={`whitespace-nowrap text-xs font-semibold ${soon ? 'text-urgent' : ''}`}>
+                          {left !== null ? `Resets in ${formatDuration(left)}` : '—'}
+                        </span>
+                      </button>
+                      {/* Modes without a fixed schedule: you enter when the current cycle ends */}
+                      {t.frequency === 'dated' && (
+                        <EndDateEditor
+                          task={t}
+                          active={!!p.period}
+                          timezone={game.timezone}
+                          zoneLabel={serverLabel ?? 'game'}
+                          now={now}
+                          onSave={(endsAt) => onSetEndDate(t, endsAt, !p.period)}
+                        />
+                      )}
+                    </div>
                   )
                 })}
             </div>
@@ -320,6 +348,62 @@ function TaskRow({ task, done, onToggle, meta }: { task: Task; done: boolean; on
       </span>
       {meta && <span className="whitespace-nowrap text-xs text-muted">{meta}</span>}
     </button>
+  )
+}
+
+// "Set end date" for endgame modes whose dates change each cycle. The time is the server's, as the game shows it.
+function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }: { task: Task; active: boolean; timezone: string; zoneLabel: string; now: Date; onSave: (endsAt: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [problem, setProblem] = useState<string | null>(null)
+  const id = `ends-${task.id}`
+
+  const open = () => {
+    setDraft(active && task.cycle_ends_at ? task.cycle_ends_at.replace(' ', 'T').slice(0, 16) : '')
+    setProblem(null)
+    setEditing(true)
+  }
+
+  const save = () => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(draft)
+    if (!match) return setProblem('Pick a date and a time.')
+    const [y, m, d, h, mi] = match.slice(1).map(Number)
+    if (zonedTime(y, m, d, h, mi, timezone) <= now) return setProblem('That time has already passed.')
+    onSave(draft)
+    setEditing(false)
+  }
+
+  if (!editing) {
+    return (
+      <button type="button" onClick={open} className="min-h-9 self-start px-3 pb-2 text-xs font-semibold text-accent hover:underline">
+        {active ? 'Change end date' : 'Set end date'}
+      </button>
+    )
+  }
+
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2 border-t border-line px-3 py-2.5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        save()
+      }}
+    >
+      <label htmlFor={id} className="w-full text-xs text-muted">
+        When does the current cycle end? Enter it in {zoneLabel} server time, as the game shows it.
+      </label>
+      <input
+        id={id}
+        type="datetime-local"
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        className="min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-page px-3 text-sm text-ink [color-scheme:dark]"
+      />
+      <button type="submit" className="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent">Save</button>
+      <button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg px-2 text-sm text-muted hover:text-ink">Cancel</button>
+      {problem && <p className="w-full text-xs text-urgent">{problem}</p>}
+    </form>
   )
 }
 

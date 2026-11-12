@@ -111,8 +111,15 @@ export function taskPeriod(rule: TaskRule, clock: ResetClock, now: Date): Period
       if (!rule.cycle_ends_at) return null
       const end = parseServerLocal(rule.cycle_ends_at, tz)
       if (end <= now) return null
-      // Assumption until each mode's length is confirmed: a completion in the last 28 days counts.
-      return { start: new Date(end.getTime() - 28 * DAY_MS), end }
+      // Without a known start, a completion in the last 28 days counts.
+      let start = new Date(end.getTime() - 28 * DAY_MS)
+      // cycle_anchor holds the day the previous cycle ended, so a clear from that cycle is not counted again.
+      if (rule.cycle_anchor) {
+        const [ay, am, ad] = rule.cycle_anchor.split('-').map(Number)
+        const known = zonedTime(ay, am, ad, h, mi, tz)
+        if (known > start && known < end) start = known
+      }
+      return { start, end }
     }
     case 'none':
       return { start: new Date(0), end: null }

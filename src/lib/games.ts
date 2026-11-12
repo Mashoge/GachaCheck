@@ -5,7 +5,8 @@ import { findPreset, findServer, type GamePreset, type PresetTask } from '../dat
 export function fetchGames() {
   return supabase
     .from('games')
-    .select('id, name, server, timezone, daily_reset_time, weekly_reset_day, preset_id, preset_version, tasks(id, title, frequency, category, hidden, optional, archived, preset_key, note, weekly_target, monthly_day, cycle_anchor, cycle_days, cycle_ends_at, due_at), stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at, preset_key, spend_presets)')    .order('created_at')
+    .select('id, name, server, timezone, daily_reset_time, weekly_reset_day, preset_id, preset_version, tasks(id, title, frequency, category, hidden, optional, archived, preset_key, note, weekly_target, monthly_day, cycle_anchor, cycle_days, cycle_ends_at, due_at), stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at, preset_key, spend_presets)')
+    .order('created_at')
     .order('sort_order', { referencedTable: 'tasks' })
     .order('sort_order', { referencedTable: 'stamina_meters' })
 }
@@ -29,6 +30,15 @@ function taskFields(task: PresetTask, sortOrder: number) {
   }
 }
 
+// End dates are written in server time, e.g. '2026-11-12T04:00'. Returns the later of the two.
+// Used so a sync never replaces an end date you entered with an older one (or with nothing).
+export function laterEndDate(a: string | null, b: string | null) {
+  const minute = (v: string) => v.replace(' ', 'T').slice(0, 16)
+  if (!a) return b
+  if (!b) return a
+  return minute(a) >= minute(b) ? a : b
+}
+
 /** Bring one game in line with its preset. Never touches hidden flags or custom tasks. */
 export async function syncGame(gameId: string, preset: GamePreset, serverId: string | null) {
   const server = findServer(preset, serverId) ?? findServer(preset, preset.defaultServer)
@@ -49,18 +59,22 @@ export async function syncGame(gameId: string, preset: GamePreset, serverId: str
   // ---- Tasks (only rows that came from the preset) ----
   const { data: existingTasks, error: tasksError } = await supabase
     .from('tasks')
-    .select('id, preset_key, archived')
+    .select('id, preset_key, archived, cycle_ends_at, cycle_anchor')
     .eq('game_id', gameId)
     .not('preset_key', 'is', null)
   if (tasksError) throw tasksError
 
-  const taskIdByKey = new Map(existingTasks.map((t) => [t.preset_key ?? '', t.id]))
+  const taskByKey = new Map(existingTasks.map((t) => [t.preset_key ?? '', t]))
   const newTasks: TablesInsert<'tasks'>[] = []
   for (const [index, task] of preset.tasks.entries()) {
     const fields = taskFields(task, index)
-    const existingId = taskIdByKey.get(task.key)
-    if (existingId) {
-      const { error } = await supabase.from('tasks').update({ ...fields, archived: false }).eq('id', existingId)
+    const existing = taskByKey.get(task.key)
+    if (existing) {
+      // Keep an end date entered in the app unless the preset has a later one
+      const cycle_ends_at = laterEndDate(existing.cycle_ends_at, fields.cycle_ends_at)
+      // ...and the start day saved with it (modes on a fixed schedule take theirs from the preset)
+      const cycle_anchor = fields.cycle_anchor ?? existing.cycle_anchor
+      const { error } = await supabase.from('tasks').update({ ...fields, cycle_ends_at, cycle_anchor, archived: false }).eq('id', existing.id)
       if (error) throw error
     } else {
       newTasks.push({ ...fields, game_id: gameId, preset_key: task.key, hidden: task.optional ?? false })
@@ -210,6 +224,19 @@ export async function setTaskHidden(taskId: string, hidden: boolean) {
 
 export async function setWeeklyTarget(taskId: string, target: number | null) {
   const { error } = await supabase.from('tasks').update({ weekly_target: target }).eq('id', taskId)
+  if (error) throw error
+}
+
+/**
+ * End date of the current cycle for modes without a fixed schedule, in server time ('YYYY-MM-DDTHH:MM').
+ * `previousEnd` is the end of the cycle that just finished, if there was one: the new cycle starts there,
+ * so a clear from the old cycle isn't counted again.
+ */
+export async function setCycleEndsAt(taskId: string, endsAt: string, previousEnd: string | null) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ cycle_ends_at: endsAt, ...(previousEnd ? { cycle_anchor: previousEnd.slice(0, 10) } : {}) })
+    .eq('id', taskId)
   if (error) throw error
 }
 

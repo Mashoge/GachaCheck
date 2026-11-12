@@ -174,6 +174,21 @@ describe('fixed end date (dated)', () => {
     expect(p.end).toEqual(at('2026-11-12T04:00:00+08:00'))
   })
 
+  it('a clear from the previous cycle does not count once the next end date is set', () => {
+    // Previous cycle ended Nov 12; the next one ends Nov 26 (a 14-day cycle).
+    const next = rule({ frequency: 'dated', cycle_ends_at: '2026-11-26T04:00', cycle_anchor: '2026-11-12' })
+    const p = taskPeriod(next, ASIA_4AM, at('2026-11-13T12:00:00+08:00'))!
+    expect(p.start).toEqual(at('2026-11-12T04:00:00+08:00'))
+    expect(countIn(p, ['2026-11-10T20:00:00+08:00'])).toBe(0) // cleared last cycle
+    expect(countIn(p, ['2026-11-13T09:00:00+08:00'])).toBe(1) // cleared this cycle
+  })
+
+  it('an old start day is ignored when it is more than 28 days before the end', () => {
+    const r = rule({ frequency: 'dated', cycle_ends_at: '2026-11-26T04:00', cycle_anchor: '2026-09-01' })
+    const p = taskPeriod(r, ASIA_4AM, at('2026-11-13T12:00:00+08:00'))!
+    expect(p.start).toEqual(at('2026-10-29T04:00:00+08:00'))
+  })
+
   it('after the end date there is no period until new dates are added', () => {
     expect(taskPeriod(endstate, ASIA_4AM, at('2026-11-12T04:00:00+08:00'))).toBeNull()
   })
