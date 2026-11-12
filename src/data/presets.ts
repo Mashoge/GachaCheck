@@ -34,6 +34,7 @@ export interface PresetTask {
   cycleAnchor?: string        // 'YYYY-MM-DD' server date, for rule 'interval'
   cycleDays?: number          // for rule 'interval'
   cycleEndsAt?: string        // 'YYYY-MM-DDTHH:MM' server time, for rule 'dated' (omit if unknown)
+  meter?: string              // key of the stamina meter this task spends; ticking it asks for the new value
 }
 
 export interface GamePreset {
@@ -88,7 +89,7 @@ export const PRESETS: GamePreset[] = [
     meters: [{ key: 'resin', name: 'Original Resin', cap: 200, minutesPerPoint: 8 }],
     tasks: [
       daily('commissions', 'Daily commissions', { note: '4 commissions or Encounter Points' }),
-      daily('spend-resin', 'Spend Original Resin'),
+      daily('spend-resin', 'Spend Original Resin', { meter: 'resin' }),
       daily('hoyolab', 'HoYoLAB check-in'),
       daily('expeditions', 'Collect and send expeditions'),
       daily('teapot-daily', 'Teapot: Realm Currency + Companionship EXP'),
@@ -130,7 +131,7 @@ export const PRESETS: GamePreset[] = [
     ],
     tasks: [
       daily('daily-activity', 'Daily activity (100 points)'),
-      daily('spend-waveplates', 'Spend Waveplates'),
+      daily('spend-waveplates', 'Spend Waveplates', { meter: 'waveplates' }),
       daily('podcast-daily', 'Pioneer Podcast dailies'),
       daily('lunite', 'Claim Lunite Subscription', { optional: true }),
       daily('mail', 'Check mail', { optional: true }),
@@ -167,7 +168,7 @@ export const PRESETS: GamePreset[] = [
     meters: [{ key: 'pixels', name: 'Character Pixels', cap: 360, minutesPerPoint: 6, estimated: true }],
     tasks: [
       daily('commissions', 'Daily commissions (Exploration Guide)'),
-      daily('spend-pixels', 'Spend Character Pixels'),
+      daily('spend-pixels', 'Spend Character Pixels', { meter: 'pixels' }),
       daily('crackdown', 'Illegal Activities Crackdown'),
       daily('witch', "Witch's House fortune"),
       daily('pool', "Nacupeda's Pool rewards"),

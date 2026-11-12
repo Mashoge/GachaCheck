@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link, NavLink, useParams } from 'react-router'
 import { findPreset, findServer } from '../data/presets'
 import { meterStates, type MeterRow, type MeterState } from '../lib/stamina'
@@ -121,11 +121,25 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter }:
     }).map((c) => c.id)
   }
 
+  // A "Spend …" task is linked to a stamina meter in the preset. Ticking it asks what the meter shows now,
+  // so reminders keep working from a real value.
+  const [askFor, setAskFor] = useState<string | null>(null) // id of the task whose meter we're asking about
+  const meterFor = (t: Task) => {
+    const key = preset?.tasks.find((pt) => pt.key === t.preset_key)?.meter
+    const row = key ? game.stamina_meters.find((m) => m.preset_key === key) : undefined
+    return row ? meters.find((m) => m.id === row.id) : undefined
+  }
+
   const toggle = (t: Task) => {
     const p = progressOf(t)
     if (!p.period) return
-    if (p.done) onRemove(t, completionIds(t))
-    else onTick(t, p.period.start)
+    if (p.done) {
+      onRemove(t, completionIds(t))
+      if (askFor === t.id) setAskFor(null)
+    } else {
+      onTick(t, p.period.start)
+      if (meterFor(t)) setAskFor(t.id)
+    }
   }
 
   return (
@@ -161,7 +175,8 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter }:
         <div className="flex flex-col gap-6 [grid-area:checklist]">
           {groups.map((group) => {
             const done = group.items.filter((t) => progressOf(t).doneForNow).length
-            const shown = quick ? group.items.filter((t) => !progressOf(t).doneForNow) : group.items
+            // A task that is waiting for its stamina value stays visible until that is answered
+            const shown = quick ? group.items.filter((t) => !progressOf(t).doneForNow || t.id === askFor) : group.items
             return (
               <div key={group.label} className="flex flex-col">
                 <div className="flex items-center justify-between pb-1">
@@ -172,7 +187,19 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter }:
                   t.weekly_target ? (
                     <CountedRow key={t.id} task={t} progress={progressOf(t)} onAdd={() => onTick(t, progressOf(t).period!.start)} onUndo={() => onRemove(t, completionIds(t).slice(-1))} />
                   ) : (
-                    <TaskRow key={t.id} task={t} done={progressOf(t).done} onToggle={() => toggle(t)} />
+                    <Fragment key={t.id}>
+                      <TaskRow task={t} done={progressOf(t).done} onToggle={() => toggle(t)} />
+                      {askFor === t.id && meterFor(t) && (
+                        <SpendPrompt
+                          meter={meterFor(t)!}
+                          onSave={(v) => {
+                            onSetMeter(meterFor(t)!.id, v)
+                            setAskFor(null)
+                          }}
+                          onSkip={() => setAskFor(null)}
+                        />
+                      )}
+                    </Fragment>
                   ),
                 )}
                 {shown.length === 0 && (
@@ -293,6 +320,42 @@ function TaskRow({ task, done, onToggle, meta }: { task: Task; done: boolean; on
       </span>
       {meta && <span className="whitespace-nowrap text-xs text-muted">{meta}</span>}
     </button>
+  )
+}
+
+// Shown under a "Spend …" task right after it is ticked.
+function SpendPrompt({ meter, onSave, onSkip }: { meter: MeterState; onSave: (value: number) => void; onSkip: () => void }) {
+  const [draft, setDraft] = useState('')
+  const id = `spent-${meter.id}`
+  const value = Number(draft)
+  const valid = draft.trim() !== '' && Number.isFinite(value) && value >= 0
+
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2 border-b border-line bg-raised px-3 py-2.5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (valid) onSave(value)
+      }}
+    >
+      <label htmlFor={id} className="w-full text-xs text-muted">
+        How much {meter.name} do you have now? This keeps the countdown and reminders right.
+      </label>
+      <input
+        id={id}
+        type="number"
+        inputMode="numeric"
+        min={0}
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={`0–${meter.cap}`}
+        className="min-h-10 w-28 rounded-lg border border-line bg-page px-3 text-sm text-ink placeholder:text-muted"
+      />
+      <button type="submit" disabled={!valid} className="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent disabled:opacity-40">Save</button>
+      <button type="button" onClick={() => onSave(0)} className="min-h-10 rounded-lg border border-line px-3 text-sm font-semibold text-muted hover:text-ink">None left</button>
+      <button type="button" onClick={onSkip} className="min-h-10 rounded-lg px-2 text-sm text-muted hover:text-ink">Skip</button>
+    </form>
   )
 }
 
