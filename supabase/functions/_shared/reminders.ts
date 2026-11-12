@@ -6,6 +6,7 @@ import { countIn, dailyPeriod, taskPeriod, weeklyPeriod, type ResetClock, type T
 
 export type ReminderTask = TaskRule & {
   id: string
+  preset_key?: string | null
   title: string
   category: string
   hidden: boolean

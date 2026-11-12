@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { findPreset, findServer } from '../data/presets'
 import { messageOf } from '../lib/errors'
-import { addEvent, deleteEvent, fetchEvents, setEventDone, updateEvent, type EventInput, type GameEvent } from '../lib/events'
+import { addEvent, deleteEvent, fetchEvents, hideEvent, setEventDone, updateEvent, type EventInput, type GameEvent } from '../lib/events'
 import { minuteBefore, serverParts, toInstant } from '../lib/eventTime'
 import { formatDuration, formatWhen, taskPeriod } from '../lib/time'
 import { clockOf, isVisible, useTodayData, type Game } from '../lib/today'
@@ -127,8 +127,9 @@ export default function EventsPage() {
             if (ok && !keepOpen) setForm(null)
             return ok
           }}
-          onDelete={async (id) => {
-            if (await run(() => deleteEvent(id))) setForm(null)
+          onDelete={async (event) => {
+            const remove = event.source === 'manual' ? deleteEvent : hideEvent
+            if (await run(() => remove(event.id))) setForm(null)
           }}
         />
       )}
@@ -208,6 +209,7 @@ function EventCard({ event, game, now, onEdit, onDone }: { event: GameEvent; gam
         <span className="flex items-center gap-2">
           <span aria-hidden="true" className={`size-2.5 rounded-sm ${gameBg(game)}`} />
           {shortName(game)}
+          {event.source !== 'manual' && <span className="rounded-full border border-line px-1.5 text-[10px]">Auto-added</span>}
         </span>
         <span className={`font-semibold ${urgent ? 'text-urgent' : ''}`}>
           {isDone ? 'Done' : upcoming ? `Starts in ${formatDuration(start.getTime() - now.getTime())}` : `Ends in ${formatDuration(left)}`}
@@ -340,7 +342,7 @@ type FormProps = {
   now: Date
   onCancel: () => void
   onSave: (input: EventInput, keepOpen: boolean) => Promise<boolean>
-  onDelete: (id: string) => Promise<void>
+  onDelete: (event: GameEvent) => Promise<void>
 }
 
 function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDelete }: FormProps) {
@@ -360,6 +362,7 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [added, setAdded] = useState(0)
+  const imported = !!editing && editing.source !== 'manual'
 
   const game = games.find((g) => g.id === gameId) ?? first
   const preset = findPreset(game.preset_id)
@@ -412,6 +415,9 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
       }}
     >
       <h2 className="text-sm font-semibold">{editing ? 'Edit event' : 'Add event'}</h2>
+      {imported && (
+        <p className="-mt-2 text-xs text-muted">Added automatically from the Genshin announcements. Your changes are kept; the import won't overwrite them.</p>
+      )}
 
       <div className="grid gap-4 md:grid-cols-[200px_minmax(0,1fr)]">
         <div className="flex flex-col gap-1.5">
@@ -475,9 +481,9 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
         {editing &&
           (confirmDelete ? (
             <span className="ml-auto flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted">Delete this event?</span>
-              <button type="button" onClick={() => void onDelete(editing.id)} className="min-h-10 rounded-lg border border-urgent px-3 font-semibold text-urgent">
-                Yes, delete
+              <span className="text-muted">{imported ? "Hide this event? It won't be added again." : 'Delete this event?'}</span>
+              <button type="button" onClick={() => void onDelete(editing)} className="min-h-10 rounded-lg border border-urgent px-3 font-semibold text-urgent">
+                {imported ? 'Yes, hide' : 'Yes, delete'}
               </button>
               <button type="button" onClick={() => setConfirmDelete(false)} className="min-h-10 rounded-lg px-2 text-muted hover:text-ink">
                 Keep
@@ -485,7 +491,7 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
             </span>
           ) : (
             <button type="button" onClick={() => setConfirmDelete(true)} className="ml-auto min-h-10 rounded-lg px-3 text-sm text-muted hover:text-urgent">
-              Delete
+              {imported ? 'Hide' : 'Delete'}
             </button>
           ))}
       </div>

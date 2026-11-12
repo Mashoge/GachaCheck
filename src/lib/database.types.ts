@@ -79,11 +79,14 @@ export type Database = {
           completed_at: string | null
           created_at: string
           ends_at: string
+          external_id: string | null
           game_id: string
+          hidden: boolean
           id: string
           name: string
           note: string | null
           remind: boolean
+          source: string
           starts_at: string | null
           user_id: string
         }
@@ -91,11 +94,14 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           ends_at: string
+          external_id?: string | null
           game_id: string
+          hidden?: boolean
           id?: string
           name: string
           note?: string | null
           remind?: boolean
+          source?: string
           starts_at?: string | null
           user_id?: string
         }
@@ -103,11 +109,14 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           ends_at?: string
+          external_id?: string | null
           game_id?: string
+          hidden?: boolean
           id?: string
           name?: string
           note?: string | null
           remind?: boolean
+          source?: string
           starts_at?: string | null
           user_id?: string
         }
@@ -343,6 +352,7 @@ export type Database = {
         Row: {
           created_at: string
           event_reminder_days: number
+          last_event_import_at: string | null
           last_reminder_run_at: string | null
           nudge_enabled: boolean
           nudge_time: string
@@ -355,6 +365,7 @@ export type Database = {
         Insert: {
           created_at?: string
           event_reminder_days?: number
+          last_event_import_at?: string | null
           last_reminder_run_at?: string | null
           nudge_enabled?: boolean
           nudge_time?: string
@@ -367,6 +378,7 @@ export type Database = {
         Update: {
           created_at?: string
           event_reminder_days?: number
+          last_event_import_at?: string | null
           last_reminder_run_at?: string | null
           nudge_enabled?: boolean
           nudge_time?: string

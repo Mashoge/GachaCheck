@@ -113,11 +113,12 @@ export function taskPeriod(rule: TaskRule, clock: ResetClock, now: Date): Period
       if (end <= now) return null
       // Without a known start, a completion in the last 28 days counts.
       let start = new Date(end.getTime() - 28 * DAY_MS)
-      // cycle_anchor holds the day the previous cycle ended, so a clear from that cycle is not counted again.
+      // cycle_anchor holds the day the cycle started (or the previous one ended), so a clear from the
+      // previous cycle isn't counted again, and a cycle longer than 28 days still counts from its start.
       if (rule.cycle_anchor) {
         const [ay, am, ad] = rule.cycle_anchor.split('-').map(Number)
         const known = zonedTime(ay, am, ad, h, mi, tz)
-        if (known > start && known < end) start = known
+        if (known < end && end.getTime() - known.getTime() <= 60 * DAY_MS) start = known
       }
       return { start, end }
     }

@@ -7,6 +7,8 @@
 // Every call needs the header  x-cron-secret: <CRON_SECRET>.
 // Secrets (set with `supabase secrets set`, never committed): CRON_SECRET, DISCORD_WEBHOOK_URL.
 // Optional setting: APP_URL (the address of the app) adds an "Open GachaCheck" link to each message.
+// Once a day it also reads Genshin's announcement feed and adds new events (see _shared/genshinFeed.ts).
+// A dry run shows what the feed would add, without saving anything.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
@@ -14,10 +16,73 @@ import {
   type Completions, type Reminder, type ReminderEvent, type ReminderGame, type ReminderSettings,
 } from '../_shared/reminders.ts'
 import { meterStates } from '../_shared/stamina.ts'
+import { FEED_REGIONS, feedUrl, laterEndDate, pickFeedEvents, type FeedResult } from '../_shared/genshinFeed.ts'
+
+const IMPORT_EVERY_MS = 20 * 3_600_000 // about once a day; a failed read is retried on the next run
+
+type Db = ReturnType<typeof adminClient>
+type FeedGame = ReminderGame & { user_id: string; preset_id: string | null; server: string | null }
+
+// One read per region per run, shared by every user on that server
+const feedCache = new Map<string, Promise<unknown>>()
+function readFeed(region: string) {
+  if (!feedCache.has(region)) {
+    feedCache.set(
+      region,
+      fetch(feedUrl(region), { signal: AbortSignal.timeout(8000) }).then((res) => {
+        if (!res.ok) throw new Error(`Genshin feed answered ${res.status}`)
+        return res.json()
+      }),
+    )
+  }
+  return feedCache.get(region)!
+}
+
+// What the feed has for this user's Genshin game, or why there is nothing to read
+async function genshinFeedFor(games: FeedGame[], now: Date): Promise<{ game: FeedGame; result: FeedResult } | { skip: string }> {
+  const game = games.find((g) => g.preset_id === 'genshin')
+  if (!game) return { skip: 'no Genshin game' }
+  const region = FEED_REGIONS[game.server ?? '']
+  if (!region) return { skip: `the feed is only set up for the Asia server (this game is on "${game.server}")` }
+  return { game, result: pickFeedEvents(await readFeed(region), now, game.timezone) }
+}
+
+// Adds new events (each notice once; hidden or edited ones are left alone) and the Stygian Onslaught date
+async function importGenshin(db: Db, userId: string, game: FeedGame, result: FeedResult) {
+  let added = 0
+  if (result.events.length > 0) {
+    const { data, error } = await db
+      .from('events')
+      .upsert(
+        result.events.map((e) => ({
+          user_id: userId, game_id: game.id, name: e.name, ends_at: e.endsAt, source: 'genshin_feed', external_id: e.externalId,
+        })),
+        { onConflict: 'user_id,external_id', ignoreDuplicates: true },
+      )
+      .select('id')
+    if (error) throw error
+    added = data.length
+  }
+
+  let stygian: string | null = null
+  const task = game.tasks.find((t) => t.preset_key === 'stygian')
+  if (result.stygian && task) {
+    const current = task.cycle_ends_at
+    if (laterEndDate(current, result.stygian.endsAt) !== current) {
+      const { error } = await db
+        .from('tasks')
+        .update({ cycle_ends_at: result.stygian.endsAt, ...(result.stygian.startDay ? { cycle_anchor: result.stygian.startDay } : {}) })
+        .eq('id', task.id)
+      if (error) throw error
+      stygian = result.stygian.endsAt
+    }
+  }
+  return { added, stygian }
+}
 
 const GAME_COLUMNS =
-  'id, user_id, name, timezone, daily_reset_time, weekly_reset_day, notify_nudge, notify_stamina, notify_events, skipped_until, ' +
-  'tasks(id, title, frequency, category, hidden, optional, archived, weekly_target, monthly_day, cycle_anchor, cycle_days, cycle_ends_at), ' +
+  'id, user_id, name, preset_id, server, timezone, daily_reset_time, weekly_reset_day, notify_nudge, notify_stamina, notify_events, skipped_until, ' +
+  'tasks(id, title, preset_key, frequency, category, hidden, optional, archived, weekly_target, monthly_day, cycle_anchor, cycle_days, cycle_ends_at), ' +
   'stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at)'
 
 const json = (body: unknown, status = 200) =>
@@ -41,6 +106,7 @@ async function sendToDiscord(webhook: string, content: string) {
 }
 
 Deno.serve(async (req) => {
+  feedCache.clear() // a warm instance must not reuse yesterday's feed
   const secret = Deno.env.get('CRON_SECRET')
   if (!secret) return json({ error: 'CRON_SECRET is not set' }, 500)
   if (req.headers.get('x-cron-secret') !== secret) return json({ error: 'Not allowed' }, 401)
@@ -59,10 +125,10 @@ Deno.serve(async (req) => {
     const db = adminClient()
     const since = new Date(now.getTime() - 62 * 86_400_000).toISOString()
     const [settingsRes, gamesRes, completionsRes, eventsRes] = await Promise.all([
-      db.from('user_settings').select('user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, event_reminder_days'),
+      db.from('user_settings').select('user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, event_reminder_days, last_event_import_at'),
       db.from('games').select(GAME_COLUMNS).order('sort_order'),
       db.from('completions').select('task_id, completed_at').gte('completed_at', since),
-      db.from('events').select('id, user_id, game_id, name, starts_at, ends_at, note, remind, completed_at').gt('ends_at', now.toISOString()).is('completed_at', null),
+      db.from('events').select('id, user_id, game_id, name, starts_at, ends_at, note, remind, completed_at').gt('ends_at', now.toISOString()).is('completed_at', null).eq('hidden', false),
     ])
     if (settingsRes.error) throw settingsRes.error
     if (gamesRes.error) throw gamesRes.error
@@ -70,7 +136,7 @@ Deno.serve(async (req) => {
     if (eventsRes.error) throw eventsRes.error
     const allEvents = eventsRes.data as (ReminderEvent & { user_id: string })[]
 
-    const allGames = gamesRes.data as unknown as (ReminderGame & { user_id: string })[]
+    const allGames = gamesRes.data as unknown as FeedGame[]
     const completions: Completions = new Map()
     for (const c of completionsRes.data as { task_id: string; completed_at: string }[]) {
       const list = completions.get(c.task_id) ?? []
@@ -79,7 +145,7 @@ Deno.serve(async (req) => {
     }
 
     const report = []
-    for (const settings of settingsRes.data as ReminderSettings[]) {
+    for (const settings of settingsRes.data as (ReminderSettings & { last_event_import_at: string | null })[]) {
       // One user's problem must not stop the others.
       try {
         const games = allGames.filter((g) => g.user_id === settings.user_id)
@@ -87,6 +153,23 @@ Deno.serve(async (req) => {
         const due = buildReminders(settings, games, completions, now, events)
 
         if (dry) {
+          // What the Genshin import would add right now (nothing is saved)
+          let feed: unknown
+          try {
+            const read = await genshinFeedFor(games, now)
+            feed = 'skip' in read
+              ? { skipped: read.skip }
+              : {
+                  // Events already added (or hidden) are skipped by the real import
+                  eventsInFeed: read.result.events.map((e) => `${e.name} (ends ${e.endsAt})`),
+                  stygianEndsAt: read.result.stygian?.endsAt ?? null,
+                  skippedByRules: read.result.skipped.map((s) => `${s.name}: ${s.reason}`),
+                  lastImport: settings.last_event_import_at,
+                }
+          } catch (err) {
+            feed = { error: err instanceof Error ? err.message : String(err) }
+          }
+
           const sent = new Set<string>()
           if (due.length > 0) {
             const { data, error } = await db.from('notify_log').select('dedupe_key').in('dedupe_key', due.map((r) => r.key))
@@ -110,6 +193,7 @@ Deno.serve(async (req) => {
                 events: g.events.map((e) => `${e.name} (ends ${e.endsAt.toISOString()})`),
               })),
               openEvents: events.length,
+              genshinFeed: feed,
             },
           })
           continue
@@ -139,7 +223,23 @@ Deno.serve(async (req) => {
             throw err
           }
         }
-        report.push({ due: due.length, sent: sentCount })
+        // Genshin events, about once a day. A problem here never blocks the reminders above.
+        let imported: unknown = null
+        const lastImport = settings.last_event_import_at ? new Date(settings.last_event_import_at).getTime() : 0
+        if (now.getTime() - lastImport >= IMPORT_EVERY_MS) {
+          try {
+            const read = await genshinFeedFor(games, now)
+            if ('skip' in read) imported = { skipped: read.skip }
+            else imported = await importGenshin(db, settings.user_id, read.game, read.result)
+            const { error } = await db.from('user_settings').update({ last_event_import_at: now.toISOString() }).eq('user_id', settings.user_id)
+            if (error) throw error
+          } catch (err) {
+            console.error('Genshin event import failed (will retry next run):', err)
+            imported = { error: err instanceof Error ? err.message : String(err) }
+          }
+        }
+
+        report.push({ due: due.length, sent: sentCount, ...(imported ? { genshinImport: imported } : {}) })
 
         // Shown on the Reminders page as "Last checked"
         const { error: stampError } = await db.from('user_settings').update({ last_reminder_run_at: now.toISOString() }).eq('user_id', settings.user_id)

@@ -183,7 +183,15 @@ describe('fixed end date (dated)', () => {
     expect(countIn(p, ['2026-11-13T09:00:00+08:00'])).toBe(1) // cleared this cycle
   })
 
-  it('an old start day is ignored when it is more than 28 days before the end', () => {
+  it('a known start counts the whole cycle, even when it is longer than 28 days', () => {
+    // Stygian Onslaught from the Genshin feed: Nov 9 to Dec 15 (36 days)
+    const r = rule({ frequency: 'dated', cycle_ends_at: '2026-12-15T04:00', cycle_anchor: '2026-11-09' })
+    const p = taskPeriod(r, ASIA_4AM, at('2026-12-01T12:00:00+08:00'))!
+    expect(p.start).toEqual(at('2026-11-09T04:00:00+08:00'))
+    expect(countIn(p, ['2026-11-10T20:00:00+08:00'])).toBe(1)
+  })
+
+  it('an old start day is ignored when it is more than 60 days before the end', () => {
     const r = rule({ frequency: 'dated', cycle_ends_at: '2026-11-26T04:00', cycle_anchor: '2026-09-01' })
     const p = taskPeriod(r, ASIA_4AM, at('2026-11-13T12:00:00+08:00'))!
     expect(p.start).toEqual(at('2026-10-29T04:00:00+08:00'))
