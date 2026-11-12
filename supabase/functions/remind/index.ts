@@ -12,7 +12,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
-  buildReminders, inQuietHours, lastNudgeTime, toMessages, whatsLeft,
+  buildReminders, inQuietHours, lastNudgeTime, toMessages, whatsLeft, withoutRepeatedEvents,
   type Completions, type Reminder, type ReminderEvent, type ReminderGame, type ReminderSettings,
 } from '../_shared/reminders.ts'
 import { meterStates } from '../_shared/stamina.ts'
@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
         }
 
         let sentCount = 0
-        for (const message of toMessages(fresh)) {
+        for (const message of toMessages(withoutRepeatedEvents(fresh, settings, games, completions, now, events))) {
           try {
             // <…> keeps Discord from adding a large link preview
             await sendToDiscord(webhook!, appUrl ? `${message.content}\n\n[Open GachaCheck](<${appUrl}>)` : message.content)

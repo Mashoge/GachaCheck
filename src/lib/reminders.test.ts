@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildReminders, eventReminders, inQuietHours, nudgeReminder, staminaReminders, toMessages, whatsLeft,
+  buildReminders, eventReminders, inQuietHours, nudgeReminder, staminaReminders, toMessages, whatsLeft, withoutRepeatedEvents,
   type Completions, type ReminderEvent, type ReminderGame, type ReminderSettings, type ReminderTask,
 } from '../../supabase/functions/_shared/reminders.ts'
 
@@ -309,5 +309,35 @@ describe('weeklies in the evening nudge', () => {
     const r = nudgeReminder(settings, [game({ tasks: weeklyTasks })], ticks({}), SUNDAY_9PM)!
     expect(r.text).toContain('- Weekly: Weekly bosses')
     expect(r.text).toContain('- Weekly: Enhanced Echo drops (0 of 5)')
+  })
+})
+
+describe('an event is not listed twice in one message', () => {
+  const soon = (): ReminderEvent => ({
+    id: 'e1', game_id: 'g1', name: 'Overdash Club', starts_at: null, ends_at: '2026-11-13T03:59:00+08:00',
+    note: null, remind: true, completed_at: null,
+  })
+  const games = [game({ tasks: [task('Daily activity')] })]
+  const oneDay = { ...settings, event_reminder_days: 1 }
+
+  it('the nudge leaves out an event whose own reminder goes out now', () => {
+    const due = buildReminders(oneDay, games, ticks({}), NINE_PM, [soon()])
+    expect(due.map((r) => r.kind)).toEqual(['event', 'nudge'])
+    const sent = withoutRepeatedEvents(due, oneDay, games, ticks({}), NINE_PM, [soon()])
+    expect(sent.find((r) => r.kind === 'nudge')!.text).not.toContain('Overdash Club')
+    expect(sent.find((r) => r.kind === 'event')!.text).toContain('Overdash Club')
+  })
+
+  it('keeps the event in the nudge when its reminder was sent on an earlier day', () => {
+    const due = buildReminders(oneDay, games, ticks({}), NINE_PM, [soon()])
+    const onlyNudge = due.filter((r) => r.kind === 'nudge') // the event reminder was already in notify_log
+    const sent = withoutRepeatedEvents(onlyNudge, oneDay, games, ticks({}), NINE_PM, [soon()])
+    expect(sent[0].text).toContain('- Event: Overdash Club ends')
+  })
+
+  it('drops the nudge if the event was the only thing in it', () => {
+    const nothingElse = [game({ tasks: [] })]
+    const due = buildReminders(oneDay, nothingElse, ticks({}), NINE_PM, [soon()])
+    expect(withoutRepeatedEvents(due, oneDay, nothingElse, ticks({}), NINE_PM, [soon()]).map((r) => r.kind)).toEqual(['event'])
   })
 })

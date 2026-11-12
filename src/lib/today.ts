@@ -3,7 +3,8 @@ import { supabase } from './supabase'
 import { loadGames, type GameSummary } from './games'
 import { messageOf } from './errors'
 import { meterStates, type MeterState } from './stamina'
-import { countIn, dailyPeriod, formatWhen, taskPeriod, weeklyPeriod, type ResetClock } from './time'
+import { dailyPeriod, formatWhen, type ResetClock } from './time'
+import { progress } from '../../supabase/functions/_shared/progress.ts'
 
 export type Game = GameSummary
 export type Task = GameSummary['tasks'][number]
@@ -24,16 +25,10 @@ export const clockOf = (game: Game): ResetClock => ({
 
 // How many times a task was ticked in its current period, and whether that counts as done.
 // Tasks with a weekly target (e.g. "5 days a week") count across the week; a daily one can be ticked once a day.
+// Uses the same rule as the reminder job (supabase/functions/_shared/progress.ts).
+// "doneForNow" is hidden in What's left and counted as done in the group header.
 export function taskProgress(task: Task, data: TodayData, clock: ResetClock, now: Date) {
-  const ats = (data.completions.get(task.id) ?? []).map((c) => c.at)
-  const counted = task.weekly_target != null
-  const period = counted ? weeklyPeriod(clock, now) : taskPeriod(task, clock, now)
-  const count = period ? countIn(period, ats) : 0
-  const target = task.weekly_target ?? 1
-  const done = count >= target
-  const today = counted && task.frequency === 'daily' ? countIn(dailyPeriod(clock, now), ats) > 0 : false
-  // "done for now": hidden in What's left, counted as done in the group header
-  return { period, count, target, done, today, doneForNow: done || today }
+  return progress(task, (data.completions.get(task.id) ?? []).map((c) => c.at), clock, now)
 }
 
 // Ids of the task's completions in its current period (what an untick removes)

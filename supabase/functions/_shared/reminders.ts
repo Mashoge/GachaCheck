@@ -2,7 +2,8 @@
 // so it can be unit-tested. The "remind" function loads the rows and sends the result.
 
 import { meterStates, type MeterRow } from './stamina.ts'
-import { countIn, dailyPeriod, taskPeriod, weeklyPeriod, type ResetClock, type TaskRule } from './time.ts'
+import { progress } from './progress.ts'
+import { dailyPeriod, weeklyPeriod, type ResetClock, type TaskRule } from './time.ts'
 
 export type ReminderTask = TaskRule & {
   id: string
@@ -54,6 +55,7 @@ export type Reminder = {
   kind: 'stamina' | 'nudge' | 'event'
   key: string // saved in notify_log so the same reminder is never sent twice
   text: string
+  eventId?: string // for kind 'event'
 }
 
 // task id → when it was ticked (ISO strings)
@@ -82,16 +84,7 @@ const isLive = (e: ReminderEvent, now: Date) =>
   !e.completed_at && new Date(e.ends_at) > now && (!e.starts_at || new Date(e.starts_at) <= now)
 const isVisible = (t: ReminderTask) => !t.archived && !t.hidden
 
-// Same rules as the app: weekly-target tasks count across the week, and a daily one ticked today is done for now.
-function progress(task: ReminderTask, ats: string[], clock: ResetClock, now: Date) {
-  const counted = task.weekly_target != null
-  const period = counted ? weeklyPeriod(clock, now) : taskPeriod(task, clock, now)
-  const count = period ? countIn(period, ats) : 0
-  const target = task.weekly_target ?? 1
-  const done = count >= target
-  const today = counted && task.frequency === 'daily' ? countIn(dailyPeriod(clock, now), ats) > 0 : false
-  return { period, count, target, doneForNow: done || today }
-}
+// "Is it done?" is the same rule the app uses, from progress.ts
 
 // ---- Quiet hours: stamina pings are held, then sent on the first run after they end ----
 
@@ -218,6 +211,7 @@ export function eventReminders(settings: ReminderSettings, games: ReminderGame[]
     const note = e.note?.trim() ? ` Progress: ${e.note.trim()}` : ''
     out.push({
       kind: 'event',
+      eventId: e.id,
       // The end time is part of the key, so moving the end date allows a fresh reminder.
       key: `event:${e.id}:${endsAt.toISOString()}`,
       text: `**${game.name}**: ${e.name} ends ${relative(endsAt)} (<t:${unix(endsAt)}:f>).${note}`,
@@ -233,6 +227,17 @@ export function buildReminders(settings: ReminderSettings, games: ReminderGame[]
   const stamina = held ? [] : staminaReminders(games, now)
   const ending = held ? [] : eventReminders(settings, games, events, now)
   return [...stamina, ...ending, ...(nudge ? [nudge] : [])]
+}
+
+// When an event's own reminder goes out in the same run as the evening nudge, the nudge leaves that event
+// out, so it isn't listed twice in one message. `fresh` is what is actually being sent (not sent before).
+export function withoutRepeatedEvents(
+  fresh: Reminder[], settings: ReminderSettings, games: ReminderGame[], completions: Completions, now: Date, events: ReminderEvent[],
+): Reminder[] {
+  const sentNow = new Set(fresh.filter((r) => r.kind === 'event' && r.eventId).map((r) => r.eventId!))
+  if (sentNow.size === 0 || !fresh.some((r) => r.kind === 'nudge')) return fresh
+  const nudge = nudgeReminder(settings, games, completions, now, events.filter((e) => !sentNow.has(e.id)))
+  return fresh.flatMap((r) => (r.kind !== 'nudge' ? [r] : nudge ? [{ ...r, text: nudge.text }] : []))
 }
 
 // Discord allows 2,000 characters per message; group reminders into messages under that.
