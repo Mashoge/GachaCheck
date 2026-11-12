@@ -38,9 +38,9 @@ function schedule(task: Task) {
 }
 
 const smallButton =
-  'h-8 rounded-lg border border-[#3A4052] bg-[#262B39] px-2.5 text-xs disabled:opacity-50'
+  'min-h-9 rounded-lg border border-line bg-surface px-2.5 text-xs font-semibold disabled:opacity-50'
 const fieldClass =
-  'h-10 rounded-xl border border-[#2E3445] bg-[#0D0F14] px-3 text-sm text-[#ECEEF3] outline-none [color-scheme:dark] focus:border-[#8B7CFF]'
+  'min-h-10 rounded-xl border border-line bg-page px-3 text-sm text-ink outline-none [color-scheme:dark] focus:border-accent'
 
 interface TaskManagerProps {
   game: GameSummary
@@ -88,13 +88,13 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
   const preset = findPreset(game.preset_id)
 
   return (
-    <div className="space-y-4 border-t border-[#262B39] pt-4">
+    <div className="space-y-4 border-t border-line pt-4">
       {GROUPS.map((group) => {
         const tasks = active.filter(group.match)
         if (tasks.length === 0) return null
         return (
           <section key={group.label} className="space-y-2">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-[#9AA1B2]">{group.label}</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">{group.label}</h4>
             <ul className="space-y-1.5">
               {tasks.map((task) => {
                 const isCustom = task.preset_key === null
@@ -103,57 +103,61 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
                 const showTarget = task.weekly_target !== null || targetFor === task.id
                 const canSetTarget =
                   !showTarget && (isCustom ? task.frequency !== 'none' : Boolean(presetTask?.targetEditable))
+                // With a target box, the name gets its own line on a phone so it isn't squeezed
+                const extras = showTarget || canSetTarget
                 return (
                   <li key={task.id}
-                    className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-[#1E2230] px-3 py-2 ${task.hidden ? 'opacity-50' : ''}`}>
-                    <div className="min-w-0 flex-1 space-y-0.5">
+                    className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-raised px-3 py-2 ${task.hidden ? 'opacity-50' : ''}`}>
+                    <div className={`min-w-0 space-y-0.5 ${extras ? 'basis-full sm:basis-0 sm:flex-1' : 'flex-1'}`}>
                       <div className="flex flex-wrap items-center gap-2 text-sm">
                         <span>{task.title}</span>
-                        {task.optional && <span className="rounded bg-[#262B39] px-1.5 text-[11px] text-[#C9CDD8]">Optional</span>}
-                        {isCustom && <span className="rounded bg-[#241F44] px-1.5 text-[11px] text-[#B9B0FF]">Mine</span>}
-                        {task.hidden && <span className="text-[11px] text-[#9AA1B2]">Hidden</span>}
+                        {task.optional && <span className="rounded bg-line px-1.5 text-[11px] text-muted">Optional</span>}
+                        {isCustom && <span className="rounded bg-active px-1.5 text-[11px] text-accent">Mine</span>}
+                        {task.hidden && <span className="text-[11px] text-muted">Hidden</span>}
                       </div>
                       {(task.note || hint) && (
-                        <p className="text-xs text-[#9AA1B2]">{[hint, task.note].filter(Boolean).join(' · ')}</p>
+                        <p className="text-xs text-muted">{[hint, task.note].filter(Boolean).join(' · ')}</p>
                       )}
                     </div>
 
-                    {showTarget && (
-                      <label className="flex items-center gap-1.5 text-xs text-[#C9CDD8]">
-                        Target / week
-                        <input
-                          key={`${task.id}-${task.weekly_target ?? ''}`}
-                          type="number" min={1} max={50} disabled={busy}
-                          autoFocus={targetFor === task.id}
-                          defaultValue={task.weekly_target ?? ''}
-                          onBlur={(e) => {
-                            const value = e.target.value ? Number(e.target.value) : null
-                            setTargetFor(null)
-                            if (value !== task.weekly_target) void run(() => setWeeklyTarget(task.id, value))
-                          }}
-                          className="h-8 w-16 rounded-lg border border-[#2E3445] bg-[#0D0F14] px-2 text-sm [color-scheme:dark]"
-                        />
-                      </label>
-                    )}
-                    {canSetTarget && (
-                      <button type="button" disabled={busy} onClick={() => setTargetFor(task.id)}
-                        className="text-xs text-[#B9B0FF] hover:text-[#D6D0FF] disabled:opacity-50">
-                        Set target
-                      </button>
-                    )}
+                    <div className="ml-auto flex shrink-0 items-center gap-3">
+                      {showTarget && (
+                        <label className="flex items-center gap-1.5 text-xs text-muted">
+                          Target / week
+                          <input
+                            key={`${task.id}-${task.weekly_target ?? ''}`}
+                            type="number" min={1} max={50} disabled={busy}
+                            autoFocus={targetFor === task.id}
+                            defaultValue={task.weekly_target ?? ''}
+                            onBlur={(e) => {
+                              const value = e.target.value ? Number(e.target.value) : null
+                              setTargetFor(null)
+                              if (value !== task.weekly_target) void run(() => setWeeklyTarget(task.id, value))
+                            }}
+                            className="min-h-9 w-16 rounded-lg border border-line bg-page px-2 text-sm text-ink [color-scheme:dark]"
+                          />
+                        </label>
+                      )}
+                      {canSetTarget && (
+                        <button type="button" disabled={busy} onClick={() => setTargetFor(task.id)}
+                          className="min-h-9 text-xs font-medium text-accent hover:underline disabled:opacity-50">
+                          Set target
+                        </button>
+                      )}
 
-                    {isCustom ? (
-                      <button type="button" disabled={busy} onClick={() => handleRemove(task)}
-                        className={`${smallButton} text-[#FF8A8A]`}>
-                        Remove
-                      </button>
-                    ) : (
-                      <button type="button" disabled={busy}
-                        onClick={() => void run(() => setTaskHidden(task.id, !task.hidden))}
-                        className={smallButton}>
-                        {task.hidden ? 'Show' : 'Hide'}
-                      </button>
-                    )}
+                      {isCustom ? (
+                        <button type="button" disabled={busy} onClick={() => handleRemove(task)}
+                          className={`${smallButton} text-muted hover:text-urgent`}>
+                          Remove
+                        </button>
+                      ) : (
+                        <button type="button" disabled={busy}
+                          onClick={() => void run(() => setTaskHidden(task.id, !task.hidden))}
+                          className={`${smallButton} text-ink`}>
+                          {task.hidden ? 'Show' : 'Hide'}
+                        </button>
+                      )}
+                    </div>
                   </li>
                 )
               })}
@@ -167,10 +171,10 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
           e.preventDefault()
           handleAdd()
         }}
-        className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-[#3A4052] p-3"
+        className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-line p-3"
       >
         <div className="flex min-w-[180px] flex-1 flex-col gap-1">
-          <label htmlFor={`new-task-${game.id}`} className="text-xs text-[#C9CDD8]">Add your own</label>
+          <label htmlFor={`new-task-${game.id}`} className="text-xs text-muted">Add your own</label>
           <input id={`new-task-${game.id}`} value={title} maxLength={80} placeholder={preset?.taskExample ?? 'e.g. Build a new character'}
             onChange={(e) => setTitle(e.target.value)} className={fieldClass} />
         </div>
@@ -189,12 +193,12 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
           </>
         )}
         <button type="submit" disabled={busy || !title.trim()}
-          className="h-10 rounded-xl bg-[#8B7CFF] px-4 text-sm font-semibold text-[#0D0F14] disabled:opacity-60">
+          className="min-h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent disabled:opacity-60">
           Add
         </button>
       </form>
 
-      {error && <p role="alert" className="text-sm text-[#FF8A8A]">{error}</p>}
+      {error && <p role="alert" className="text-sm text-urgent">{error}</p>}
     </div>
   )
 }

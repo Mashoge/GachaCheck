@@ -185,7 +185,7 @@ function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, o
         </p>
       </header>
 
-      <div className="mt-5 grid gap-6 [grid-template-areas:'stamina'_'checklist'_'side'] md:grid-cols-[minmax(0,1fr)_340px] md:grid-rows-[auto_1fr] md:[grid-template-areas:'checklist_stamina'_'checklist_side']">
+      <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-6 [grid-template-areas:'stamina'_'checklist'_'side'] md:grid-cols-[minmax(0,1fr)_340px] md:grid-rows-[auto_1fr] md:[grid-template-areas:'checklist_stamina'_'checklist_side']">
         {/* Stamina: values come from the last recorded snapshot; entering your real value arrives in step 4 */}
         <div className="flex flex-col gap-4 rounded-xl bg-raised p-4 [grid-area:stamina]">
           <h2 className="text-sm font-semibold">Stamina</h2>
@@ -545,7 +545,7 @@ function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterState; r
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={`What the game shows (0–${state.cap})`}
-            className="min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-page px-3 text-sm text-ink placeholder:text-muted"
+            className="min-h-10 w-0 min-w-0 flex-1 rounded-lg border border-line bg-page px-3 text-sm text-ink placeholder:text-muted"
           />
           <button type="submit" className="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent">Save</button>
           <button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg px-2 text-sm text-muted hover:text-ink">Cancel</button>

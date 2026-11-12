@@ -277,7 +277,7 @@ function Timeline({ games, events, now, onOpen }: { games: Game[]; events: GameE
   const beforeDays = phone ? 1 : 2
   const days = phone ? 21 : 44
   // Bars narrower than this put their name beside the bar instead of inside it
-  const minInside = phone ? 30 : 12
+  const minInside = phone ? 40 : 12
   const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - beforeDays).getTime()
   const span = days * DAY
   const percent = (t: number) => Math.min(100, Math.max(0, ((t - from) / span) * 100))
