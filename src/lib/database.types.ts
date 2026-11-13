@@ -348,6 +348,36 @@ export type Database = {
           },
         ]
       }
+      user_event_state: {
+        Row: {
+          completed_at: string | null
+          event_id: string
+          hidden: boolean
+          note: string | null
+          remind: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          event_id: string
+          hidden?: boolean
+          note?: string | null
+          remind?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          completed_at?: string | null
+          event_id?: string
+          hidden?: boolean
+          note?: string | null
+          remind?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           created_at: string
@@ -359,6 +389,7 @@ export type Database = {
           quiet_end: string | null
           quiet_start: string | null
           reset_message_enabled: boolean
+          show_web_events: boolean
           timezone: string
           user_id: string
         }
@@ -372,6 +403,7 @@ export type Database = {
           quiet_end?: string | null
           quiet_start?: string | null
           reset_message_enabled?: boolean
+          show_web_events?: boolean
           timezone?: string
           user_id?: string
         }
@@ -385,6 +417,7 @@ export type Database = {
           quiet_end?: string | null
           quiet_start?: string | null
           reset_message_enabled?: boolean
+          show_web_events?: boolean
           timezone?: string
           user_id?: string
         }
@@ -392,7 +425,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_events: {
+        Row: {
+          catalog_event_id: string | null
+          completed_at: string | null
+          ends_at: string | null
+          game_id: string | null
+          id: string | null
+          kind: string | null
+          name: string | null
+          note: string | null
+          official_url: string | null
+          origin: string | null
+          own_event_id: string | null
+          remind: boolean | null
+          source: string | null
+          starts_at: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

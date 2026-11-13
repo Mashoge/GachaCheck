@@ -128,13 +128,18 @@ Deno.serve(async (req) => {
       db.from('user_settings').select('user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, event_reminder_days, last_event_import_at'),
       db.from('games').select(GAME_COLUMNS).order('sort_order'),
       db.from('completions').select('task_id, completed_at').gte('completed_at', since),
-      db.from('events').select('id, user_id, game_id, name, starts_at, ends_at, note, remind, completed_at').gt('ends_at', now.toISOString()).is('completed_at', null).eq('hidden', false),
+      // user_events = each user's own events plus the shared catalog events for their games (hidden ones left out)
+      db.from('user_events').select('id, origin, user_id, game_id, name, starts_at, ends_at, note, remind, completed_at').gt('ends_at', now.toISOString()).is('completed_at', null),
     ])
     if (settingsRes.error) throw settingsRes.error
     if (gamesRes.error) throw gamesRes.error
     if (completionsRes.error) throw completionsRes.error
     if (eventsRes.error) throw eventsRes.error
-    const allEvents = eventsRes.data as (ReminderEvent & { user_id: string })[]
+    // A catalog event is shared, so its id is the same for every user. The "already sent" key is
+    // built from the id, so the user is added to it here; own events keep the keys they always had.
+    const allEvents = (eventsRes.data as unknown as (ReminderEvent & { user_id: string; origin: string })[]).map((e) =>
+      e.origin === 'catalog' ? { ...e, id: `${e.id}:${e.user_id}` } : e,
+    )
 
     const allGames = gamesRes.data as unknown as FeedGame[]
     const completions: Completions = new Map()

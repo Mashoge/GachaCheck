@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { findPreset, findServer } from '../data/presets'
 import { messageOf } from '../lib/errors'
-import { addEvent, addEvents, deleteEvent, fetchEvents, hideEvent, setEventDone, updateEvent, type EventInput, type GameEvent } from '../lib/events'
+import { addEvent, addEvents, deleteEvent, fetchEvents, fetchShowWebEvents, hideEvent, setEventDone, setShowWebEvents, updateEvent, type EventInput, type GameEvent } from '../lib/events'
 import { minuteBefore, serverParts, toInstant } from '../lib/eventTime'
 import { formatDuration, formatWhen, taskPeriod } from '../lib/time'
 import { clockOf, isVisible, useTodayData, type Game } from '../lib/today'
@@ -38,10 +38,13 @@ export default function EventsPage() {
   const [filter, setFilter] = useState(readFilter)
   const [form, setForm] = useState<{ mode: 'add' } | { mode: 'import' } | { mode: 'edit'; event: GameEvent } | null>(null)
   const [showDone, setShowDone] = useState(false)
+  const [showWeb, setShowWeb] = useState(true)
 
   const refresh = useCallback(async () => {
     try {
-      setEvents(await fetchEvents())
+      const [list, web] = await Promise.all([fetchEvents(), fetchShowWebEvents()])
+      setEvents(list)
+      setShowWeb(web)
       setError(null)
     } catch (err) {
       setError(messageOf(err))
@@ -92,7 +95,7 @@ export default function EventsPage() {
       game={gameOf(e)}
       now={now}
       onEdit={() => setForm({ mode: 'edit', event: e })}
-      onDone={(isDone) => void run(() => setEventDone(e.id, isDone))}
+      onDone={(isDone) => void run(() => setEventDone(e, isDone))}
     />
   )
 
@@ -145,13 +148,14 @@ export default function EventsPage() {
           onCancel={() => setForm(null)}
           onSave={async (input, keepOpen) => {
             const editing = form.mode === 'edit' ? form.event : null
-            const ok = await run(() => (editing ? updateEvent(editing.id, input) : addEvent(input)))
+            const ok = await run(() => (editing ? updateEvent(editing, input) : addEvent(input)))
             if (ok && !keepOpen) setForm(null)
             return ok
           }}
           onDelete={async (event) => {
+            // Only events you typed in yourself are deleted; imported and official ones are hidden
             const remove = event.source === 'manual' ? deleteEvent : hideEvent
-            if (await run(() => remove(event.id))) setForm(null)
+            if (await run(() => remove(event))) setForm(null)
           }}
         />
       )}
@@ -172,6 +176,24 @@ export default function EventsPage() {
             </button>
           ))}
         </div>
+      )}
+
+      {/* Web events are played in a browser, outside the game, so they can be switched off as a group.
+          The switch covers every game, so whether it shows must not depend on the game filter. */}
+      {events !== null && (!showWeb || events.some((e) => e.kind === 'web_event')) && (
+        <label className="flex min-h-9 w-fit items-center gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            checked={showWeb}
+            onChange={(e) => {
+              const next = e.target.checked
+              setShowWeb(next)
+              void run(() => setShowWebEvents(next))
+            }}
+            className="size-4 accent-[var(--color-accent)]"
+          />
+          Show web events (all games)
+        </label>
       )}
 
       {events !== null && data && games.length > 0 && (
@@ -231,7 +253,8 @@ function EventCard({ event, game, now, onEdit, onDone }: { event: GameEvent; gam
         <span className="flex items-center gap-2">
           <span aria-hidden="true" className={`size-2.5 rounded-sm ${gameBg(game)}`} />
           {shortName(game)}
-          {event.source !== 'manual' && <span className="rounded-full border border-line px-1.5 text-[10px]">Auto-added</span>}
+          {event.kind === 'web_event' && <span className="rounded-full border border-line px-1.5 text-[10px]">Web event</span>}
+          {event.source !== 'manual' && <span className="rounded-full border border-line px-1.5 text-[10px]">{event.origin === 'catalog' ? 'Official' : 'Auto-added'}</span>}
         </span>
         <span className={`font-semibold ${urgent ? 'text-urgent' : ''}`}>
           {isDone ? 'Done' : upcoming ? `Starts in ${formatDuration(start.getTime() - now.getTime())}` : `Ends in ${formatDuration(left)}`}
@@ -240,6 +263,11 @@ function EventCard({ event, game, now, onEdit, onDone }: { event: GameEvent; gam
 
       <h3 className={`font-display text-lg font-semibold leading-snug ${isDone ? 'text-muted line-through' : ''}`}>{event.name}</h3>
       {event.note && <p className="text-sm text-muted">{event.note}</p>}
+      {event.official_url && (
+        <a href={event.official_url} target="_blank" rel="noreferrer" className="w-fit text-xs font-semibold text-accent hover:underline">
+          Open the event page
+        </a>
+      )}
 
       {passed !== null && !isDone && (
         <div aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-line">
@@ -421,6 +449,8 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [added, setAdded] = useState(0)
   const imported = !!editing && editing.source !== 'manual'
+  // Shared events from the official announcements: the name and dates are not yours to change
+  const official = editing?.origin === 'catalog'
 
   const game = games.find((g) => g.id === gameId) ?? first
   const preset = findPreset(game.preset_id)
@@ -434,6 +464,13 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
   }
 
   const submit = async (keepOpen: boolean) => {
+    if (official && editing) {
+      setProblem(null)
+      setSaving(true)
+      await onSave({ game_id: editing.game_id, name: editing.name, starts_at: editing.starts_at, ends_at: editing.ends_at, note: note.trim() || null, remind }, false)
+      setSaving(false)
+      return
+    }
     const title = name.trim()
     if (!title) return setProblem('Give the event a name.')
     const endsAt = toInstant(endDate, endTime, game.timezone)
@@ -461,7 +498,7 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
     formRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [])
 
-  const field = 'min-h-10 rounded-lg border border-line bg-page px-3 text-sm text-ink placeholder:text-muted [color-scheme:dark]'
+  const field = 'min-h-10 rounded-lg border border-line bg-page px-3 text-sm text-ink placeholder:text-muted [color-scheme:dark] disabled:opacity-60'
 
   return (
     <form
@@ -473,14 +510,16 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
       }}
     >
       <h2 className="text-sm font-semibold">{editing ? 'Edit event' : 'Add event'}</h2>
-      {imported && (
-        <p className="-mt-2 text-xs text-muted">Added automatically from the Genshin announcements. Your changes are kept; the import won't overwrite them.</p>
+      {official ? (
+        <p className="-mt-2 text-xs text-muted">From the official announcements. The name and dates are kept up to date for you; the note and the reminder choice are yours.</p>
+      ) : (
+        imported && <p className="-mt-2 text-xs text-muted">Added automatically from the Genshin announcements. Your changes are kept; the import won't overwrite them.</p>
       )}
 
       <div className="grid gap-4 md:grid-cols-[200px_minmax(0,1fr)]">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="event-game" className="text-xs text-muted">Game</label>
-          <select id="event-game" value={gameId} onChange={(e) => changeGame(e.target.value)} className={field}>
+          <select id="event-game" value={gameId} onChange={(e) => changeGame(e.target.value)} disabled={official} className={field}>
             {games.map((g) => (
               <option key={g.id} value={g.id}>{g.name}</option>
             ))}
@@ -488,7 +527,7 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="event-name" className="text-xs text-muted">Event name</label>
-          <input id="event-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus={!editing} className={field} />
+          <input id="event-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoFocus={!editing} disabled={official} className={field} />
         </div>
       </div>
 
@@ -496,15 +535,15 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
         <div className="flex flex-col gap-1.5">
           <label htmlFor="event-end-date" className="text-xs text-muted">Ends</label>
           <div className="flex gap-2">
-            <input id="event-end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={`${field} min-w-0 flex-1`} />
-            <input aria-label="End time" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={field} />
+            <input id="event-end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} disabled={official} className={`${field} min-w-0 flex-1`} />
+            <input aria-label="End time" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} disabled={official} className={field} />
           </div>
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="event-start-date" className="text-xs text-muted">Starts (leave empty if it is already running)</label>
           <div className="flex gap-2">
-            <input id="event-start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={`${field} min-w-0 flex-1`} />
-            <input aria-label="Start time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={field} />
+            <input id="event-start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} disabled={official} className={`${field} min-w-0 flex-1`} />
+            <input aria-label="Start time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} disabled={official} className={field} />
           </div>
         </div>
       </div>
@@ -539,7 +578,7 @@ function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDel
         {editing &&
           (confirmDelete ? (
             <span className="ml-auto flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted">{imported ? "Hide this event? It won't be added again." : 'Delete this event?'}</span>
+              <span className="text-muted">{imported ? "Hide this event? It won't come back on its own." : 'Delete this event?'}</span>
               <button type="button" onClick={() => void onDelete(editing)} className="min-h-10 rounded-lg border border-urgent px-3 font-semibold text-urgent">
                 {imported ? 'Yes, hide' : 'Yes, delete'}
               </button>

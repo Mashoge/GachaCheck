@@ -62,7 +62,8 @@ async function loadToday(): Promise<TodayData> {
   const [games, completionsRes, eventsRes] = await Promise.all([
     loadGames(),
     supabase.from('completions').select('id, task_id, completed_at').gte('completed_at', since).order('completed_at'),
-    supabase.from('events').select('id, game_id, name, starts_at, ends_at').is('completed_at', null).eq('hidden', false).gte('ends_at', new Date().toISOString()).order('ends_at'),
+    // The view already leaves out hidden events and adds the shared catalog events for your games
+    supabase.from('user_events').select('id, game_id, name, starts_at, ends_at').is('completed_at', null).gte('ends_at', new Date().toISOString()).order('ends_at'),
   ])
   if (completionsRes.error) throw completionsRes.error
   if (eventsRes.error) throw eventsRes.error
@@ -74,7 +75,8 @@ async function loadToday(): Promise<TodayData> {
     completions.set(c.task_id, list)
   }
   // Only events that are running now: upcoming and finished ones live on the Events page
-  const started = eventsRes.data.filter((e) => !e.starts_at || new Date(e.starts_at) <= new Date())
+  const rows = eventsRes.data as unknown as (EventRow & { starts_at: string | null })[]
+  const started = rows.filter((e) => !e.starts_at || new Date(e.starts_at) <= new Date())
   return { games, completions, events: started }
 }
 
