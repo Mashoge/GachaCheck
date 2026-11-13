@@ -1,0 +1,22 @@
+[project]
+name = "gachacheck-collector"
+version = "0.1.0"
+description = "Reads official game announcements and sends event dates to GachaCheck's ingest function."
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27",
+  "beautifulsoup4>=4.12",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["gachacheck_collector"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
