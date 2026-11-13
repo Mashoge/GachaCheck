@@ -63,7 +63,7 @@ async function loadToday(): Promise<TodayData> {
     loadGames(),
     supabase.from('completions').select('id, task_id, completed_at').gte('completed_at', since).order('completed_at'),
     // The view already leaves out hidden events and adds the shared catalog events for your games
-    supabase.from('user_events').select('id, game_id, name, starts_at, ends_at').is('completed_at', null).gte('ends_at', new Date().toISOString()).order('ends_at'),
+    supabase.from('user_events').select('id, game_id, name, starts_at, ends_at').is('completed_at', null).gte('ends_at', new Date().toISOString()).order('ends_at').order('name'),
   ])
   if (completionsRes.error) throw completionsRes.error
   if (eventsRes.error) throw eventsRes.error
@@ -294,6 +294,6 @@ export function buildToday(data: TodayData, now: Date) {
     })
   }
 
-  attention.sort((a, b) => a.at.getTime() - b.at.getTime())
+  attention.sort((a, b) => a.at.getTime() - b.at.getTime() || a.title.localeCompare(b.title))
   return { attention, cards }
 }

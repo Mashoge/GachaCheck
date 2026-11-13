@@ -83,7 +83,7 @@ export default function EventsPage() {
   const live = (events ?? []).filter((e) => new Date(e.ends_at) > now && (activeFilter === 'all' || e.game_id === activeFilter))
   const done = live.filter((e) => e.completed_at)
   const open = live.filter((e) => !e.completed_at)
-  const upcoming = open.filter((e) => e.starts_at && new Date(e.starts_at) > now).sort((a, b) => a.starts_at!.localeCompare(b.starts_at!))
+  const upcoming = open.filter((e) => e.starts_at && new Date(e.starts_at) > now).sort((a, b) => a.starts_at!.localeCompare(b.starts_at!) || a.name.localeCompare(b.name))
   const running = open.filter((e) => !e.starts_at || new Date(e.starts_at) <= now)
   const soon = running.filter((e) => new Date(e.ends_at).getTime() - now.getTime() <= SOON_MS)
   const later = running.filter((e) => new Date(e.ends_at).getTime() - now.getTime() > SOON_MS)
@@ -319,15 +319,15 @@ function Timeline({ games, events, now, onOpen }: { games: Game[]; events: GameE
         const start = e.starts_at ? new Date(e.starts_at).getTime() : from
         bars.push({ key: e.id, label: e.name, start, end: new Date(e.ends_at).getTime(), openStart: !e.starts_at, event: e })
       }
-      // Events in the order they start (then end), like a schedule
-      bars.sort((a, b) => a.start - b.start || a.end - b.end)
+      // Events in the order they start (then end, then name), like a schedule
+      bars.sort((a, b) => a.start - b.start || a.end - b.end || a.label.localeCompare(b.label))
       // Endgame cycles come from the reset rules, so they fill in on their own; they go first
       const cycles: typeof bars = []
       for (const t of game.tasks.filter((x) => x.category === 'endgame' && isVisible(x))) {
         const period = taskPeriod(t, clockOf(game), now)
         if (period?.end) cycles.push({ key: t.id, label: t.title, start: period.start.getTime(), end: period.end.getTime() })
       }
-      cycles.sort((a, b) => a.end - b.end)
+      cycles.sort((a, b) => a.end - b.end || a.label.localeCompare(b.label))
       return { game, bars: [...cycles, ...bars].filter((b) => b.end > from && b.start < from + span) }
     })
     .filter((g) => g.bars.length > 0)

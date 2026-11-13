@@ -30,6 +30,7 @@ export async function fetchEvents(): Promise<GameEvent[]> {
     .select(COLUMNS)
     .gte('ends_at', new Date().toISOString())
     .order('ends_at')
+    .order('name')   // events ending at the same minute keep a stable order
   if (error) throw error
   return data as unknown as GameEvent[]
 }
