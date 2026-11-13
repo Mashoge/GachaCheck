@@ -9,6 +9,7 @@ import {
 } from '../lib/games'
 import { messageOf } from '../lib/errors'
 import { findPreset } from '../data/presets'
+import { Button, Input, Notice, Select, Tag, useConfirm } from './ui'
 
 type Task = GameSummary['tasks'][number]
 
@@ -37,11 +38,6 @@ function schedule(task: Task) {
   return null
 }
 
-const smallButton =
-  'min-h-9 rounded-lg border border-line bg-surface px-2.5 text-xs font-semibold disabled:opacity-50'
-const fieldClass =
-  'min-h-10 rounded-xl border border-line bg-page px-3 text-sm text-ink outline-none [color-scheme:dark] focus:border-accent'
-
 interface TaskManagerProps {
   game: GameSummary
   onChanged: () => Promise<void>
@@ -54,6 +50,7 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
   const [kind, setKind] = useState<CustomTaskKind>('daily')
   const [dueDate, setDueDate] = useState('')
   const [targetFor, setTargetFor] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   async function run(action: () => Promise<void>) {
     setBusy(true)
@@ -79,9 +76,9 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
     })
   }
 
-  function handleRemove(task: Task) {
-    if (!window.confirm(`Remove "${task.title}"?`)) return
-    void run(() => removeCustomTask(task.id))
+  async function handleRemove(task: Task) {
+    const ok = await confirm({ title: `Remove "${task.title}"?`, message: 'Its history goes with it.', confirmLabel: 'Remove', danger: true })
+    if (ok) void run(() => removeCustomTask(task.id))
   }
 
   const active = game.tasks.filter((t) => !t.archived)
@@ -111,9 +108,9 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
                     <div className={`min-w-0 space-y-0.5 ${extras ? 'basis-full sm:basis-0 sm:flex-1' : 'flex-1'}`}>
                       <div className="flex flex-wrap items-center gap-2 text-sm">
                         <span>{task.title}</span>
-                        {task.optional && <span className="rounded bg-line px-1.5 text-[11px] text-muted">Optional</span>}
-                        {isCustom && <span className="rounded bg-active px-1.5 text-[11px] text-accent">Mine</span>}
-                        {task.hidden && <span className="text-[11px] text-muted">Hidden</span>}
+                        {task.optional && <Tag tone="neutral">Optional</Tag>}
+                        {isCustom && <Tag tone="accent">Mine</Tag>}
+                        {task.hidden && <span className="text-xs text-muted">Hidden</span>}
                       </div>
                       {(task.note || hint) && (
                         <p className="text-xs text-muted">{[hint, task.note].filter(Boolean).join(' · ')}</p>
@@ -124,7 +121,8 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
                       {showTarget && (
                         <label className="flex items-center gap-1.5 text-xs text-muted">
                           Target / week
-                          <input
+                          <Input
+                            size="sm"
                             key={`${task.id}-${task.weekly_target ?? ''}`}
                             type="number" min={1} max={50} disabled={busy}
                             autoFocus={targetFor === task.id}
@@ -134,28 +132,24 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
                               setTargetFor(null)
                               if (value !== task.weekly_target) void run(() => setWeeklyTarget(task.id, value))
                             }}
-                            className="min-h-9 w-16 rounded-lg border border-line bg-page px-2 text-sm text-ink [color-scheme:dark]"
+                            className="w-16"
                           />
                         </label>
                       )}
                       {canSetTarget && (
-                        <button type="button" disabled={busy} onClick={() => setTargetFor(task.id)}
-                          className="min-h-9 text-xs font-medium text-accent hover:underline disabled:opacity-50">
+                        <Button variant="link" size="sm" disabled={busy} onClick={() => setTargetFor(task.id)}>
                           Set target
-                        </button>
+                        </Button>
                       )}
 
                       {isCustom ? (
-                        <button type="button" disabled={busy} onClick={() => handleRemove(task)}
-                          className={`${smallButton} text-muted hover:text-urgent`}>
+                        <Button size="sm" disabled={busy} onClick={() => void handleRemove(task)}>
                           Remove
-                        </button>
+                        </Button>
                       ) : (
-                        <button type="button" disabled={busy}
-                          onClick={() => void run(() => setTaskHidden(task.id, !task.hidden))}
-                          className={`${smallButton} text-ink`}>
+                        <Button size="sm" disabled={busy} onClick={() => void run(() => setTaskHidden(task.id, !task.hidden))}>
                           {task.hidden ? 'Show' : 'Hide'}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </li>
@@ -175,30 +169,27 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
       >
         <div className="flex min-w-[180px] flex-1 flex-col gap-1">
           <label htmlFor={`new-task-${game.id}`} className="text-xs text-muted">Add your own</label>
-          <input id={`new-task-${game.id}`} value={title} maxLength={80} placeholder={preset?.taskExample ?? 'e.g. Build a new character'}
-            onChange={(e) => setTitle(e.target.value)} className={fieldClass} />
+          <Input id={`new-task-${game.id}`} value={title} maxLength={80} placeholder={preset?.taskExample ?? 'e.g. Build a new character'}
+            onChange={(e) => setTitle(e.target.value)} />
         </div>
         <label className="sr-only" htmlFor={`new-kind-${game.id}`}>Type</label>
-        <select id={`new-kind-${game.id}`} value={kind}
-          onChange={(e) => setKind(e.target.value as CustomTaskKind)} className={fieldClass}>
+        <Select id={`new-kind-${game.id}`} value={kind} onChange={(e) => setKind(e.target.value as CustomTaskKind)}>
           <option value="daily">Daily task</option>
           <option value="weekly">Weekly task</option>
           <option value="goal">Goal</option>
-        </select>
+        </Select>
         {kind === 'goal' && (
           <>
             <label className="sr-only" htmlFor={`new-due-${game.id}`}>Due date (optional)</label>
-            <input id={`new-due-${game.id}`} type="date" value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)} className={fieldClass} />
+            <Input id={`new-due-${game.id}`} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </>
         )}
-        <button type="submit" disabled={busy || !title.trim()}
-          className="min-h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent disabled:opacity-60">
+        <Button type="submit" variant="primary" disabled={busy || !title.trim()}>
           Add
-        </button>
+        </Button>
       </form>
 
-      {error && <p role="alert" className="text-sm text-urgent">{error}</p>}
+      {error && <Notice tone="error">{error}</Notice>}
     </div>
   )
 }

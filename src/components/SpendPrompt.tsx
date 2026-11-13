@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { MeterState } from '../lib/stamina'
+import { Button, Input } from './ui'
 
 // Asks what a stamina meter shows now. Shown under a "Spend …" task right after it is ticked,
 // and after "All done" on the game page and on Today.
@@ -20,7 +21,7 @@ export default function SpendPrompt({ meter, onSave, onSkip }: { meter: MeterSta
       <label htmlFor={id} className="w-full text-xs text-muted">
         How much {meter.name} do you have now? This keeps the countdown and reminders right.
       </label>
-      <input
+      <Input
         id={id}
         type="number"
         inputMode="numeric"
@@ -29,11 +30,11 @@ export default function SpendPrompt({ meter, onSave, onSkip }: { meter: MeterSta
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder={`0–${meter.cap}`}
-        className="min-h-10 w-28 rounded-lg border border-line bg-page px-3 text-sm text-ink placeholder:text-muted"
+        className="w-28"
       />
-      <button type="submit" disabled={!valid} className="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent disabled:opacity-40">Save</button>
-      <button type="button" onClick={() => onSave(0)} className="min-h-10 rounded-lg border border-line px-3 text-sm font-semibold text-muted hover:text-ink">None left</button>
-      <button type="button" onClick={onSkip} className="min-h-10 rounded-lg px-2 text-sm text-muted hover:text-ink">Skip</button>
+      <Button type="submit" variant="primary" disabled={!valid}>Save</Button>
+      <Button onClick={() => onSave(0)}>None left</Button>
+      <Button variant="quiet" onClick={onSkip}>Skip</Button>
     </form>
   )
 }

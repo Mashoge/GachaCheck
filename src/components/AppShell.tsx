@@ -1,20 +1,15 @@
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { supabase } from '../lib/supabase'
+import { Button, EventsIcon, GamesIcon, RemindersIcon, TodayIcon } from './ui'
 
 type NavItem = { to: string; label: string; icon: ReactNode }
 
-const icon = (d: ReactNode) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {d}
-  </svg>
-)
-
 const NAV: NavItem[] = [
-  { to: '/', label: 'Today', icon: icon(<><circle cx="12" cy="12" r="9" /><path d="M8 12l3 3 5-6" /></>) },
-  { to: '/events', label: 'Events', icon: icon(<><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>) },
-  { to: '/games', label: 'Games', icon: icon(<><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></>) },
-  { to: '/reminders', label: 'Reminders', icon: icon(<><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z" /><path d="M10 20a2 2 0 0 0 4 0" /></>) },
+  { to: '/', label: 'Today', icon: <TodayIcon size={22} /> },
+  { to: '/events', label: 'Events', icon: <EventsIcon size={22} /> },
+  { to: '/games', label: 'Games', icon: <GamesIcon size={22} /> },
+  { to: '/reminders', label: 'Reminders', icon: <RemindersIcon size={22} /> },
 ]
 
 export default function AppShell({ email }: { email: string }) {
@@ -36,7 +31,7 @@ export default function AppShell({ email }: { email: string }) {
                   key={item.to}
                   to={item.to}
                   aria-current={isActive(item.to) ? 'page' : undefined}
-                  className={`rounded-lg px-3.5 py-2.5 text-sm font-medium ${
+                  className={`rounded-lg px-3.5 py-2.5 text-sm font-medium transition-colors ${
                     isActive(item.to) ? 'bg-active text-accent' : 'text-muted hover:text-ink'
                   }`}
                 >
@@ -47,13 +42,7 @@ export default function AppShell({ email }: { email: string }) {
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden text-muted sm:inline">{email}</span>
-            <button
-              type="button"
-              onClick={() => void supabase.auth.signOut()}
-              className="min-h-11 rounded-lg border border-line px-3 text-muted hover:text-ink"
-            >
-              Sign out
-            </button>
+            <Button onClick={() => void supabase.auth.signOut()}>Sign out</Button>
           </div>
         </div>
       </header>
@@ -69,7 +58,7 @@ export default function AppShell({ email }: { email: string }) {
             key={item.to}
             to={item.to}
             aria-current={isActive(item.to) ? 'page' : undefined}
-            className={`flex min-h-13 flex-col items-center justify-center gap-1 text-[11px] ${
+            className={`flex min-h-13 flex-col items-center justify-center gap-1 rounded-lg text-xs ${
               isActive(item.to) ? 'font-semibold text-accent' : 'font-medium text-muted'
             }`}
           >

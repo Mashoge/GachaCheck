@@ -3,6 +3,7 @@ import { messageOf } from '../lib/errors'
 import { supabase } from '../lib/supabase'
 import { formatWhen } from '../lib/time'
 import { useNow } from '../lib/useNow'
+import { Card, Input, Loading, Notice, PageTitle, Select, Switch } from '../components/ui'
 
 type Settings = {
   user_id: string
@@ -88,17 +89,17 @@ export default function RemindersPage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
       <div className="flex flex-col gap-1">
-        <h1 className="font-display text-3xl font-bold">Reminders</h1>
+        <PageTitle>Reminders</PageTitle>
         <p className="text-sm text-muted">Sent to your Discord channel. GachaCheck checks every 15 minutes.</p>
       </div>
 
-      {error && <p className="text-urgent">{error}</p>}
-      {!loaded && <p className="text-muted">Loading…</p>}
-      {loaded && !settings && !error && <p className="text-muted">No settings found for this account.</p>}
+      {error && <Notice tone="error" size="md">{error}</Notice>}
+      {!loaded && <Loading />}
+      {loaded && !settings && !error && <Notice size="md">No settings found for this account.</Notice>}
 
       {settings && (
         <>
-          <section className={`rounded-2xl border bg-surface p-4 ${stale ? 'border-urgent' : 'border-line'}`}>
+          <Card as="section" padding="md" tone={stale ? 'urgent' : 'default'}>
             {!lastRun ? (
               <p className="text-sm text-muted">Not checked yet. The first check happens within 15 minutes of turning the schedule on.</p>
             ) : stale ? (
@@ -114,9 +115,9 @@ export default function RemindersPage() {
                 <span className="text-muted">Last checked {formatWhen(lastRun, now)}.</span>
               </p>
             )}
-          </section>
+          </Card>
 
-          <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5">
+          <Card as="section" className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-4">
               <div className="flex flex-col gap-0.5">
                 <h2 className="text-sm font-semibold">Evening nudge</h2>
@@ -132,9 +133,9 @@ export default function RemindersPage() {
                 onChange={(v) => void saveSettings({ nudge_time: v })}
               />
             )}
-          </section>
+          </Card>
 
-          <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5">
+          <Card as="section" className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-4">
               <div className="flex flex-col gap-0.5">
                 <h2 className="text-sm font-semibold">Quiet hours</h2>
@@ -154,34 +155,33 @@ export default function RemindersPage() {
                 <TimeField id="quiet-end" label="Until" value={hhmm(settings.quiet_end)} onChange={(v) => void saveSettings({ quiet_end: v })} />
               </div>
             )}
-          </section>
+          </Card>
 
-          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-5">
+          <Card as="section" className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-col gap-0.5">
               <h2 className="text-sm font-semibold">Event reminder</h2>
               <p className="text-sm text-muted">One message per event before it ends, with your progress note. Events marked as done are skipped.</p>
             </div>
             <div className="flex items-center gap-2">
               <label htmlFor="event-days" className="text-sm text-muted">Remind me</label>
-              <select
+              <Select
                 id="event-days"
                 value={settings.event_reminder_days}
                 onChange={(e) => void saveSettings({ event_reminder_days: Number(e.target.value) })}
-                className="min-h-10 rounded-lg border border-line bg-page px-3 text-sm text-ink"
               >
                 {(EVENT_DAY_CHOICES.includes(settings.event_reminder_days) ? EVENT_DAY_CHOICES : [...EVENT_DAY_CHOICES, settings.event_reminder_days]).map((n) => (
                   <option key={n} value={n}>
                     {n === 0 ? 'Never' : n === 1 ? '1 day before' : `${n} days before`}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
-          </section>
+          </Card>
 
-          <section className="flex flex-col rounded-2xl border border-line bg-surface p-5">
+          <Card as="section" className="flex flex-col">
             <h2 className="text-sm font-semibold">Per game</h2>
             <p className="pb-2 text-sm text-muted">Stamina pings are sent once per fill-up, when a meter reaches 90%.</p>
-            {games.length === 0 && <p className="text-sm text-muted">No games added yet.</p>}
+            {games.length === 0 && <Notice>No games added yet.</Notice>}
             {games.map((g) => (
               <div key={g.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line py-3">
                 <span className="text-sm font-medium">{g.name}</span>
@@ -202,7 +202,7 @@ export default function RemindersPage() {
                 </div>
               </div>
             ))}
-          </section>
+          </Card>
 
           <p className="text-xs text-muted">Times use your timezone: {settings.timezone}.</p>
         </>
@@ -211,36 +211,17 @@ export default function RemindersPage() {
   )
 }
 
-function Switch({ label, on, onChange }: { label: string; on: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      onClick={() => onChange(!on)}
-      className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${on ? 'border-accent bg-accent' : 'border-line bg-raised'}`}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute top-1/2 size-5 -translate-y-1/2 rounded-full transition-all ${on ? 'left-6 bg-on-accent' : 'left-0.5 bg-muted'}`}
-      />
-    </button>
-  )
-}
-
 function TimeField({ id, label, value, onChange }: { id: string; label: string; value: string; onChange: (value: string) => void }) {
   return (
     <div className="flex items-center gap-2">
       <label htmlFor={id} className="text-sm text-muted">{label}</label>
-      <input
+      <Input
         id={id}
         type="time"
         value={value}
         onChange={(e) => {
           if (/^\d{2}:\d{2}$/.test(e.target.value)) onChange(e.target.value)
         }}
-        className="min-h-10 rounded-lg border border-line bg-page px-3 text-sm text-ink [color-scheme:dark]"
       />
     </div>
   )

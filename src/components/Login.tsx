@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
-
-const inputClass = 'h-11 w-full rounded-xl border border-line bg-page px-3 text-ink outline-none focus:border-accent'
+import { Button, Card, Field, Input, Notice, PageTitle } from './ui'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -19,36 +18,31 @@ export default function Login() {
 
   return (
     <main className="grid min-h-screen place-items-center px-5">
-      <form
-        onSubmit={(e) => {
+      <Card
+        as="form"
+        padding="none"
+        onSubmit={(e: FormEvent) => {
           e.preventDefault()
           void signIn()
         }}
-        className="w-full max-w-sm space-y-4 rounded-2xl border border-line bg-surface p-6"
+        className="w-full max-w-sm space-y-4 p-6"
       >
-        <h1 className="font-display text-2xl font-bold">GachaCheck</h1>
+        <PageTitle size="md">GachaCheck</PageTitle>
 
-        <div className="space-y-1.5">
-          <label htmlFor="email" className="text-sm text-muted">Email</label>
-          <input id="email" type="email" autoComplete="email" required value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={inputClass} />
-        </div>
+        <Field id="email" label="Email">
+          <Input size="lg" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
 
-        <div className="space-y-1.5">
-          <label htmlFor="password" className="text-sm text-muted">Password</label>
-          <input id="password" type="password" autoComplete="current-password" required value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={inputClass} />
-        </div>
+        <Field id="password" label="Password">
+          <Input size="lg" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
 
-        {error && <p role="alert" className="text-sm text-urgent">{error}</p>}
+        {error && <Notice tone="error">{error}</Notice>}
 
-        <button type="submit" disabled={loading}
-          className="h-11 w-full rounded-xl bg-accent font-semibold text-on-accent disabled:opacity-60">
+        <Button type="submit" variant="primary" size="lg" full disabled={loading}>
           {loading ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
+        </Button>
+      </Card>
     </main>
   )
 }

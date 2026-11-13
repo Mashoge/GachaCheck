@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-/* Neutral Phase 2 look. One place for every colour and font.
+/* Neutral look. One place for every colour, font and motion value. The components in
+   src/components/ui read these, so a change here changes the whole app.
    Game themes (Phase 7) will add their own values on top of these. */
 @theme {
   --color-page: #0c0c0c;
@@ -19,12 +20,60 @@
   --color-game-wuwa: #43c5c0;
   --color-game-nte: #f65b9e;
 
+  /* Borders of controls (inputs, outline buttons, switches): 3:1 against page and surface,
+     so a control's edge is visible. Cards and dividers keep the quieter --color-line. */
+  --color-edge: #636363;
+
   --font-sans: "Inter", system-ui, sans-serif;
   --font-display: "Space Grotesk", "Inter", sans-serif;
+
+  /* Motion: one easing and one default duration for every transition */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: var(--ease-standard);
 }
 
 @layer base {
   body {
     @apply bg-page text-ink font-sans antialiased;
+  }
+
+  /* Outlines are always the accent colour, so the focus ring appears at once
+     instead of fading in from the text colour when a button has a colour transition */
+  *, ::before, ::after {
+    outline-color: var(--color-accent);
+  }
+
+  /* One visible focus ring for everything you can reach with the keyboard */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* Dialogs fade and rise in */
+.gc-dialog[open] {
+  animation: gc-dialog-in 180ms var(--ease-standard);
+}
+.gc-dialog[open]::backdrop {
+  animation: gc-fade-in 180ms var(--ease-standard);
+}
+@keyframes gc-dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+@keyframes gc-fade-in {
+  from { opacity: 0; }
+}
+
+/* When the device asks for less motion, animations and transitions finish instantly */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) {
+    animation: none !important;
   }
 }

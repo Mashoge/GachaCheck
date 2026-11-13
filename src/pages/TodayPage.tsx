@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import SpendPrompt from '../components/SpendPrompt'
+import { Button, Card, Loading, Notice, PageTitle } from '../components/ui'
 import { buildToday, clockOf, dailiesLeft, periodCompletionIds, useTodayData, type Task } from '../lib/today'
 import { dailyPeriod, formatClock, formatDuration, formatWhen } from '../lib/time'
 import { useNow } from '../lib/useNow'
@@ -44,14 +45,14 @@ export default function TodayPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="font-display text-3xl font-bold">Today</h1>
+        <PageTitle>Today</PageTitle>
         <span className="text-sm text-muted">
           {now.toLocaleDateString([], { weekday: 'long' })} · {formatClock(now)}
         </span>
       </div>
 
-      {loading && <p className="text-muted">Loading your games…</p>}
-      {error && <p className="text-urgent">{error}</p>}
+      {loading && <Loading>Loading your games…</Loading>}
+      {error && <Notice tone="error" size="md">{error}</Notice>}
 
       {today && (
         <>
@@ -61,11 +62,11 @@ export default function TodayPage() {
               <span className="text-xs text-muted">Next 24 hours</span>
             </div>
             {today.attention.length === 0 ? (
-              <p className="rounded-2xl border border-line bg-surface px-4 py-4 text-sm text-muted">
+              <Card as="p" padding="md" className="text-sm text-muted">
                 Nothing urgent. You're all caught up.
-              </p>
+              </Card>
             ) : (
-              <ul className="overflow-hidden rounded-2xl border border-line bg-surface">
+              <Card as="ul" padding="none" className="overflow-hidden">
                 {today.attention.map((item, i) => {
                   const ms = item.at.getTime() - now.getTime()
                   return (
@@ -83,7 +84,7 @@ export default function TodayPage() {
                     </li>
                   )
                 })}
-              </ul>
+              </Card>
             )}
           </section>
 
@@ -103,14 +104,16 @@ export default function TodayPage() {
                 const mine = bulk?.gameId === card.id ? bulk : null
                 const saving = !!mine && mine.tasks.some((t) => idsFor(t, card.id).some((id) => id.startsWith('temp-')))
                 return (
-                  // The whole card opens the game page; the buttons inside sit above that link
-                  <div
+                  // The whole card opens the game page; the buttons inside sit above that link.
+                  // The focus ring goes round the whole card, since the whole card is the link.
+                  <Card
                     key={card.id}
-                    className="relative flex min-w-0 flex-[1_1_300px] flex-col gap-3 rounded-2xl border border-line bg-surface p-4 hover:border-muted"
+                    padding="md"
+                    className="relative flex min-w-0 flex-[1_1_300px] flex-col gap-3 hover:border-muted has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-accent"
                   >
                     <span className="flex items-center gap-2">
                       <span aria-hidden="true" className={`size-2.5 rounded-[3px] ${dot(card.presetId)}`} />
-                      <Link to={`/game/${card.presetId}`} className="flex-1 font-semibold after:absolute after:inset-0 after:rounded-2xl">
+                      <Link to={`/game/${card.presetId}`} className="flex-1 font-semibold after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none">
                         {card.name}
                       </Link>
                       <span className="text-xs text-muted">Reset in {formatDuration(card.resetAt.getTime() - now.getTime())}</span>
@@ -153,17 +156,13 @@ export default function TodayPage() {
                     {(toTick > 1 || mine) && (
                       <div className="relative z-10 flex items-center gap-2">
                         {mine ? (
-                          <button type="button" onClick={undoAll} disabled={saving} className="min-h-9 rounded-lg px-1 text-xs font-semibold text-accent hover:underline disabled:opacity-50">
+                          <Button variant="link" size="sm" onClick={undoAll} disabled={saving}>
                             {saving ? 'Saving…' : `Undo (${mine.tasks.length})`}
-                          </button>
+                          </Button>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => tickAll(card.id, !!card.meter)}
-                            className="min-h-9 rounded-lg border border-line px-3 text-xs font-semibold text-muted hover:text-ink"
-                          >
+                          <Button size="sm" onClick={() => tickAll(card.id, !!card.meter)}>
                             All {toTick} dailies done
-                          </button>
+                          </Button>
                         )}
                       </div>
                     )}
@@ -179,7 +178,7 @@ export default function TodayPage() {
                         />
                       </div>
                     )}
-                  </div>
+                  </Card>
                 )
               })}
             </div>
