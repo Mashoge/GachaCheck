@@ -126,6 +126,8 @@ def parse_patch_notes(article_json: dict, content_hash: str | None = None) -> Ar
         m = MAINTENANCE.search(line)
         if m:
             update_end = iso_minute(m.group(2))
+            # The version goes live when the maintenance ends (the site prints it in UTC+8)
+            article.version_release = {"version": version, "released_at": f"{update_end}:00+08:00"}
             break
 
     seen: set[str] = set()

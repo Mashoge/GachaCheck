@@ -37,6 +37,9 @@ export type IngestArticle = {
   published_at: string | null // ISO instant with an offset
   content_hash: string | null
   complete: boolean // true = these are all the events in the article; missing ones get flagged
+  // Optional: the version this article announces and when it goes live (the end of the update
+  // maintenance). Gives "after update" events their start. Usually only on patch notes.
+  version_release: { version: string; released_at: string } | null
   observations: IngestObservation[]
 }
 
@@ -100,6 +103,19 @@ export function checkPayload(body: unknown): IngestCheck {
     const content_hash = a.content_hash == null ? null : typeof a.content_hash === 'string' && a.content_hash.length <= 128 ? a.content_hash : (fail(`${at}.content_hash`, 'at most 128 characters'), null)
     const complete = a.complete === true
 
+    let version_release: IngestArticle['version_release'] = null
+    if (a.version_release != null) {
+      const vr = a.version_release
+      if (!isObject(vr)) fail(`${at}.version_release`, 'must be an object: { version, released_at }')
+      else {
+        const version = typeof vr.version === 'string' ? vr.version.trim() : ''
+        if (version.length < 1 || version.length > 20) fail(`${at}.version_release.version`, 'required, 1 to 20 characters')
+        const released_at = typeof vr.released_at === 'string' && INSTANT.test(vr.released_at) && !Number.isNaN(Date.parse(vr.released_at)) ? vr.released_at : ''
+        if (!released_at) fail(`${at}.version_release.released_at`, 'an ISO time with an offset, e.g. 2026-11-11T11:00:00+08:00')
+        if (version && released_at) version_release = { version, released_at }
+      }
+    }
+
     const list = a.observations == null ? [] : a.observations
     if (!Array.isArray(list)) return fail(`${at}.observations`, 'must be a list')
     if (list.length > LIMITS.observationsPerArticle) return fail(`${at}.observations`, `at most ${LIMITS.observationsPerArticle} per article`)
@@ -159,7 +175,7 @@ export function checkPayload(body: unknown): IngestCheck {
       })
     })
 
-    articles.push({ external_id, title, url, article_kind, published_at, content_hash, complete, observations })
+    articles.push({ external_id, title, url, article_kind, published_at, content_hash, complete, version_release, observations })
   })
 
   if (total > LIMITS.observations) fail('articles', `at most ${LIMITS.observations} observations per request`)

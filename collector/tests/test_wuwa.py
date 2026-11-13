@@ -220,3 +220,10 @@ def test_a_failing_site_raises_instead_of_sending_half_a_run():
             pass
         else:
             raise AssertionError("expected an error when the site is down")
+
+
+def test_the_version_goes_live_when_maintenance_ends():
+    assert wuwa.parse_patch_notes(load("article_5783.json")).version_release == {
+        "version": "3.8", "released_at": "2026-11-12T11:00:00+08:00"}
+    assert wuwa.parse_patch_notes(load("article_5571.json")).version_release == {
+        "version": "3.7", "released_at": "2026-09-30T11:00:00+08:00"}

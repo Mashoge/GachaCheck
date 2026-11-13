@@ -124,6 +124,21 @@ describe('checkPayload', () => {
     expect(errorsOf(payload([observation({ kind: 'party', name: '', ends_local: 'soon' })])).length).toBe(3)
   })
 
+  it('passes on a version release, and leaves it empty when there is none', () => {
+    const r = checkPayload(payload(undefined, { version_release: { version: ' 3.8 ', released_at: '2026-11-12T11:00:00+08:00' } }))
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.payload.articles[0].version_release).toEqual({ version: '3.8', released_at: '2026-11-12T11:00:00+08:00' })
+    const none = checkPayload(payload())
+    if (none.ok) expect(none.payload.articles[0].version_release).toBeNull()
+  })
+
+  it('refuses a version release that is not complete or has no offset', () => {
+    expect(errorsOf(payload(undefined, { version_release: '3.8' }))).toHaveLength(1)
+    expect(errorsOf(payload(undefined, { version_release: { version: '', released_at: '2026-11-12T11:00:00+08:00' } }))).toHaveLength(1)
+    expect(errorsOf(payload(undefined, { version_release: { version: '3.8', released_at: '2026-11-12 11:00' } }))).toHaveLength(1)
+    expect(errorsOf(payload(undefined, { version_release: { version: 'x'.repeat(21), released_at: 'soon' } }))).toHaveLength(2)
+  })
+
   it('tidies names and trims raw text', () => {
     const r = checkPayload(payload([observation({ name: '  Lahai-Roi   Blocks:\nTurnabout ', raw_text: 'x'.repeat(900) })]))
     expect(r.ok).toBe(true)

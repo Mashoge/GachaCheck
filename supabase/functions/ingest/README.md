@@ -45,6 +45,7 @@ cause is in the function logs under that id.
       "published_at": "2026-11-12T10:00:00+08:00",
       "content_hash": "48CF4518551DBF235796A664DFAD4816",
       "complete": true,
+      "version_release": { "version": "3.8", "released_at": "2026-11-12T11:00:00+08:00" },
       "observations": [
         {
           "observed_key": "lahai-roi blocks turnabout",
@@ -74,6 +75,10 @@ Field rules are in `supabase/functions/_shared/ingest.ts` (`checkPayload`). The 
 - **`observed_key`**: the collector's stable key for this item inside the article. Keep it the same
   when the publisher edits a date, so the edit updates the existing event. Merge repeats of one event
   inside an article before sending; the same key twice in one article is rejected.
+- **`version_release`** (optional, usually only on patch notes): the version the article announces and
+  the moment it goes live, which is the end of the update maintenance, with an offset. It is stored once
+  per game and version in `catalog_versions`, and gives every `after_update` event with no start date
+  its start. A later run with a different time (a longer maintenance) replaces it.
 - **Endgame cycles** (`kind: endgame_cycle`) need `task_preset_key` and an `occurrence_key`
   (a cycle number or label, else the cycle's start date).
 
@@ -119,9 +124,12 @@ Rules at launch:
    is sent back to review (`conflict`); otherwise the event takes the new dates (`updated`).
 4. An article that reports one event under two keys: the second is `skipped`.
 
+The reply's `versions` counts (`created`, `updated`, `unchanged`) report the `version_release` values.
+
 ## Tests
 
 - Payload rules: `src/lib/ingest.test.ts` (Vitest, `npm test`).
 - Database behaviour: `supabase/tests/catalog_ingest_scenarios.sql`. Run it in the Supabase SQL
   editor or with `psql`. It uses a fake game `zztest` and source `zztest_source`, removes its own rows,
   and ends with a results table where every row should show `pass = true`.
+- Version dates and their use in the events view: `supabase/tests/catalog_versions.sql`, run the same way.

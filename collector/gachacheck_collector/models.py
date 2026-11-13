@@ -38,6 +38,9 @@ class Article:
     content_hash: str | None = None
     # True only when the article was fetched and parsed in full (see the ingest README).
     complete: bool = False
+    # The version this article announces and when it goes live (the end of the update maintenance):
+    # {"version": "1.5", "released_at": "2026-11-11T11:00:00+08:00"}. Gives "after update" events a start.
+    version_release: dict | None = None
     observations: list[Observation] = field(default_factory=list)
     # Lines that looked like a date but could not be read. Never sent; shown in the run report.
     problems: list[str] = field(default_factory=list)

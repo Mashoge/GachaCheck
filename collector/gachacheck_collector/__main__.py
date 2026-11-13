@@ -14,14 +14,19 @@ import json
 import os
 import sys
 
-from . import wuwa
+from . import nte, wuwa
 from .ingest import IngestError, send
 from .models import build_payload
 
-ADAPTERS = {"wuwa": wuwa}
+ADAPTERS = {"wuwa": wuwa, "nte": nte}
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Always write UTF-8. On Windows, piped output otherwise falls back to cp1252, which has no
+    # characters like 「 or ✦ that the official pages use, and printing would crash.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(prog="gachacheck_collector", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("game", choices=sorted(ADAPTERS))
     mode = parser.add_mutually_exclusive_group()
@@ -39,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
     for a in articles:
         print(f"{a.external_id}  {a.title}")
         print(f"    {len(a.observations)} items, complete={a.complete}")
+        if a.version_release:
+            print(f"    version {a.version_release['version']} goes live {a.version_release['released_at']}")
         for problem in a.problems:
             print(f"    PROBLEM: {problem}")
     if not articles:
@@ -62,6 +69,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print(("DRY RUN, nothing saved: " if args.dry_run else "Saved: ") + json.dumps(reply.get("counts", {})))
+    if reply.get("versions"):
+        print("    versions: " + json.dumps(reply["versions"]))
     for item in reply.get("items", []):
         status = f" ({item['status']})" if item.get("status") else ""
         print(f"    {item.get('action')}{status}: {item.get('name', item.get('key'))}")

@@ -53,3 +53,19 @@ def test_the_secret_never_appears_in_an_error():
         with pytest.raises(IngestError) as err:
             send({}, URL, "s3cret-value", client=client)
     assert "s3cret-value" not in str(err.value)
+
+
+def test_printing_works_whatever_the_console_encoding(monkeypatch, capsys):
+    """Piped output on Windows is cp1252; the official pages use characters it cannot hold."""
+    import io
+    import sys
+
+    from gachacheck_collector import __main__ as cli
+    from gachacheck_collector.models import Article
+
+    narrow = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", narrow)
+    monkeypatch.setattr(cli.ADAPTERS["nte"], "collect", lambda: [Article(external_id="1", title="Ver. 1.4 「Test」 Patch Notes ✦")])
+    assert cli.main(["nte", "--print"]) == 0
+    narrow.flush()
+    assert "「Test」".encode("utf-8") in narrow.buffer.getvalue()

@@ -11,7 +11,8 @@ name: Collect events
 on:
   schedule:
     # Times are UTC. 03:17 and 15:17 UTC = 11:17 AM and 11:17 PM in Manila.
-    # WuWa posts Patch Notes around 10:00 AM UTC+8 on update day, so the morning run catches them.
+    # WuWa posts Patch Notes around 10:00 AM UTC+8 on update day, so the morning run catches them;
+    # NTE posts its notes about two days before the update.
     # Off the hour on purpose: GitHub delays runs scheduled at :00 the most.
     - cron: '17 3,15 * * *'
   workflow_dispatch:        # a "Run workflow" button in the Actions tab, for manual runs
@@ -29,9 +30,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  wuwa:
+  collect:
+    name: ${{ matrix.game }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false      # one game's failure does not stop the other
+      matrix:
+        game: [wuwa, nte]
     defaults:
       run:
         working-directory: collector
@@ -54,4 +60,4 @@ jobs:
         env:
           INGEST_URL: https://tapgczqdcrslcnwjvkxd.supabase.co/functions/v1/ingest
           INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
-        run: python -m gachacheck_collector wuwa ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: python -m gachacheck_collector ${{ matrix.game }} ${{ inputs.dry_run && '--dry-run' || '' }}
