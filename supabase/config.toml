@@ -434,3 +434,6 @@ entrypoint = "./functions/discord-test/index.ts"
 
 [functions.remind]
 verify_jwt = false
+
+[functions.ingest]
+verify_jwt = false
