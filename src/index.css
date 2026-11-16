@@ -77,3 +77,27 @@
     animation: none !important;
   }
 }
+
+/* PWA-2 / UI-6: comfortable mobile hit areas. Desktop keeps the compact density. */
+@media (max-width: 767px) {
+  button {
+    min-height: 44px;
+  }
+
+  button.size-9,
+  button.size-10,
+  button[role="switch"] {
+    min-width: 44px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) {
+    min-height: 44px;
+  }
+}

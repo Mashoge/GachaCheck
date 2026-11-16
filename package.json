@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:pwa": "node scripts/check-pwa-assets.mjs"
   },
   "dependencies": {
     "@dnd-kit/dom": "0.5.3",

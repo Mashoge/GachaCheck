@@ -117,7 +117,7 @@ export default function TodayPage() {
             <h2 id="g-h" className="text-base font-semibold">Your games</h2>
             {today.cards.length === 0 && (
               <p className="text-muted">
-                No games yet. <Link to="/games" className="text-accent underline">Add one</Link>.
+                No games yet. <Link to="/games" className="inline-flex min-h-11 items-center text-accent underline">Add one</Link>.
               </p>
             )}
             <div className="flex flex-wrap gap-4">

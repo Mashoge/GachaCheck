@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { Button, EventsIcon, GamesIcon, RemindersIcon, TodayIcon } from './ui'
+import type { usePwaInstall } from '../lib/usePwaInstall'
 
 type NavItem = { to: string; label: string; icon: ReactNode }
 
@@ -12,8 +13,9 @@ const NAV: NavItem[] = [
   { to: '/reminders', label: 'Reminders', icon: <RemindersIcon size={22} /> },
 ]
 
-export default function AppShell({ email }: { email: string }) {
+export default function AppShell({ email, pwaInstall }: { email: string; pwaInstall: ReturnType<typeof usePwaInstall> }) {
   const { pathname } = useLocation()
+  const { canInstall, install, status } = pwaInstall
 
   // Game pages belong to Today
   const isActive = (to: string) =>
@@ -21,7 +23,7 @@ export default function AppShell({ email }: { email: string }) {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-line bg-surface">
+      <header className="border-b border-line bg-surface pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3">
           <div className="flex items-center gap-7">
             <span className="font-display text-xl font-bold">GachaCheck</span>
@@ -40,15 +42,21 @@ export default function AppShell({ email }: { email: string }) {
               ))}
             </nav>
           </div>
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex items-center gap-2 text-sm sm:gap-3">
             <span className="hidden text-muted sm:inline">{email}</span>
-            <Button onClick={() => void supabase.auth.signOut()}>Sign out</Button>
+            {canInstall && (
+              <Button variant="primary" size="md" className="min-h-11" onClick={() => void install()}>
+                Install
+              </Button>
+            )}
+            <Button className="min-h-11" onClick={() => void supabase.auth.signOut()}>Sign out</Button>
+            <span className="sr-only" role="status" aria-live="polite">{status}</span>
           </div>
         </div>
       </header>
 
       {/* Room for the bottom bar, plus the iPhone home line */}
-      <main className="mx-auto max-w-6xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-6 md:px-5 md:pb-12">
+      <main className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-6 md:px-5 md:pb-12">
         <Outlet />
       </main>
 

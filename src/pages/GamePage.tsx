@@ -43,7 +43,7 @@ export default function GamePage() {
                 key={g.id}
                 to={`/game/${g.preset_id}`}
                 className={({ isActive }) =>
-                  `flex min-h-10 flex-1 items-center justify-center rounded-lg px-4 text-sm font-semibold ${
+                  `flex min-h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-semibold ${
                     isActive ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink'
                   }`
                 }
@@ -75,7 +75,7 @@ export default function GamePage() {
       {(error || saveError) && <p className="text-urgent">{error ?? saveError}</p>}
       {data && !game && (
         <p className="text-muted">
-          This game isn't in your list. <Link to="/games" className="text-accent underline">Manage games</Link>
+          This game isn't in your list. <Link to="/games" className="inline-flex min-h-11 items-center text-accent underline">Manage games</Link>
         </p>
       )}
 

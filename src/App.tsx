@@ -6,6 +6,7 @@ import Login from './components/Login'
 import AppShell from './components/AppShell'
 import BulkUndoProvider from './components/bulkUndo/BulkUndoProvider'
 import { ConfirmProvider, Loading } from './components/ui'
+import { usePwaInstall } from './lib/usePwaInstall'
 
 // Each page loads when it's first opened, so the app starts faster on a phone
 const TodayPage = lazy(() => import('./pages/TodayPage'))
@@ -17,6 +18,8 @@ const GamesScreen = lazy(() => import('./components/GamesScreen'))
 const page = (element: ReactNode) => <Suspense fallback={<Loading />}>{element}</Suspense>
 
 export default function App() {
+  // Listen above the auth gate so Chromium's one-shot install event cannot be missed.
+  const pwaInstall = usePwaInstall()
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
 
@@ -36,7 +39,7 @@ export default function App() {
     <ConfirmProvider>
       <BulkUndoProvider>
         <Routes>
-          <Route element={<AppShell email={session.user.email ?? ''} />}>
+          <Route element={<AppShell email={session.user.email ?? ''} pwaInstall={pwaInstall} />}>
             <Route index element={page(<TodayPage />)} />
             <Route path="game/:presetId" element={page(<GamePage />)} />
             <Route

@@ -50,7 +50,7 @@ export function EventCard({ event, game, now, onEdit, onDone }: { event: GameEve
       <h3 className={`font-display text-lg font-semibold leading-snug ${isDone ? 'text-muted line-through' : ''}`}>{event.name}</h3>
       {event.note && <p className="text-sm text-muted">{event.note}</p>}
       {event.official_url && (
-        <a href={event.official_url} target="_blank" rel="noreferrer" className="w-fit text-xs font-semibold text-accent hover:underline">
+        <a href={event.official_url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 w-fit items-center text-xs font-semibold text-accent hover:underline">
           Open the event page
         </a>
       )}
@@ -126,8 +126,13 @@ export function Timeline({ games, events, now, onOpen }: { games: Game[]; events
         <h2 className="text-sm font-semibold">Timeline · next {phone ? 3 : 6} weeks</h2>
         <span className="text-xs text-muted">Solid bars are events, outlined bars are endgame cycles. A faded edge means it was already running.</span>
       </div>
-      <div className="rounded-2xl border border-line bg-surface md:overflow-x-auto">
-        <div className="relative p-3 md:min-w-[760px] md:p-4">
+      <div
+        role="region"
+        aria-label="Event and endgame timeline. Scroll horizontally on wider screens."
+        tabIndex={0}
+        className="rounded-2xl border border-line bg-surface focus-visible:outline-offset-4 md:overflow-x-auto"
+      >
+        <div className="relative min-w-0 p-3 md:min-w-[760px] md:p-4">
           {/* Week marks */}
           <div className="relative h-5 text-[11px] text-muted">
             {weeks.map((w) => (
@@ -159,7 +164,7 @@ export function Timeline({ games, events, now, onOpen }: { games: Game[]; events
                   const outsideStyle = nameOnLeft ? { right: `${100 - left}%`, maxWidth: `${left}%` } : { left: `${right}%`, maxWidth: `${100 - right}%` }
                   const outsideClass = `absolute inset-y-0 z-10 flex items-center truncate px-2 text-xs ${nameOnLeft ? 'justify-end' : ''}`
                   return (
-                    <div key={bar.key} className="relative h-7">
+                    <div key={bar.key} className="relative h-11 md:h-7">
                       {bar.event ? (
                         <>
                           <button
