@@ -37,6 +37,11 @@ jobs:
         run: npm run lint
 
       - name: Run tests
+        env:
+          # today.test.ts imports the Supabase client through today.ts, but these
+          # tests only exercise pure calculations and never make network requests.
+          VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-key-for-tests-only
         run: npm test
 
       - name: Build production app
