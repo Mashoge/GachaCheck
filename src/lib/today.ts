@@ -5,6 +5,7 @@ import { messageOf } from './errors'
 import { meterStates, type MeterState } from './stamina'
 import { dailyPeriod, formatWhen, type ResetClock } from './time'
 import { progress } from '../../supabase/functions/_shared/progress.ts'
+import { groupCompletionRows, nonResettingTaskIds, type CompletionRow } from './completionHistory'
 
 export type Game = GameSummary
 export type Task = GameSummary['tasks'][number]
@@ -56,7 +57,7 @@ export function dailiesLeft(game: Game, data: TodayData, now: Date): Task[] {
   )
 }
 
-// Loads games (syncing outdated presets), recent completions and upcoming events.
+// Loads games (syncing outdated presets), recent completions, full goal history and upcoming events.
 async function loadToday(): Promise<TodayData> {
   const since = new Date(Date.now() - 62 * 86_400_000).toISOString()
   const [games, completionsRes, eventsRes] = await Promise.all([
@@ -68,12 +69,13 @@ async function loadToday(): Promise<TodayData> {
   if (completionsRes.error) throw completionsRes.error
   if (eventsRes.error) throw eventsRes.error
 
-  const completions = new Map<string, Completion[]>()
-  for (const c of completionsRes.data) {
-    const list = completions.get(c.task_id) ?? []
-    list.push({ id: c.id, at: c.completed_at })
-    completions.set(c.task_id, list)
-  }
+  const nonResettingIds = nonResettingTaskIds(games)
+  const nonResettingRes = nonResettingIds.length > 0
+    ? await supabase.from('completions').select('id, task_id, completed_at').in('task_id', nonResettingIds).order('completed_at')
+    : { data: [] as CompletionRow[], error: null }
+  if (nonResettingRes.error) throw nonResettingRes.error
+
+  const completions = groupCompletionRows(completionsRes.data, nonResettingRes.data, new Set(nonResettingIds))
   // Only events that are running now: upcoming and finished ones live on the Events page
   const rows = eventsRes.data as unknown as (EventRow & { starts_at: string | null })[]
   const started = rows.filter((e) => !e.starts_at || new Date(e.starts_at) <= new Date())
@@ -133,9 +135,11 @@ export function useTodayData() {
           .single()
         if (err) throw err
         patchCompletions(taskId, (list) => list.map((c) => (c.id === tempId ? { id: row.id, at: row.completed_at } : c)))
+        return row.id
       } catch (err) {
         setError(messageOf(err))
         await refresh()
+        return null
       }
     },
     [patchCompletions, refresh],
@@ -143,15 +147,17 @@ export function useTodayData() {
 
   // Removes completions by id (untick removes all in the period; −1 removes the newest).
   const removeCompletions = useCallback(
-    async (taskId: string, ids: string[]) => {
-      if (ids.length === 0) return
+    async (taskId: string, ids: string[]): Promise<boolean> => {
+      if (ids.length === 0) return true
       patchCompletions(taskId, (list) => list.filter((c) => !ids.includes(c.id)))
       try {
         const { error: err } = await supabase.from('completions').delete().in('id', ids)
         if (err) throw err
+        return true
       } catch (err) {
         setError(messageOf(err))
         await refresh()
+        return false
       }
     },
     [patchCompletions, refresh],
@@ -213,6 +219,11 @@ export type AttentionItem = {
   title: string
   at: Date // when it happens (now for things already full)
   urgent: boolean
+}
+
+export type DailyProgress = {
+  done: number
+  total: number
 }
 
 export type GameCard = {
@@ -295,5 +306,12 @@ export function buildToday(data: TodayData, now: Date) {
   }
 
   attention.sort((a, b) => a.at.getTime() - b.at.getTime() || a.title.localeCompare(b.title))
-  return { attention, cards }
+
+  // Reuse each card's counted daily totals so the global summary matches per-game progress.
+  const dailyProgress = cards.reduce<DailyProgress>(
+    (total, card) => ({ done: total.done + card.dailyDone, total: total.total + card.dailyTotal }),
+    { done: 0, total: 0 },
+  )
+
+  return { attention, cards, dailyProgress }
 }

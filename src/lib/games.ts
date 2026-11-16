@@ -1,11 +1,12 @@
 import { supabase } from './supabase'
 import type { TablesInsert } from './database.types'
+import { nextCustomTaskSortOrder, nextTaskSortOrder } from './taskOrdering'
 import { findPreset, findServer, type GamePreset, type PresetTask } from '../data/presets'
 
 export function fetchGames() {
   return supabase
     .from('games')
-    .select('id, name, server, timezone, daily_reset_time, weekly_reset_day, preset_id, preset_version, tasks(id, title, frequency, category, hidden, optional, archived, preset_key, note, weekly_target, monthly_day, cycle_anchor, cycle_days, cycle_ends_at, due_at), stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at, preset_key, spend_presets)')
+    .select('id, name, server, timezone, daily_reset_time, weekly_reset_day, preset_id, preset_version, task_order_customized, tasks(id, title, frequency, category, hidden, optional, archived, preset_key, note, weekly_target, monthly_day, cycle_anchor, cycle_days, cycle_ends_at, due_at), stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at, preset_key, spend_presets)')
     .order('created_at')
     .order('sort_order', { referencedTable: 'tasks' })
     .order('sort_order', { referencedTable: 'stamina_meters' })
@@ -40,7 +41,7 @@ export function laterEndDate(a: string | null, b: string | null) {
 }
 
 /** Bring one game in line with its preset. Never touches hidden flags or custom tasks. */
-export async function syncGame(gameId: string, preset: GamePreset, serverId: string | null) {
+export async function syncGame(gameId: string, preset: GamePreset, serverId: string | null, preserveTaskOrder = false) {
   const server = findServer(preset, serverId) ?? findServer(preset, preset.defaultServer)
   if (!server) throw new Error(`No servers defined for ${preset.name}`)
 
@@ -56,16 +57,17 @@ export async function syncGame(gameId: string, preset: GamePreset, serverId: str
     .eq('id', gameId)
   if (gameError) throw gameError
 
-  // ---- Tasks (only rows that came from the preset) ----
+  // ---- Tasks (sync preset rows without clobbering a player-selected order) ----
   const { data: existingTasks, error: tasksError } = await supabase
     .from('tasks')
-    .select('id, preset_key, archived, cycle_ends_at, cycle_anchor')
+    .select('id, preset_key, archived, cycle_ends_at, cycle_anchor, sort_order')
     .eq('game_id', gameId)
-    .not('preset_key', 'is', null)
   if (tasksError) throw tasksError
 
-  const taskByKey = new Map(existingTasks.map((t) => [t.preset_key ?? '', t]))
+  const presetTasks = existingTasks.filter((task) => task.preset_key !== null)
+  const taskByKey = new Map(presetTasks.map((task) => [task.preset_key ?? '', task]))
   const newTasks: TablesInsert<'tasks'>[] = []
+  let nextAppendedSortOrder = nextTaskSortOrder(existingTasks)
   for (const [index, task] of preset.tasks.entries()) {
     const fields = taskFields(task, index)
     const existing = taskByKey.get(task.key)
@@ -74,10 +76,18 @@ export async function syncGame(gameId: string, preset: GamePreset, serverId: str
       const cycle_ends_at = laterEndDate(existing.cycle_ends_at, fields.cycle_ends_at)
       // ...and the start day saved with it (modes on a fixed schedule take theirs from the preset)
       const cycle_anchor = fields.cycle_anchor ?? existing.cycle_anchor
-      const { error } = await supabase.from('tasks').update({ ...fields, cycle_ends_at, cycle_anchor, archived: false }).eq('id', existing.id)
+      const { sort_order: presetSortOrder, ...fieldsWithoutSortOrder } = fields
+      const updateFields = preserveTaskOrder ? fieldsWithoutSortOrder : { ...fieldsWithoutSortOrder, sort_order: presetSortOrder }
+      const { error } = await supabase.from('tasks').update({ ...updateFields, cycle_ends_at, cycle_anchor, archived: false }).eq('id', existing.id)
       if (error) throw error
     } else {
-      newTasks.push({ ...fields, game_id: gameId, preset_key: task.key, hidden: task.optional ?? false })
+      newTasks.push({
+        ...fields,
+        ...(preserveTaskOrder ? { sort_order: nextAppendedSortOrder++ } : {}),
+        game_id: gameId,
+        preset_key: task.key,
+        hidden: task.optional ?? false,
+      })
     }
   }
   if (newTasks.length > 0) {
@@ -87,7 +97,7 @@ export async function syncGame(gameId: string, preset: GamePreset, serverId: str
 
   // Preset tasks that were removed from the file are archived (history kept)
   const presetTaskKeys = new Set(preset.tasks.map((t) => t.key))
-  const retired = existingTasks
+  const retired = presetTasks
     .filter((t) => !t.archived && !presetTaskKeys.has(t.preset_key ?? ''))
     .map((t) => t.id)
   if (retired.length > 0) {
@@ -156,7 +166,7 @@ export async function syncOutdatedGames(games: GameSummary[]) {
   for (const game of games) {
     const preset = findPreset(game.preset_id)
     if (preset && (game.preset_version ?? 0) < preset.version) {
-      await syncGame(game.id, preset, game.server)
+      await syncGame(game.id, preset, game.server, game.task_order_customized)
       changed = true
     }
   }
@@ -247,13 +257,19 @@ export async function addCustomTask(
   input: { title: string; kind: CustomTaskKind; dueAt: string | null },
 ) {
   const isGoal = input.kind === 'goal'
+  const { data: existingTasks, error: tasksError } = await supabase
+    .from('tasks')
+    .select('sort_order, archived')
+    .eq('game_id', gameId)
+  if (tasksError) throw tasksError
+
   const { error } = await supabase.from('tasks').insert({
     game_id: gameId,
     title: input.title,
     frequency: isGoal ? 'none' : input.kind,
     category: isGoal ? 'goal' : 'routine',
     due_at: isGoal ? input.dueAt : null,
-    sort_order: 1000, // after preset tasks
+    sort_order: nextCustomTaskSortOrder(existingTasks),
   })
   if (error) throw error
 }
@@ -265,5 +281,26 @@ export async function removeCustomTask(taskId: string) {
     .update({ archived: true })
     .eq('id', taskId)
     .is('preset_key', null)
+  if (error) throw error
+}
+
+/** Restore a previously removed custom task without discarding its completion history. */
+export async function restoreCustomTask(taskId: string) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ archived: false })
+    .eq('id', taskId)
+    .eq('archived', true)
+    .is('preset_key', null)
+  if (error) throw error
+}
+
+/** Persist one complete task group's order atomically through a database function. */
+export async function reorderGameTasks(gameId: string, taskIds: readonly string[]) {
+  if (taskIds.length < 2) return
+  const { error } = await supabase.rpc('reorder_game_tasks', {
+    p_game_id: gameId,
+    p_task_ids: [...taskIds],
+  })
   if (error) throw error
 }

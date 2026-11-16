@@ -1,25 +1,18 @@
 import { cloneElement, isValidElement, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { cx } from './cx'
+import { controlBaseClass, controlClass, type ControlSize } from './fieldStyles'
 
-// Control borders use the "edge" colour (3:1 against the surfaces) so a field's outline is visible.
-const CONTROL = 'rounded-lg border border-edge bg-page px-3 text-ink placeholder:text-muted [color-scheme:dark] transition-colors focus:border-accent disabled:opacity-60'
-const HEIGHT = { sm: 'min-h-9 text-sm', md: 'min-h-10 text-sm', lg: 'h-11 rounded-xl text-base' } as const
 
-type Size = keyof typeof HEIGHT
-
-/** The classes of a text-like control, for the rare element the components below do not cover. */
-export const controlClass = (size: Size = 'md') => cx(CONTROL, HEIGHT[size])
-
-export function Input({ size = 'md', className, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & { size?: Size }) {
+export function Input({ size = 'md', className, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & { size?: ControlSize }) {
   return <input className={cx(controlClass(size), className)} {...rest} />
 }
 
-export function Select({ size = 'md', className, ...rest }: Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> & { size?: Size }) {
+export function Select({ size = 'md', className, ...rest }: Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> & { size?: ControlSize }) {
   return <select className={cx(controlClass(size), className)} {...rest} />
 }
 
 export function Textarea({ className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cx(CONTROL, 'py-2 text-sm', className)} {...rest} />
+  return <textarea className={cx(controlBaseClass, 'py-2 text-sm', className)} {...rest} />
 }
 
 type FieldProps = {

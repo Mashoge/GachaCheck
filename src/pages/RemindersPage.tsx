@@ -52,15 +52,33 @@ export default function RemindersPage() {
     setLoaded(true)
   }, [])
 
+  // Load asynchronously after the effect has completed, and ignore responses after unmount.
+  // The same loader also refreshes the reminder status every five minutes.
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    let active = true
+    const refreshWhileMounted = () => {
+      void load()
+        .then((data) => {
+          if (!active) return
+          setSettings(data.settings)
+          setGames(data.games)
+          setError(null)
+        })
+        .catch((err: unknown) => {
+          if (active) setError(messageOf(err))
+        })
+        .finally(() => {
+          if (active) setLoaded(true)
+        })
+    }
 
-  // Pick up a newer "last checked" time while the page stays open
-  useEffect(() => {
-    const id = setInterval(() => void refresh(), 5 * 60_000)
-    return () => clearInterval(id)
-  }, [refresh])
+    refreshWhileMounted()
+    const id = setInterval(refreshWhileMounted, 5 * 60_000)
+    return () => {
+      active = false
+      clearInterval(id)
+    }
+  }, [])
 
   // Show the change straight away, save it, and reload if saving fails.
   const saveSettings = async (patch: Partial<Settings>) => {

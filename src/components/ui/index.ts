@@ -1,11 +1,14 @@
 // The app's shared building blocks. Pages compose these instead of copying class strings,
 // so the theme lives in one place (src/index.css) and every control looks and behaves the same.
-export { Button, buttonClass, type ButtonSize, type ButtonVariant } from './Button'
+export { Button, type ButtonSize, type ButtonVariant } from './Button'
+export { buttonClass } from './buttonStyles'
 export { Card } from './Card'
-export { ConfirmProvider, useConfirm, type ConfirmOptions } from './confirm'
+export { ConfirmProvider } from './ConfirmProvider'
+export { useConfirm, type ConfirmOptions } from './confirm'
 export { cx } from './cx'
 export { Dialog } from './Dialog'
-export { controlClass, Field, Input, Select, Textarea } from './Field'
+export { Field, Input, Select, Textarea } from './Field'
+export { controlClass } from './fieldStyles'
 export * from './icons'
 export { Loading, Notice } from './Notice'
 export { PageTitle } from './PageTitle'

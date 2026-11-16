@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from 'react-router'
 import { supabase } from './lib/supabase'
 import Login from './components/Login'
 import AppShell from './components/AppShell'
+import BulkUndoProvider from './components/bulkUndo/BulkUndoProvider'
 import { ConfirmProvider, Loading } from './components/ui'
 
 // Each page loads when it's first opened, so the app starts faster on a phone
@@ -33,23 +34,25 @@ export default function App() {
 
   return (
     <ConfirmProvider>
-      <Routes>
-        <Route element={<AppShell email={session.user.email ?? ''} />}>
-          <Route index element={page(<TodayPage />)} />
-          <Route path="game/:presetId" element={page(<GamePage />)} />
-          <Route
-            path="games"
-            element={page(
-              <div className="mx-auto max-w-3xl">
-                <GamesScreen />
-              </div>,
-            )}
-          />
-          <Route path="events" element={page(<EventsPage />)} />
-          <Route path="reminders" element={page(<RemindersPage />)} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
+      <BulkUndoProvider>
+        <Routes>
+          <Route element={<AppShell email={session.user.email ?? ''} />}>
+            <Route index element={page(<TodayPage />)} />
+            <Route path="game/:presetId" element={page(<GamePage />)} />
+            <Route
+              path="games"
+              element={page(
+                <div className="mx-auto max-w-3xl">
+                  <GamesScreen />
+                </div>,
+              )}
+            />
+            <Route path="events" element={page(<EventsPage />)} />
+            <Route path="reminders" element={page(<RemindersPage />)} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </BulkUndoProvider>
     </ConfirmProvider>
   )
 }

@@ -144,6 +144,7 @@ export type Database = {
           server: string | null
           skipped_until: string | null
           sort_order: number
+          task_order_customized: boolean
           timezone: string
           user_id: string
           weekly_reset_day: number
@@ -161,6 +162,7 @@ export type Database = {
           server?: string | null
           skipped_until?: string | null
           sort_order?: number
+          task_order_customized?: boolean
           timezone?: string
           user_id?: string
           weekly_reset_day?: number
@@ -178,6 +180,7 @@ export type Database = {
           server?: string | null
           skipped_until?: string | null
           sort_order?: number
+          task_order_customized?: boolean
           timezone?: string
           user_id?: string
           weekly_reset_day?: number
@@ -447,7 +450,10 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      reorder_game_tasks: {
+        Args: { p_game_id: string; p_task_ids: string[] }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

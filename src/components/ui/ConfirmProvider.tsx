@@ -1,27 +1,14 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { Button } from './Button'
 import { Dialog } from './Dialog'
-
-export type ConfirmOptions = {
-  title: string
-  message?: ReactNode
-  /** The confirming button's text, e.g. "Delete" */
-  confirmLabel?: string
-  cancelLabel?: string
-  /** A destructive action: the confirming button is styled as a warning */
-  danger?: boolean
-}
-
-type Ask = (options: ConfirmOptions) => Promise<boolean>
-
-const ConfirmContext = createContext<Ask | null>(null)
+import { ConfirmContext, type ConfirmAsk, type ConfirmOptions } from './confirm'
 
 /** Renders the one confirmation dialog the app needs. Wrap the signed-in app in it. */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<ConfirmOptions | null>(null)
   const resolver = useRef<((ok: boolean) => void) | null>(null)
 
-  const ask = useCallback<Ask>((next) => {
+  const ask = useCallback<ConfirmAsk>((next) => {
     resolver.current?.(false) // a second question cancels the first
     setOptions(next)
     return new Promise<boolean>((resolve) => {
@@ -58,15 +45,4 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       </Dialog>
     </ConfirmContext.Provider>
   )
-}
-
-/**
- * Asks a yes/no question in an in-app dialog instead of the browser's confirm box.
- *   const confirm = useConfirm()
- *   if (!(await confirm({ title: 'Delete Genshin?', confirmLabel: 'Delete', danger: true }))) return
- */
-export function useConfirm(): Ask {
-  const ask = useContext(ConfirmContext)
-  if (!ask) throw new Error('useConfirm needs a <ConfirmProvider> above it')
-  return ask
 }

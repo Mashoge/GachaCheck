@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import SpendPrompt from '../components/SpendPrompt'
 import { Button, Card, Loading, Notice, PageTitle } from '../components/ui'
-import { buildToday, clockOf, dailiesLeft, periodCompletionIds, useTodayData, type Task } from '../lib/today'
+import { buildToday, clockOf, dailiesLeft, useTodayData } from '../lib/today'
 import { dailyPeriod, formatClock, formatDuration, formatWhen } from '../lib/time'
+import { useBulkUndo } from '../components/bulkUndo/useBulkUndo'
 import { useNow } from '../lib/useNow'
 
 // Small colour cue per game; the only game-specific colour in the neutral look.
@@ -15,41 +15,66 @@ export default function TodayPage() {
   const now = useNow()
   const today = data ? buildToday(data, now) : null
 
-  // "All done" on a card: ticks the game's dailies left, then asks for the stamina value once.
-  // Undo is offered for a minute.
-  const [bulk, setBulk] = useState<{ gameId: string; tasks: Task[]; ask: boolean } | null>(null)
-  useEffect(() => {
-    if (!bulk) return
-    const id = setTimeout(() => setBulk(null), 60_000)
-    return () => clearTimeout(id)
-  }, [bulk])
+  // Bulk undo state lives above the route switch, so it survives navigation between tabs.
+  const { batches, begin, complete, dismiss, dismissPrompt } = useBulkUndo()
 
-  const tickAll = (gameId: string, hasMeter: boolean) => {
+  const tickAll = async (gameId: string, meterId: string | null) => {
     const game = data?.games.find((g) => g.id === gameId)
     if (!game || !data) return
     const tasks = dailiesLeft(game, data, now)
+    if (tasks.length === 0) return
+    const operationId = begin(gameId, tasks.length, meterId)
     const start = dailyPeriod(clockOf(game), now).start // these are all plain dailies
-    for (const t of tasks) void addCompletion(t.id, start)
-    setBulk({ gameId, tasks, ask: hasMeter })
+    const results = await Promise.all(tasks.map(async (task) => ({
+      taskId: task.id,
+      completionId: await addCompletion(task.id, start),
+    })))
+    complete(gameId, operationId, results.filter((entry): entry is { taskId: string; completionId: string } => !!entry.completionId))
   }
-  const idsFor = (t: Task, gameId: string) => {
-    const game = data?.games.find((g) => g.id === gameId)
-    return game && data ? periodCompletionIds(t, data, clockOf(game), now) : []
-  }
-  const undoAll = () => {
-    if (!bulk) return
-    for (const t of bulk.tasks) void removeCompletions(t.id, idsFor(t, bulk.gameId))
-    setBulk(null)
+
+  const undoAll = async (gameId: string) => {
+    const batch = batches[gameId]
+    if (!batch || batch.status !== 'ready') return
+    const results = await Promise.all(batch.entries.map((entry) => removeCompletions(entry.taskId, [entry.completionId])))
+    if (results.every(Boolean)) dismiss(gameId, batch.operationId)
+
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <PageTitle>Today</PageTitle>
-        <span className="text-sm text-muted">
-          {now.toLocaleDateString([], { weekday: 'long' })} · {formatClock(now)}
-        </span>
-      </div>
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <PageTitle>Today</PageTitle>
+          <span className="text-sm text-muted">
+            {now.toLocaleDateString([], { weekday: 'long' })} · {formatClock(now)}
+          </span>
+        </div>
+        {today && today.dailyProgress.total > 0 && (
+          <section aria-labelledby="overall-daily-progress" className="flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <h2 id="overall-daily-progress" className="text-muted">Daily progress</h2>
+              <span className="font-semibold tabular-nums">
+                {today.dailyProgress.done} of {today.dailyProgress.total} done
+              </span>
+            </div>
+            <div
+              role="progressbar"
+              aria-label="Daily progress across all games"
+              aria-valuemin={0}
+              aria-valuemax={today.dailyProgress.total}
+              aria-valuenow={today.dailyProgress.done}
+              aria-valuetext={`${today.dailyProgress.done} of ${today.dailyProgress.total} daily tasks done`}
+              className="h-2 overflow-hidden rounded-full bg-line"
+            >
+              <span
+                aria-hidden="true"
+                className="block h-full rounded-full bg-accent transition-[width]"
+                style={{ width: `${Math.round((today.dailyProgress.done / today.dailyProgress.total) * 100)}%` }}
+              />
+            </div>
+          </section>
+        )}
+      </header>
 
       {loading && <Loading>Loading your games…</Loading>}
       {error && <Notice tone="error" size="md">{error}</Notice>}
@@ -101,8 +126,8 @@ export default function TodayPage() {
                 const left = card.dailyTotal - card.dailyDone
                 const game = data?.games.find((g) => g.id === card.id)
                 const toTick = game && data ? dailiesLeft(game, data, now).length : 0
-                const mine = bulk?.gameId === card.id ? bulk : null
-                const saving = !!mine && mine.tasks.some((t) => idsFor(t, card.id).some((id) => id.startsWith('temp-')))
+                const mine = batches[card.id] ?? null
+                const saving = mine?.status === 'saving'
                 return (
                   // The whole card opens the game page; the buttons inside sit above that link.
                   // The focus ring goes round the whole card, since the whole card is the link.
@@ -156,25 +181,25 @@ export default function TodayPage() {
                     {(toTick > 1 || mine) && (
                       <div className="relative z-10 flex items-center gap-2">
                         {mine ? (
-                          <Button variant="link" size="sm" onClick={undoAll} disabled={saving}>
-                            {saving ? 'Saving…' : `Undo (${mine.tasks.length})`}
+                          <Button variant="link" size="sm" onClick={() => void undoAll(card.id)} disabled={saving}>
+                            {saving ? 'Saving…' : `Undo (${mine.entries.length})`}
                           </Button>
                         ) : (
-                          <Button size="sm" onClick={() => tickAll(card.id, !!card.meter)}>
+                          <Button size="sm" onClick={() => void tickAll(card.id, card.meter?.id ?? null)}>
                             All {toTick} dailies done
                           </Button>
                         )}
                       </div>
                     )}
-                    {mine?.ask && card.meter && (
+                    {mine?.promptVisible && card.meter && (
                       <div className="relative z-10 -mx-4 -mb-4 overflow-hidden rounded-b-2xl">
                         <SpendPrompt
                           meter={card.meter}
                           onSave={(v) => {
                             if (game) void setMeterValue(game, card.meter!.id, v)
-                            setBulk({ ...mine, ask: false })
+                            dismissPrompt(card.id, mine.operationId)
                           }}
-                          onSkip={() => setBulk({ ...mine, ask: false })}
+                          onSkip={() => dismissPrompt(card.id, mine.operationId)}
                         />
                       </div>
                     )}
