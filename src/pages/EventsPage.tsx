@@ -6,6 +6,7 @@ import { useTodayData, type Game } from '../lib/today'
 import { SHORT_NAMES } from '../lib/useGames'
 import EventImport from './EventImport'
 import { useNow } from '../lib/useNow'
+import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
 import { EventCard, Section, Timeline } from './events/EventDisplay'
 import { EventForm } from './events/EventForm'
 
@@ -45,6 +46,7 @@ export default function EventsPage() {
       setError(messageOf(err))
     }
   }, [fetchData])
+  useRefreshOnFocus(refresh)
 
   useEffect(() => {
     let active = true

@@ -5,6 +5,7 @@ import { messageOf } from './errors'
 import { meterStates, type MeterState } from './stamina'
 import { dailyPeriod, formatWhen, type ResetClock } from './time'
 import { progress } from '../../supabase/functions/_shared/progress.ts'
+import { useRefreshOnFocus } from './useRefreshOnFocus'
 import { groupCompletionRows, nonResettingTaskIds, type CompletionRow } from './completionHistory'
 
 export type Game = GameSummary
@@ -108,6 +109,7 @@ export function useTodayData() {
       setError(messageOf(err))
     }
   }, [])
+  useRefreshOnFocus(refresh)
 
   // Change the local copy right away so ticks feel instant; the server call follows.
   const patchCompletions = useCallback((taskId: string, change: (list: Completion[]) => Completion[]) => {

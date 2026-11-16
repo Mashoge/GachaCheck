@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { PRESETS, findPreset, findServer, type GamePreset } from '../data/presets'
 import { addGameFromPreset, changeServer, deleteGame, loadGames, type GameSummary } from '../lib/games'
 import { messageOf } from '../lib/errors'
+import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
 import TaskManager from './TaskManager'
 import { Button, Card, Notice, Select, useConfirm } from './ui'
 
@@ -31,9 +32,16 @@ export default function GamesScreen() {
     }
   }, [])
 
-  async function refresh() {
-    setGames(await loadGames())
-  }
+  const refresh = useCallback(async () => {
+    try {
+      setGames(await loadGames())
+      setError(null)
+    } catch (err) {
+      setError(messageOf(err))
+      throw err
+    }
+  }, [])
+  useRefreshOnFocus(refresh)
 
   async function run(id: string, action: () => Promise<void>) {
     setBusyId(id)

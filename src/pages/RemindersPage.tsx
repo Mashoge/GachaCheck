@@ -3,6 +3,7 @@ import { messageOf } from '../lib/errors'
 import { supabase } from '../lib/supabase'
 import { formatWhen } from '../lib/time'
 import { useNow } from '../lib/useNow'
+import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
 import { Card, Input, Loading, Notice, PageTitle, Select, Switch } from '../components/ui'
 
 type Settings = {
@@ -51,6 +52,7 @@ export default function RemindersPage() {
     }
     setLoaded(true)
   }, [])
+  useRefreshOnFocus(refresh)
 
   // Load asynchronously after the effect has completed, and ignore responses after unmount.
   // The same loader also refreshes the reminder status every five minutes.
