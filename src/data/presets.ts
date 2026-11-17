@@ -111,8 +111,8 @@ export const PRESETS: GamePreset[] = [
   },
   {
     id: 'wuwa',
-    version: 6,
-    lastChecked: '2026-11-09',
+    version: 7,
+    lastChecked: '2026-11-18',
     name: 'Wuthering Waves',
     taskExample: 'e.g. Farm Echoes for my main DPS',  // WuWa
     dailyResetTime: '04:00',
@@ -145,8 +145,9 @@ export const PRESETS: GamePreset[] = [
       weekly('shop', 'Weekly shop exchanges'),
       endgame('tower', 'Tower of Adversity', { rule: 'interval', cycleAnchor: '2026-09-14', cycleDays: 28 }),
       endgame('whimpering', 'Whimpering Wastes', { rule: 'interval', cycleAnchor: '2026-09-28', cycleDays: 28 }),
-      // Seen in game on Nov 9: current cycle ends Nov 12, 04:00. Next dates once the cycle length is confirmed.
-      endgame('endstate', 'Endstate Matrix', { cycleEndsAt: '2026-11-12T04:00', note: 'Cycle length to be confirmed' }),
+      // Seen in game on Nov 9: that cycle ended Nov 12, 04:00. Each next end date comes from the official
+      // Patch Notes via the event collector (EVT-10), so no fixed cycle length is needed here.
+      endgame('endstate', 'Endstate Matrix', { cycleEndsAt: '2026-11-12T04:00', note: 'Dates come from the official Patch Notes' }),
     ],
   },
   {

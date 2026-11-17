@@ -263,7 +263,7 @@ export default function RemindersPage() {
 
           <Card as="section" className="flex flex-col">
             <h2 className="text-sm font-semibold">Per game</h2>
-            <p className="pb-2 text-sm text-muted">Stamina pings are sent once per fill-up, when a meter reaches 90%.</p>
+            <p className="pb-2 text-sm text-muted">Stamina pings are sent once per fill-up, when a meter reaches 90% or the number you set for it in Games.</p>
             {games.length === 0 && <Notice>No games added yet.</Notice>}
             {games.map((g) => (
               <div key={g.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line py-3">

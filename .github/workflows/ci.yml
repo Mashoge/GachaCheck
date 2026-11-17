@@ -46,3 +46,29 @@ jobs:
 
       - name: Build production app
         run: npm run build
+
+  collector:
+    name: Collector tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: collector
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      # Same Python and install as the scheduled collect job, so a change that breaks the
+      # collector shows up on push instead of at the next 11:17 run.
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: collector/pyproject.toml
+
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run tests (no network, nothing is sent)
+        run: python -m pytest -q
