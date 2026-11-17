@@ -11,7 +11,7 @@ import { buttonClass, ToggleGroup } from '../components/ui'
 
 export default function GamePage() {
   const { presetId } = useParams()
-  const { data, error, loading, refresh, addCompletion, removeCompletions, setMeterValue } = useTodayData()
+  const { data, error, loading, refresh, addCompletion, removeCompletions, setMeterValue, setSkipped } = useTodayData()
   const now = useNow()
   // Phone opens on "What's left", PC on "Everything"; after that, the last choice on this device
   const [view, setView] = useState<GameView>(() => initialGameView())
@@ -83,6 +83,7 @@ export default function GamePage() {
           onRemove={(task, ids) => removeCompletions(task.id, ids)}
           onSetMeter={(meterId, value) => void setMeterValue(game, meterId, value)}
           onSetEndDate={(task, endsAt, startDay, cycleOver) => void saveEndDate(task, endsAt, startDay, cycleOver)}
+          onSetSkipped={(skip) => void setSkipped(game, skip)}
         />
       )}
     </div>

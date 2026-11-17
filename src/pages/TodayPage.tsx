@@ -12,7 +12,7 @@ const DOT: Record<string, string> = { genshin: 'bg-game-genshin', wuwa: 'bg-game
 const dot = (presetId: string) => DOT[presetId] ?? 'bg-muted'
 
 export default function TodayPage() {
-  const { data, error, loading, addCompletion, removeCompletions, setMeterValue } = useTodayData()
+  const { data, error, loading, addCompletion, removeCompletions, setMeterValue, setSkipped } = useTodayData()
   const now = useNow()
   const today = data ? buildToday(data, now) : null
 
@@ -156,10 +156,12 @@ export default function TodayPage() {
                           <span className="text-muted">
                             Dailies <span className="font-semibold text-ink">{card.dailyDone} / {card.dailyTotal}</span> done
                           </span>
-                          <span className="font-semibold">{left === 0 ? 'All done' : `${left} left`}</span>
+                          <span className="font-semibold">
+                            {card.skipped ? <span className="font-medium text-muted">Resting today</span> : left === 0 ? 'All done' : `${left} left`}
+                          </span>
                         </span>
                         <span aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-line">
-                          <span className={`block h-full ${dot(card.presetId)}`} style={{ width: `${pct}%` }} />
+                          <span className={`block h-full ${card.skipped ? 'bg-muted/40' : dot(card.presetId)}`} style={{ width: `${pct}%` }} />
                         </span>
                       </span>
 
@@ -188,19 +190,37 @@ export default function TodayPage() {
 
                     </div>
 
-                    {/* One tap for a quick session: tick the rest, then say how much stamina is left.
-                        A footer of its own, outside the link: tapping around it never opens the game. */}
-                    {(toTick > 1 || mine) && (
-                      <div className="flex items-center gap-2 border-t border-line px-4 py-2.5">
+                    {/* Quick actions, in a footer of their own outside the link: tapping around them never opens the game.
+                        "All dailies done" ticks the rest; "Skip today" rests the game until its reset (TOD-7). */}
+                    {(mine || card.skipped || left > 0) && (
+                      <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-2.5">
                         {mine ? (
                           <Button variant="link" size="sm" onClick={() => void undoAll(card.id)} disabled={saving}>
                             {saving ? 'Saving…' : `Undo (${mine.entries.length})`}
                           </Button>
+                        ) : card.skipped ? (
+                          <>
+                            <span className="text-xs text-muted">Resting until reset · no reminders</span>
+                            {game && (
+                              <Button variant="link" size="sm" className="ml-auto" onClick={() => void setSkipped(game, false)} aria-label={`Undo skip for ${card.name}`}>
+                                Undo skip
+                              </Button>
+                            )}
+                          </>
                         ) : (
-                          <Button size="sm" onClick={() => void tickAll(card.id, card.meter?.id ?? null)}>
-                            <CheckIcon size={14} />
-                            All {toTick} dailies done
-                          </Button>
+                          <>
+                            {toTick > 1 && (
+                              <Button size="sm" onClick={() => void tickAll(card.id, card.meter?.id ?? null)}>
+                                <CheckIcon size={14} />
+                                All {toTick} dailies done
+                              </Button>
+                            )}
+                            {game && (
+                              <Button variant="quiet" size="sm" className="ml-auto" onClick={() => void setSkipped(game, true)} aria-label={`Skip ${card.name} today`}>
+                                Skip today
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     )}

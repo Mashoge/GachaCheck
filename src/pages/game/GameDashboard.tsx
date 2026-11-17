@@ -3,9 +3,9 @@ import SpendPrompt from '../../components/SpendPrompt'
 import { findPreset, findServer } from '../../data/presets'
 import { meterStates } from '../../lib/stamina'
 import { dailyPeriod, formatDuration, formatWhen, weeklyPeriod } from '../../lib/time'
-import { clockOf, dailiesLeft, isVisible, periodCompletionIds, taskProgress, type Task, type TodayData } from '../../lib/today'
+import { clockOf, dailiesLeft, isSkippedNow, isVisible, periodCompletionIds, taskProgress, type Task, type TodayData } from '../../lib/today'
 import { useBulkUndo } from '../../components/bulkUndo/useBulkUndo'
-import { Button, Card } from '../../components/ui'
+import { Button, Card, Tag } from '../../components/ui'
 import { Check, CountedRow, EndDateEditor, MeterCard, TaskRow } from './GameParts'
 
 type Props = {
@@ -17,9 +17,12 @@ type Props = {
   onRemove: (task: Task, ids: string[]) => Promise<boolean>
   onSetMeter: (meterId: string, value: number) => void
   onSetEndDate: (task: Task, endsAt: string, startDay: string | null, cycleOver: boolean) => void
+  /** TOD-7: rest this game until its next daily reset (true), or bring it back (false) */
+  onSetSkipped?: (skip: boolean) => void
 }
 
-export default function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, onSetEndDate }: Props) {
+export default function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, onSetEndDate, onSetSkipped }: Props) {
+  const skipped = isSkippedNow(game, now)
   const clock = clockOf(game)
   const preset = game.preset_id ? findPreset(game.preset_id) : undefined
   const serverLabel = preset && game.server ? findServer(preset, game.server)?.label : null
@@ -93,12 +96,25 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
   return (
     <Card as="section">
       <header className="flex flex-col gap-1.5">
-        <h1 className="font-display text-2xl font-bold">{game.name}</h1>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h1 className="font-display text-2xl font-bold">{game.name}</h1>
+          {skipped && <Tag>Resting today</Tag>}
+          {onSetSkipped && (
+            <Button variant={skipped ? 'link' : 'quiet'} size="sm" className="ml-auto" onClick={() => onSetSkipped(!skipped)}>
+              {skipped ? 'Undo skip' : 'Skip today'}
+            </Button>
+          )}
+        </div>
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
           <span>Daily reset in <b className="font-semibold text-ink">{formatDuration(day.end!.getTime() - now.getTime())}</b></span>
           <span>Weekly in <b className="font-semibold text-ink">{formatDuration(week.end!.getTime() - now.getTime())}</b></span>
           {serverLabel && <span>{serverLabel} server</span>}
         </p>
+        {skipped && (
+          <p className="text-xs text-muted">
+            Skipped until the next reset: left out of today's progress, and no reminders for this game until then. You can still tick tasks.
+          </p>
+        )}
       </header>
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-6 [grid-template-areas:'stamina'_'checklist'_'side'] md:grid-cols-[minmax(0,1fr)_340px] md:grid-rows-[auto_1fr] md:[grid-template-areas:'checklist_stamina'_'checklist_side']">

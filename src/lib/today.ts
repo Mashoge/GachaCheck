@@ -19,6 +19,10 @@ export type TodayData = {
   events: EventRow[]
 }
 
+/** TOD-7: a game is resting until its skipped_until moment (its next daily reset). Same rule as the reminder job. */
+export const isSkippedNow = (game: { skipped_until?: string | null }, now: Date) =>
+  !!game.skipped_until && new Date(game.skipped_until) > now
+
 export const clockOf = (game: Game): ResetClock => ({
   timezone: game.timezone,
   daily_reset_time: game.daily_reset_time,
@@ -209,7 +213,23 @@ export function useTodayData() {
     [refresh],
   )
 
-  return { data, error, loading: !data && !error, refresh, addCompletion, removeCompletions, setMeterValue }
+  // TOD-7: rest a game until its next daily reset, or bring it back. The local copy changes at once.
+  const setSkipped = useCallback(
+    async (game: Game, skip: boolean) => {
+      const until = skip ? dailyPeriod(clockOf(game), new Date()).end!.toISOString() : null
+      setData((d) => d && { ...d, games: d.games.map((g) => (g.id === game.id ? { ...g, skipped_until: until } : g)) })
+      try {
+        const { error: err } = await supabase.from('games').update({ skipped_until: until }).eq('id', game.id)
+        if (err) throw err
+      } catch (err) {
+        setError(messageOf(err))
+        await refresh()
+      }
+    },
+    [refresh],
+  )
+
+  return { data, error, loading: !data && !error, refresh, addCompletion, removeCompletions, setMeterValue, setSkipped }
 }
 
 // ---- What Today shows ----
@@ -237,6 +257,7 @@ export type GameCard = {
   dailyTotal: number
   meter: MeterState | null
   note: { text: string; at: Date | null; soon: boolean } | null
+  skipped: boolean // resting today: left out of daily progress and the "dailies left" row
 }
 
 const DAY = 86_400_000
@@ -260,7 +281,8 @@ export function buildToday(data: TodayData, now: Date) {
     const dailies = game.tasks.filter((t) => t.frequency === 'daily' && counted(t))
     const dailyDone = dailies.filter(doneFor).length
     const left = dailies.length - dailyDone
-    if (left > 0) {
+    const skipped = isSkippedNow(game, now)
+    if (left > 0 && !skipped) {
       attention.push({
         key: `${game.id}-dailies`, presetId, gameName: game.name,
         title: `${left} ${left === 1 ? 'daily' : 'dailies'} left`, at: day.end!, urgent: false,
@@ -307,13 +329,15 @@ export function buildToday(data: TodayData, now: Date) {
       dailyDone, dailyTotal: dailies.length,
       meter: meters.find((m) => !m.isOverflow) ?? null,
       note: soonest,
+      skipped,
     })
   }
 
   attention.sort((a, b) => a.at.getTime() - b.at.getTime() || a.title.localeCompare(b.title))
 
   // Reuse each card's counted daily totals so the global summary matches per-game progress.
-  const dailyProgress = cards.reduce<DailyProgress>(
+  // A game skipped for today (TOD-7) is left out, so resting a game doesn't hold the bar back.
+  const dailyProgress = cards.filter((card) => !card.skipped).reduce<DailyProgress>(
     (total, card) => ({ done: total.done + card.dailyDone, total: total.total + card.dailyTotal }),
     { done: 0, total: 0 },
   )

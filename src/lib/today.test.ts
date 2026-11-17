@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildToday, type Game, type Task, type TodayData } from './today'
+import { buildToday, isSkippedNow, type Game, type Task, type TodayData } from './today'
 
 const now = new Date('2026-11-16T12:00:00+08:00')
 const completedAt = '2026-11-16T08:00:00+08:00'
@@ -90,5 +90,39 @@ describe('buildToday stamina above the cap (STA-1)', () => {
 
   it('still says "full" when it is exactly at the cap', () => {
     expect(titles(200)).toContain('Original Resin is full')
+  })
+})
+
+describe('skip a game for today (TOD-7)', () => {
+  const resting = (until: string | null) => ({ ...game('game-a', [task('a-open'), task('a-done')]), skipped_until: until }) as unknown as Game
+  const data = (g: Game): TodayData => ({
+    games: [g, game('game-b', [task('b-open')])],
+    completions: new Map([['a-done', [{ id: 'c', at: completedAt }]]]),
+    events: [{ id: 'ev', game_id: 'game-a', name: 'Lantern Rite', ends_at: '2026-11-16T20:00:00+08:00' }],
+  })
+
+  it('leaves a resting game out of daily progress and the "dailies left" row', () => {
+    const today = buildToday(data(resting('2026-11-17T04:00:00+08:00')), now)
+    expect(today.dailyProgress).toEqual({ done: 0, total: 1 }) // only game-b counts
+    expect(today.cards.find((c) => c.id === 'game-a')).toMatchObject({ skipped: true, dailyDone: 1, dailyTotal: 2 })
+    expect(today.attention.map((a) => a.key)).not.toContain('game-a-dailies')
+  })
+
+  it('still lists the resting game\'s deadlines, such as an event ending', () => {
+    const today = buildToday(data(resting('2026-11-17T04:00:00+08:00')), now)
+    expect(today.attention.map((a) => a.title)).toContain('Lantern Rite ends')
+  })
+
+  it('ignores a skip that has already run out (the reset passed)', () => {
+    const today = buildToday(data(resting('2026-11-16T04:00:00+08:00')), now)
+    expect(today.cards.find((c) => c.id === 'game-a')?.skipped).toBe(false)
+    expect(today.dailyProgress).toEqual({ done: 1, total: 3 })
+    expect(today.attention.map((a) => a.key)).toContain('game-a-dailies')
+  })
+
+  it('isSkippedNow matches the reminder job: only a future time counts', () => {
+    expect(isSkippedNow({ skipped_until: null }, now)).toBe(false)
+    expect(isSkippedNow({ skipped_until: '2026-11-16T12:00:00+08:00' }, now)).toBe(false) // exactly now: over
+    expect(isSkippedNow({ skipped_until: '2026-11-16T12:01:00+08:00' }, now)).toBe(true)
   })
 })
