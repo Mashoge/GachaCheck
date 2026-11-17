@@ -1,7 +1,6 @@
 import { supabase } from './supabase'
-import type { TablesInsert } from './database.types'
-import { nextCustomTaskSortOrder, nextTaskSortOrder } from './taskOrdering'
-import { findPreset, findServer, type GamePreset, type PresetTask } from '../data/presets'
+import { nextCustomTaskSortOrder } from './taskOrdering'
+import { findPreset, findServer, type GamePreset, type PresetServer } from '../data/presets'
 
 export function fetchGames() {
   return supabase
@@ -14,150 +13,61 @@ export function fetchGames() {
 
 export type GameSummary = NonNullable<Awaited<ReturnType<typeof fetchGames>>['data']>[number]
 
-function taskFields(task: PresetTask, sortOrder: number) {
+/**
+ * The preset as the database functions read it (ARC-1), set to one server. Tasks and meters stay in
+ * preset order, which is the order they get unless the player reordered their tasks.
+ */
+export function presetPayload(preset: GamePreset, server: PresetServer) {
   return {
-    title: task.title,
-    frequency: task.rule,
-    category: task.category ?? 'routine',
-    optional: task.optional ?? false,
-    note: task.note ?? null,
-    monthly_day: task.monthlyDay ?? null,
-    cycle_anchor: task.cycleAnchor ?? null,
-    cycle_days: task.cycleDays ?? null,
-    cycle_ends_at: task.cycleEndsAt ?? null,
-    sort_order: sortOrder,
-    // Only overwrite the target when the preset defines one; otherwise keep the player's own
-    ...(task.weeklyTarget !== undefined ? { weekly_target: task.weeklyTarget } : {}),
-  }
-}
-
-// End dates are written in server time, e.g. '2026-11-12T04:00'. Returns the later of the two.
-// Used so a sync never replaces an end date you entered with an older one (or with nothing).
-export function laterEndDate(a: string | null, b: string | null) {
-  const minute = (v: string) => v.replace(' ', 'T').slice(0, 16)
-  if (!a) return b
-  if (!b) return a
-  return minute(a) >= minute(b) ? a : b
-}
-
-/** Bring one game in line with its preset. Never touches hidden flags or custom tasks. */
-export async function syncGame(gameId: string, preset: GamePreset, serverId: string | null, preserveTaskOrder = false) {
-  const server = findServer(preset, serverId) ?? findServer(preset, preset.defaultServer)
-  if (!server) throw new Error(`No servers defined for ${preset.name}`)
-
-  const { error: gameError } = await supabase
-    .from('games')
-    .update({
-      name: preset.name,
-      server: server.id,
-      timezone: server.timezone,
-      daily_reset_time: preset.dailyResetTime,
-      weekly_reset_day: preset.weeklyResetDay,
-    })
-    .eq('id', gameId)
-  if (gameError) throw gameError
-
-  // ---- Tasks (sync preset rows without clobbering a player-selected order) ----
-  const { data: existingTasks, error: tasksError } = await supabase
-    .from('tasks')
-    .select('id, preset_key, archived, cycle_ends_at, cycle_anchor, sort_order')
-    .eq('game_id', gameId)
-  if (tasksError) throw tasksError
-
-  const presetTasks = existingTasks.filter((task) => task.preset_key !== null)
-  const taskByKey = new Map(presetTasks.map((task) => [task.preset_key ?? '', task]))
-  const newTasks: TablesInsert<'tasks'>[] = []
-  let nextAppendedSortOrder = nextTaskSortOrder(existingTasks)
-  for (const [index, task] of preset.tasks.entries()) {
-    const fields = taskFields(task, index)
-    const existing = taskByKey.get(task.key)
-    if (existing) {
-      // Keep an end date entered in the app unless the preset has a later one
-      const cycle_ends_at = laterEndDate(existing.cycle_ends_at, fields.cycle_ends_at)
-      // ...and the start day saved with it (modes on a fixed schedule take theirs from the preset)
-      const cycle_anchor = fields.cycle_anchor ?? existing.cycle_anchor
-      const { sort_order: presetSortOrder, ...fieldsWithoutSortOrder } = fields
-      const updateFields = preserveTaskOrder ? fieldsWithoutSortOrder : { ...fieldsWithoutSortOrder, sort_order: presetSortOrder }
-      const { error } = await supabase.from('tasks').update({ ...updateFields, cycle_ends_at, cycle_anchor, archived: false }).eq('id', existing.id)
-      if (error) throw error
-    } else {
-      newTasks.push({
-        ...fields,
-        ...(preserveTaskOrder ? { sort_order: nextAppendedSortOrder++ } : {}),
-        game_id: gameId,
-        preset_key: task.key,
-        hidden: task.optional ?? false,
-      })
-    }
-  }
-  if (newTasks.length > 0) {
-    const { error } = await supabase.from('tasks').insert(newTasks)
-    if (error) throw error
-  }
-
-  // Preset tasks that were removed from the file are archived (history kept)
-  const presetTaskKeys = new Set(preset.tasks.map((t) => t.key))
-  const retired = presetTasks
-    .filter((t) => !t.archived && !presetTaskKeys.has(t.preset_key ?? ''))
-    .map((t) => t.id)
-  if (retired.length > 0) {
-    const { error } = await supabase.from('tasks').update({ archived: true }).in('id', retired)
-    if (error) throw error
-  }
-
-  // ---- Stamina meters ----
-  const { data: existingMeters, error: metersError } = await supabase
-    .from('stamina_meters')
-    .select('id, preset_key')
-    .eq('game_id', gameId)
-  if (metersError) throw metersError
-
-  const meterIdByKey = new Map(
-    existingMeters.filter((m) => m.preset_key).map((m) => [m.preset_key ?? '', m.id]),
-  )
-  // Normal meters first, so overflow meters can point at them
-  const ordered = [...preset.meters].sort(
-    (a, b) => Number(Boolean(a.fillsWhenFullOf)) - Number(Boolean(b.fillsWhenFullOf)),
-  )
-  for (const meter of ordered) {
-    const fields = {
+    preset_id: preset.id,
+    version: preset.version,
+    name: preset.name,
+    server: server.id,
+    timezone: server.timezone,
+    daily_reset_time: preset.dailyResetTime,
+    weekly_reset_day: preset.weeklyResetDay,
+    tasks: preset.tasks.map((task) => ({
+      key: task.key,
+      title: task.title,
+      frequency: task.rule,
+      category: task.category ?? 'routine',
+      optional: task.optional ?? false,
+      note: task.note ?? null,
+      monthly_day: task.monthlyDay ?? null,
+      cycle_anchor: task.cycleAnchor ?? null,
+      cycle_days: task.cycleDays ?? null,
+      cycle_ends_at: task.cycleEndsAt ?? null,
+      // Only sent when the preset defines one, so the player's own target is kept otherwise
+      ...(task.weeklyTarget !== undefined ? { weekly_target: task.weeklyTarget } : {}),
+    })),
+    meters: preset.meters.map((meter) => ({
+      key: meter.key,
       name: meter.name,
       cap: meter.cap,
       minutes_per_point: meter.minutesPerPoint,
-      sort_order: preset.meters.indexOf(meter),
-      fills_when_full_of: meter.fillsWhenFullOf ? (meterIdByKey.get(meter.fillsWhenFullOf) ?? null) : null,
-    }
-    const existingId = meterIdByKey.get(meter.key)
-    if (existingId) {
-      const { error } = await supabase.from('stamina_meters').update(fields).eq('id', existingId)
-      if (error) throw error
-    } else {
-      const { data: row, error } = await supabase
-        .from('stamina_meters')
-        .insert({ ...fields, game_id: gameId, preset_key: meter.key })
-        .select('id')
-        .single()
-      if (error) throw error
-      meterIdByKey.set(meter.key, row.id)
-    }
+      fills_when_full_of_key: meter.fillsWhenFullOf ?? null,
+    })),
   }
+}
 
-  // Meters no longer in the preset are removed
-  const presetMeterKeys = new Set(preset.meters.map((m) => m.key))
-  const staleMeters = existingMeters
-    .filter((m) => !m.preset_key || !presetMeterKeys.has(m.preset_key))
-    .map((m) => m.id)
-  if (staleMeters.length > 0) {
-    const { error } = await supabase.from('stamina_meters').delete().in('id', staleMeters)
-    if (error) throw error
-  }
+function presetServer(preset: GamePreset, serverId: string | null) {
+  const server = findServer(preset, serverId) ?? findServer(preset, preset.defaultServer)
+  if (!server) throw new Error(`No servers defined for ${preset.name}`)
+  return server
+}
 
-  // Mark as synced last, so a failed sync is retried on the next load
-  const { error: versionError } = await supabase
-    .from('games')
-    .update({ preset_version: preset.version })
-    .eq('id', gameId)
-  if (versionError) throw versionError
+/**
+ * Bring one game in line with its preset, all or nothing (database function sync_game_preset).
+ * Never touches hidden flags, your own tasks, your task order, later end dates or meter settings.
+ * Returns false when the game was already on this version (e.g. another tab synced it first).
+ */
+export async function syncGame(gameId: string, preset: GamePreset, serverId: string | null) {
+  const { data, error } = await supabase.rpc('sync_game_preset', {
+    p_game_id: gameId,
+    p_preset: presetPayload(preset, presetServer(preset, serverId)),
+  })
+  if (error) throw error
+  return data
 }
 
 /** Sync every game whose preset has a newer version. Returns true if anything changed. */
@@ -166,8 +76,7 @@ export async function syncOutdatedGames(games: GameSummary[]) {
   for (const game of games) {
     const preset = findPreset(game.preset_id)
     if (preset && (game.preset_version ?? 0) < preset.version) {
-      await syncGame(game.id, preset, game.server, game.task_order_customized)
-      changed = true
+      if (await syncGame(game.id, preset, game.server)) changed = true
     }
   }
   return changed
@@ -183,33 +92,15 @@ export async function loadGames() {
   return second.data
 }
 
+/** Add a game with its tasks and meters in one go: if anything fails, nothing is left behind. */
 export async function addGameFromPreset(preset: GamePreset, serverId: string, sortOrder: number) {
   const server = findServer(preset, serverId)
   if (!server) throw new Error(`Unknown server "${serverId}" for ${preset.name}`)
-
-  const { data: game, error } = await supabase
-    .from('games')
-    .insert({
-      name: preset.name,
-      server: server.id,
-      timezone: server.timezone,
-      daily_reset_time: preset.dailyResetTime,
-      weekly_reset_day: preset.weeklyResetDay,
-      preset_id: preset.id,
-      preset_version: 0,
-      sort_order: sortOrder,
-    })
-    .select('id')
-    .single()
+  const { error } = await supabase.rpc('add_game_from_preset', {
+    p_preset: presetPayload(preset, server),
+    p_sort_order: sortOrder,
+  })
   if (error) throw error
-
-  try {
-    await syncGame(game.id, preset, server.id)
-  } catch (err) {
-    // Remove the half-created game so you can simply try again
-    await supabase.from('games').delete().eq('id', game.id)
-    throw err
-  }
 }
 
 export async function changeServer(gameId: string, preset: GamePreset, serverId: string) {

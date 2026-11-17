@@ -536,9 +536,18 @@ export type Database = {
       }
     }
     Functions: {
+      // Added by hand to match migration 20261118120000_game_sync.sql (ARC-1); p_preset is presetPayload() in games.ts
+      add_game_from_preset: {
+        Args: { p_preset: Json; p_sort_order: number }
+        Returns: string
+      }
       reorder_game_tasks: {
         Args: { p_game_id: string; p_task_ids: string[] }
         Returns: undefined
+      }
+      sync_game_preset: {
+        Args: { p_game_id: string; p_preset: Json }
+        Returns: boolean
       }
     }
     Enums: {
