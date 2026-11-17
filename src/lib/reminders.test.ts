@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildReminders, eventReminders, inQuietHours, nudgeReminder, staminaReminders, toMessages, whatsLeft, withoutRepeatedEvents,
+  buildReminders, eventReminders, inQuietHours, nudgeReminder, rankLeft, staminaReminders, toMessages, whatsLeft, withoutRepeatedEvents,
   type Completions, type ReminderEvent, type ReminderGame, type ReminderSettings, type ReminderTask,
 } from '../../supabase/functions/_shared/reminders.ts'
 
@@ -251,7 +251,7 @@ describe('event reminders', () => {
     const soon = event({ ends_at: '2026-11-13T03:59:00+08:00' })
     const [g] = whatsLeft(games, ticks({}), NINE_PM, [soon, event()])
     expect(g.events).toEqual([{ name: 'Overdash Club', endsAt: at('2026-11-13T03:59:00+08:00') }])
-    expect(nudgeReminder(settings, games, ticks({}), NINE_PM, [soon])!.text).toContain('- Event: Overdash Club ends')
+    expect(nudgeReminder(settings, games, ticks({}), NINE_PM, [soon])!.text).toContain('- **Wuthering Waves**: Event: Overdash Club ends')
   })
 })
 
@@ -307,8 +307,8 @@ describe('weeklies in the evening nudge', () => {
 
   it('appear in the nudge text', () => {
     const r = nudgeReminder(settings, [game({ tasks: weeklyTasks })], ticks({}), SUNDAY_9PM)!
-    expect(r.text).toContain('- Weekly: Weekly bosses')
-    expect(r.text).toContain('- Weekly: Enhanced Echo drops (0 of 5)')
+    expect(r.text).toContain('- **Wuthering Waves**: Weekly: Weekly bosses, resets')
+    expect(r.text).toContain('- **Wuthering Waves**: Weekly: Enhanced Echo drops (0 of 5), resets')
   })
 })
 
@@ -332,12 +332,69 @@ describe('an event is not listed twice in one message', () => {
     const due = buildReminders(oneDay, games, ticks({}), NINE_PM, [soon()])
     const onlyNudge = due.filter((r) => r.kind === 'nudge') // the event reminder was already in notify_log
     const sent = withoutRepeatedEvents(onlyNudge, oneDay, games, ticks({}), NINE_PM, [soon()])
-    expect(sent[0].text).toContain('- Event: Overdash Club ends')
+    expect(sent[0].text).toContain('- **Wuthering Waves**: Event: Overdash Club ends')
   })
 
   it('drops the nudge if the event was the only thing in it', () => {
     const nothingElse = [game({ tasks: [] })]
     const due = buildReminders(oneDay, nothingElse, ticks({}), NINE_PM, [soon()])
     expect(withoutRepeatedEvents(due, oneDay, nothingElse, ticks({}), NINE_PM, [soon()]).map((r) => r.kind)).toEqual(['event'])
+  })
+})
+
+describe('the nudge is ranked (TSK-8)', () => {
+  // Two games: NTE resets at 05:00, WuWa at 04:00 (both UTC+8). It is Sunday 9 PM, the last evening of the week.
+  const SUNDAY_9PM = at('2026-11-15T21:00:00+08:00')
+  const nte = game({
+    id: 'g-nte', name: 'NTE', daily_reset_time: '05:00',
+    tasks: [task('Café Fons'), task('Witch fortune'), task('Check mail', { optional: true })],
+  })
+  const wuwa = game({
+    id: 'g-ww', name: 'WuWa',
+    tasks: [
+      task('Daily activity'),
+      task('Weekly bosses', { frequency: 'weekly' }),
+      task('Shop', { frequency: 'weekly', optional: true }),
+      task('Endstate Matrix', { category: 'endgame', frequency: 'dated', cycle_ends_at: '2026-11-16T02:00' }),
+    ],
+  })
+  const ending: ReminderEvent = {
+    id: 'ev-pixel', game_id: 'g-nte', name: 'Pixel Surge', starts_at: null, ends_at: '2026-11-15T23:30:00+08:00', note: null, remind: true, completed_at: null,
+  }
+
+  it("puts what expires before tomorrow first, across games, soonest first", () => {
+    const { dontMiss } = rankLeft(whatsLeft([nte, wuwa], ticks({}), SUNDAY_9PM, [ending]))
+    expect(dontMiss.map((l) => `${l.game}: ${l.text.split(',')[0].replace(/ ends.*| not cleared.*/, '')}`)).toEqual([
+      'NTE: Event: Pixel Surge', // 11:30 PM
+      'WuWa: Endstate Matrix', // 2:00 AM
+      'WuWa: Weekly: Weekly bosses', // 4:00 AM weekly reset
+    ])
+  })
+
+  it('lists dailies by game, the game whose reset comes first at the top', () => {
+    const { dailies } = rankLeft(whatsLeft([nte, wuwa], ticks({}), SUNDAY_9PM, [ending]))
+    expect(dailies.map((g) => [g.game, g.dailies])).toEqual([
+      ['WuWa', ['Daily activity']], // resets 4:00
+      ['NTE', ['Café Fons', 'Witch fortune']], // resets 5:00
+    ])
+  })
+
+  it('writes "Don\'t miss" before "Dailies", and optional tasks never appear', () => {
+    const text = nudgeReminder(settings, [nte, wuwa], ticks({}), SUNDAY_9PM, [ending])!.text
+    expect(text.indexOf("**Don't miss**")).toBeGreaterThan(0)
+    expect(text.indexOf("**Don't miss**")).toBeLessThan(text.indexOf('**Dailies**'))
+    expect(text).toContain('- **NTE**: Event: Pixel Surge ends')
+    expect(text).not.toContain('Check mail')
+    expect(text).not.toContain('Shop')
+  })
+
+  it('leaves out a section that would be empty', () => {
+    const onlyDailies = nudgeReminder(settings, [nte], ticks({}), NINE_PM)!.text
+    expect(onlyDailies).not.toContain("Don't miss")
+    expect(onlyDailies).toContain('**Dailies**')
+    const doneDailies = ticks({ 'Daily activity': ['2026-11-15T10:00:00+08:00'] })
+    const onlyUrgent = nudgeReminder(settings, [wuwa], doneDailies, SUNDAY_9PM)!.text
+    expect(onlyUrgent).toContain("**Don't miss**")
+    expect(onlyUrgent).not.toContain('**Dailies**')
   })
 })

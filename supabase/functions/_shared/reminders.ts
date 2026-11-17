@@ -126,6 +126,7 @@ export type GameLeft = {
   resetAt: Date
   dailies: string[]
   weeklies: string[] // only on the last day before the weekly reset
+  weeklyResetAt: Date
   endgame: { title: string; endsAt: Date }[]
   events: { name: string; endsAt: Date }[]
 }
@@ -166,10 +167,31 @@ export function whatsLeft(games: ReminderGame[], completions: Completions, now: 
       .map((e) => ({ name: e.name, endsAt: new Date(e.ends_at) }))
 
     if (dailies.length > 0 || weeklies.length > 0 || endgame.length > 0 || ending.length > 0) {
-      out.push({ game: game.name, resetAt: dailyPeriod(clock, now).end!, dailies, weeklies, endgame, events: ending })
+      out.push({ game: game.name, resetAt: dailyPeriod(clock, now).end!, dailies, weeklies, weeklyResetAt: weeklyEnd, endgame, events: ending })
     }
   }
   return out
+}
+
+// ---- TSK-8: the nudge is ranked. What expires before tomorrow leads ("Don't miss"), across all games,
+// soonest first; core dailies follow, the game whose reset comes first at the top. Optional tasks never ping
+// (whatsLeft already leaves them out). ----
+
+export type NudgeLine = { game: string; text: string; at: Date }
+
+export function rankLeft(left: GameLeft[]): { dontMiss: NudgeLine[]; dailies: GameLeft[] } {
+  const dontMiss: NudgeLine[] = []
+  for (const g of left) {
+    for (const e of g.endgame) dontMiss.push({ game: g.game, text: `${e.title} not cleared, resets ${relative(e.endsAt)}`, at: e.endsAt })
+    for (const e of g.events) dontMiss.push({ game: g.game, text: `Event: ${e.name} ends ${relative(e.endsAt)}`, at: e.endsAt })
+    for (const title of g.weeklies) dontMiss.push({ game: g.game, text: `Weekly: ${title}, resets ${relative(g.weeklyResetAt)}`, at: g.weeklyResetAt })
+  }
+  // Array sort is stable, so items of one game that end together keep their order
+  dontMiss.sort((a, b) => a.at.getTime() - b.at.getTime() || a.game.localeCompare(b.game))
+  const dailies = left
+    .filter((g) => g.dailies.length > 0)
+    .sort((a, b) => a.resetAt.getTime() - b.resetAt.getTime() || a.game.localeCompare(b.game))
+  return { dontMiss, dailies }
 }
 
 // The most recent nudge time that has already passed, in the user's timezone.
@@ -185,13 +207,19 @@ export function nudgeReminder(settings: ReminderSettings, games: ReminderGame[],
   const left = whatsLeft(games, completions, now, events)
   if (left.length === 0) return null
 
+  const { dontMiss, dailies } = rankLeft(left)
   const lines = ['**Still to do today**']
-  for (const g of left) {
-    lines.push('', `**${g.game}** (daily reset ${relative(g.resetAt)})`)
-    for (const title of g.dailies) lines.push(`- ${title}`)
-    for (const title of g.weeklies) lines.push(`- Weekly: ${title}`)
-    for (const e of g.endgame) lines.push(`- ${e.title} not cleared, resets ${relative(e.endsAt)}`)
-    for (const e of g.events) lines.push(`- Event: ${e.name} ends ${relative(e.endsAt)}`)
+  if (dontMiss.length > 0) {
+    lines.push('', "**Don't miss**")
+    for (const l of dontMiss) lines.push(`- **${l.game}**: ${l.text}`)
+  }
+  if (dailies.length > 0) {
+    lines.push('', '**Dailies**')
+    dailies.forEach((g, i) => {
+      if (i > 0) lines.push('')
+      lines.push(`**${g.game}** (daily reset ${relative(g.resetAt)})`)
+      for (const title of g.dailies) lines.push(`- ${title}`)
+    })
   }
   return { kind: 'nudge', key: `nudge:${settings.user_id}:${at.toISOString()}`, text: lines.join('\n') }
 }
