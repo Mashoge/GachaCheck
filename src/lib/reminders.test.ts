@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildReminders, eventReminders, inQuietHours, nudgeReminder, rankLeft, staminaReminders, toMessages, whatsLeft, withoutRepeatedEvents,
+  buildReminders, earlyStaminaReminders, eventReminders, inQuietHours, inWorkHours, nudgeReminder, rankLeft, staminaReminders, toMessages, whatsLeft, withoutRepeatedEvents,
   type Completions, type ReminderEvent, type ReminderGame, type ReminderSettings, type ReminderTask,
 } from '../../supabase/functions/_shared/reminders.ts'
 
@@ -396,5 +396,80 @@ describe('the nudge is ranked (TSK-8)', () => {
     const onlyUrgent = nudgeReminder(settings, [wuwa], doneDailies, SUNDAY_9PM)!.text
     expect(onlyUrgent).toContain("**Don't miss**")
     expect(onlyUrgent).not.toContain('**Dailies**')
+  })
+})
+
+describe('work hours (SUP-4)', () => {
+  // Nov 12 2026 is a Thursday, Nov 13 a Friday, Nov 14 a Saturday (Manila)
+  const work = { ...settings, work_start: '09:00', work_end: '18:00', work_days: [1, 2, 3, 4, 5] }
+
+  it('hold pings on work days only', () => {
+    expect(inWorkHours(work, at('2026-11-12T12:00:00+08:00'))).toBe(true)
+    expect(inWorkHours(work, at('2026-11-12T18:00:00+08:00'))).toBe(false)
+    expect(inWorkHours(work, at('2026-11-14T12:00:00+08:00'))).toBe(false) // Saturday
+  })
+
+  it('follow the days you pick', () => {
+    const saturdays = { ...work, work_days: [6] }
+    expect(inWorkHours(saturdays, at('2026-11-14T12:00:00+08:00'))).toBe(true)
+    expect(inWorkHours(saturdays, at('2026-11-12T12:00:00+08:00'))).toBe(false)
+  })
+
+  it('count a night shift as the day it starts on', () => {
+    const fridayNights = { ...settings, work_start: '22:00', work_end: '06:00', work_days: [5] }
+    expect(inWorkHours(fridayNights, at('2026-11-14T02:00:00+08:00'))).toBe(true) // began Friday 10 PM
+    expect(inWorkHours(fridayNights, at('2026-11-13T02:00:00+08:00'))).toBe(false) // began Thursday
+  })
+
+  it('are off when no times are set, and hold event reminders too', () => {
+    expect(inWorkHours(settings, at('2026-11-12T12:00:00+08:00'))).toBe(false)
+    const ev: ReminderEvent = { id: 'e1', game_id: 'g1', name: 'Overdash Club', starts_at: null, ends_at: '2026-11-13T20:00:00+08:00', note: null, remind: true, completed_at: null }
+    const noon = at('2026-11-12T12:00:00+08:00')
+    expect(eventReminders(work, [game()], [ev], noon)).toHaveLength(1)
+    expect(buildReminders({ ...work, nudge_enabled: false }, [game()], ticks({}), noon, [ev])).toEqual([])
+  })
+})
+
+describe('early stamina ping before a window (SUP-4)', () => {
+  const quiet = { ...settings, quiet_start: '23:00', quiet_end: '07:00' }
+  // 200 Waveplates at 10 PM: full at 2:00 AM, inside quiet hours
+  const fillsAt2am = () => game({ stamina_meters: [waveplates(200, '2026-11-12T22:00:00+08:00')] })
+
+  it('pings within the 30 minutes before quiet hours, if the meter would fill during them', () => {
+    const [r] = earlyStaminaReminders(quiet, [fillsAt2am()], at('2026-11-12T22:35:00+08:00'))
+    expect(r.text).toContain('Waveplates are at 205/240 and will be full at <t:')
+    expect(r.text).toContain('during your quiet hours')
+    // The same key as the ordinary ping, so the meter is pinged once per fill-up
+    expect(r.key).toBe(`stamina:wp:${new Date('2026-11-12T22:00:00+08:00').toISOString()}`)
+  })
+
+  it('does not ping earlier than 30 minutes before, or for a meter that fills outside the window', () => {
+    expect(earlyStaminaReminders(quiet, [fillsAt2am()], at('2026-11-12T22:25:00+08:00'))).toEqual([])
+    const fillsBefore = game({ stamina_meters: [waveplates(235, '2026-11-12T22:20:00+08:00')] }) // full 10:50 PM
+    expect(earlyStaminaReminders(quiet, [fillsBefore], at('2026-11-12T22:35:00+08:00'))).toEqual([])
+    const fillsAfter = game({ stamina_meters: [waveplates(150, '2026-11-12T22:00:00+08:00')] }) // full 7:00 AM
+    expect(earlyStaminaReminders(quiet, [fillsAfter], at('2026-11-12T22:35:00+08:00'))).toEqual([])
+  })
+
+  it('replaces the ordinary 90% ping in the same run, so only one message goes out', () => {
+    // 230 at 10:35 PM: already over 90%, full at 11:35 PM inside quiet hours
+    const g = game({ stamina_meters: [waveplates(230, '2026-11-12T22:35:00+08:00')] })
+    const sent = buildReminders({ ...quiet, nudge_enabled: false }, [g], ticks({}), at('2026-11-12T22:40:00+08:00'))
+    expect(sent).toHaveLength(1)
+    expect(sent[0].text).toContain('during your quiet hours')
+  })
+
+  it('works before work hours too, on work days only', () => {
+    const work = { ...settings, nudge_enabled: false, work_start: '09:00', work_end: '18:00', work_days: [1, 2, 3, 4, 5] }
+    const meter = (day: string) => game({ stamina_meters: [waveplates(220, `${day}T08:00:00+08:00`)] }) // full 10:00 AM
+    const friday = buildReminders(work, [meter('2026-11-13')], ticks({}), at('2026-11-13T08:40:00+08:00'))
+    expect(friday[0].text).toContain('during your work hours')
+    const saturday = buildReminders(work, [meter('2026-11-14')], ticks({}), at('2026-11-14T08:40:00+08:00'))
+    expect(saturday[0].text).not.toContain('work hours')
+  })
+
+  it('leaves a skipped game alone', () => {
+    const g = { ...fillsAt2am(), skipped_until: '2026-11-13T04:00:00+08:00' }
+    expect(earlyStaminaReminders(quiet, [g], at('2026-11-12T22:35:00+08:00'))).toEqual([])
   })
 })

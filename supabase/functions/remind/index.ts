@@ -12,7 +12,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
-  buildReminders, inQuietHours, lastNudgeTime, toMessages, whatsLeft, withoutRepeatedEvents,
+  buildReminders, inQuietHours, inWorkHours, lastNudgeTime, toMessages, whatsLeft, withoutRepeatedEvents,
   type Completions, type Reminder, type ReminderEvent, type ReminderGame, type ReminderSettings,
 } from '../_shared/reminders.ts'
 import { meterStates } from '../_shared/stamina.ts'
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
     const db = adminClient()
     const since = new Date(now.getTime() - 62 * 86_400_000).toISOString()
     const [settingsRes, gamesRes, completionsRes, eventsRes] = await Promise.all([
-      db.from('user_settings').select('user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, event_reminder_days, last_event_import_at'),
+      db.from('user_settings').select('user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, work_start, work_end, work_days, event_reminder_days, last_event_import_at'),
       db.from('games').select(GAME_COLUMNS).order('sort_order'),
       db.from('completions').select('task_id, completed_at').gte('completed_at', since),
       // user_events = each user's own events plus the shared catalog events for their games (hidden ones left out)
@@ -188,6 +188,7 @@ Deno.serve(async (req) => {
               lastNudgeTime: lastNudgeTime(settings, now).toISOString(),
               nudgeEnabled: settings.nudge_enabled,
               quietHoursNow: inQuietHours(settings, now),
+              workHoursNow: inWorkHours(settings, now),
               meters: games.flatMap((g) =>
                 meterStates(g.stamina_meters, now).filter((m) => !m.isOverflow).map((m) => `${g.name}: ${m.name} ${m.value}/${m.cap}`),
               ),

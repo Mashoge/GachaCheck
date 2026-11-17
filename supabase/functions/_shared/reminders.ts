@@ -37,6 +37,9 @@ export type ReminderSettings = {
   nudge_time: string // 'HH:MM' or 'HH:MM:SS' in the user's timezone
   quiet_start?: string | null // stamina pings wait between these two times (user's timezone)
   quiet_end?: string | null
+  work_start?: string | null // SUP-4: the same, during work hours, on the days in work_days
+  work_end?: string | null
+  work_days?: number[] | null // days a work window starts on: 0 = Sunday ... 6 = Saturday
   event_reminder_days?: number // remind this many days before an event ends (0 = off)
 }
 
@@ -86,17 +89,57 @@ const isVisible = (t: ReminderTask) => !t.archived && !t.hidden
 
 // "Is it done?" is the same rule the app uses, from progress.ts
 
-// ---- Quiet hours: stamina pings are held, then sent on the first run after they end ----
+// ---- Quiet hours and work hours (SUP-4): stamina pings and event reminders are held, then sent on the
+// first run after the window ends. A window belongs to the day it starts on. ----
+
+export type WindowKind = 'quiet' | 'work'
+export type HoldWindow = { kind: WindowKind; start: Date; end: Date }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const weekdayIn = (d: Date, tz: string) =>
+  WEEKDAYS.indexOf(new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(d))
+
+function windowTimes(settings: ReminderSettings, kind: WindowKind): { from: string; to: string } | null {
+  const from = kind === 'quiet' ? settings.quiet_start : settings.work_start
+  const to = kind === 'quiet' ? settings.quiet_end : settings.work_end
+  if (!from || !to || from.slice(0, 5) === to.slice(0, 5)) return null
+  return { from, to }
+}
+
+const onDay = (settings: ReminderSettings, kind: WindowKind, start: Date) =>
+  kind === 'quiet' || (settings.work_days ?? [1, 2, 3, 4, 5]).includes(weekdayIn(start, settings.timezone))
+
+const clockAt = (settings: ReminderSettings, time: string) => ({ timezone: settings.timezone, daily_reset_time: time, weekly_reset_day: 1 })
+
+/** The window of this kind that is running now, if any. Works across midnight. */
+export function currentWindow(settings: ReminderSettings, kind: WindowKind, now: Date): HoldWindow | null {
+  const t = windowTimes(settings, kind)
+  if (!t) return null
+  // The most recent time the window began, and the first time it ends after that
+  const start = dailyPeriod(clockAt(settings, t.from), now).start
+  const end = dailyPeriod(clockAt(settings, t.to), start).end!
+  return now < end && onDay(settings, kind, start) ? { kind, start, end } : null
+}
+
+/** The next window of this kind to begin after now, if it begins on one of its days. */
+export function nextWindow(settings: ReminderSettings, kind: WindowKind, now: Date): HoldWindow | null {
+  const t = windowTimes(settings, kind)
+  if (!t) return null
+  const start = dailyPeriod(clockAt(settings, t.from), now).end!
+  const end = dailyPeriod(clockAt(settings, t.to), start).end!
+  return onDay(settings, kind, start) ? { kind, start, end } : null
+}
 
 export function inQuietHours(settings: ReminderSettings, now: Date): boolean {
-  const { quiet_start: from, quiet_end: to } = settings
-  if (!from || !to || from.slice(0, 5) === to.slice(0, 5)) return false
-  const at = (time: string) => ({ timezone: settings.timezone, daily_reset_time: time, weekly_reset_day: 1 })
-  // The most recent time quiet hours began, and the first time they end after that. Works across midnight.
-  const began = dailyPeriod(at(from), now).start
-  const ends = dailyPeriod(at(to), began).end!
-  return now < ends
+  return currentWindow(settings, 'quiet', now) !== null
 }
+
+export function inWorkHours(settings: ReminderSettings, now: Date): boolean {
+  return currentWindow(settings, 'work', now) !== null
+}
+
+/** Stamina pings and event reminders wait while either window is running. */
+export const isHeld = (settings: ReminderSettings, now: Date) => inQuietHours(settings, now) || inWorkHours(settings, now)
 
 // ---- Stamina: one ping per fill-up, when a meter reaches 90% of its cap ----
 
@@ -114,6 +157,36 @@ export function staminaReminders(games: ReminderGame[], now: Date): Reminder[] {
         : `**${game.name}**: ${m.name} ${be} at ${m.value}/${m.cap}, full ${relative(m.fullAt)} (${clockTime(m.fullAt)}).`
       // The key changes whenever a new value is entered, so each fill-up pings once.
       out.push({ kind: 'stamina', key: `stamina:${m.id}:${new Date(row.value_recorded_at).toISOString()}`, text })
+    }
+  }
+  return out
+}
+
+// ---- SUP-4: an early ping before quiet or work hours, for a meter that would fill during them ----
+
+export const EARLY_PING_MS = 30 * 60_000 // within the 30 minutes before the window starts
+
+export function earlyStaminaReminders(settings: ReminderSettings, games: ReminderGame[], now: Date): Reminder[] {
+  const soon = (['quiet', 'work'] as const)
+    .map((kind) => nextWindow(settings, kind, now))
+    .filter((w): w is HoldWindow => !!w && w.start.getTime() - now.getTime() <= EARLY_PING_MS)
+  if (soon.length === 0) return []
+  const out: Reminder[] = []
+  for (const game of games) {
+    if (!game.notify_stamina || isSkipped(game, now)) continue
+    for (const m of meterStates(game.stamina_meters, now)) {
+      if (m.isOverflow || m.full || !m.fullAt) continue
+      const w = soon.find((x) => m.fullAt! >= x.start && m.fullAt! < x.end)
+      if (!w) continue
+      const row = game.stamina_meters.find((r) => r.id === m.id)!
+      const be = m.name.endsWith('s') ? 'are' : 'is'
+      const label = w.kind === 'quiet' ? 'quiet hours' : 'work hours'
+      out.push({
+        kind: 'stamina',
+        // The same key as the ordinary ping: one ping per fill-up, just sent before the window instead of after it
+        key: `stamina:${m.id}:${new Date(row.value_recorded_at).toISOString()}`,
+        text: `**${game.name}**: ${m.name} ${be} at ${m.value}/${m.cap} and will be full at ${clockTime(m.fullAt)}, during your ${label}. Spend some now if you can.`,
+      })
     }
   }
   return out
@@ -250,9 +323,12 @@ export function eventReminders(settings: ReminderSettings, games: ReminderGame[]
 
 export function buildReminders(settings: ReminderSettings, games: ReminderGame[], completions: Completions, now: Date, events: ReminderEvent[] = []): Reminder[] {
   const nudge = nudgeReminder(settings, games, completions, now, events)
-  // Held reminders are not recorded as sent, so they go out once quiet hours are over.
-  const held = inQuietHours(settings, now)
-  const stamina = held ? [] : staminaReminders(games, now)
+  // Held reminders are not recorded as sent, so they go out once quiet or work hours are over.
+  const held = isHeld(settings, now)
+  // An early ping shares its key with the ordinary one, so the meter is pinged once, with the clearer text
+  const byKey = new Map<string, Reminder>()
+  if (!held) for (const r of [...staminaReminders(games, now), ...earlyStaminaReminders(settings, games, now)]) byKey.set(r.key, r)
+  const stamina = [...byKey.values()]
   const ending = held ? [] : eventReminders(settings, games, events, now)
   return [...stamina, ...ending, ...(nudge ? [nudge] : [])]
 }

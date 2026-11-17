@@ -13,13 +13,22 @@ type Settings = {
   nudge_time: string
   quiet_start: string | null
   quiet_end: string | null
+  work_start: string | null
+  work_end: string | null
+  work_days: number[]
   event_reminder_days: number
   last_reminder_run_at: string | null
 }
 
 type GameSwitches = { id: string; name: string; notify_nudge: boolean; notify_stamina: boolean; notify_events: boolean }
 
-const SETTINGS_COLUMNS = 'user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, event_reminder_days, last_reminder_run_at'
+const SETTINGS_COLUMNS = 'user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, work_start, work_end, work_days, event_reminder_days, last_reminder_run_at'
+// Work days, shown Monday first. Stored as 0 = Sunday ... 6 = Saturday, like a game's weekly reset day.
+const WORK_DAYS = [
+  { day: 1, short: 'Mon', long: 'Monday' }, { day: 2, short: 'Tue', long: 'Tuesday' }, { day: 3, short: 'Wed', long: 'Wednesday' },
+  { day: 4, short: 'Thu', long: 'Thursday' }, { day: 5, short: 'Fri', long: 'Friday' }, { day: 6, short: 'Sat', long: 'Saturday' },
+  { day: 0, short: 'Sun', long: 'Sunday' },
+]
 const EVENT_DAY_CHOICES = [0, 1, 2, 3, 5, 7]
 const STALE_AFTER_MS = 45 * 60_000 // the schedule runs every 15 minutes
 const hhmm = (time: string | null) => (time ?? '').slice(0, 5)
@@ -105,6 +114,12 @@ export default function RemindersPage() {
   const lastRun = settings?.last_reminder_run_at ? new Date(settings.last_reminder_run_at) : null
   const stale = lastRun ? now.getTime() - lastRun.getTime() > STALE_AFTER_MS : false
   const quietOn = !!settings?.quiet_start && !!settings?.quiet_end
+  const workOn = !!settings?.work_start && !!settings?.work_end
+  const toggleWorkDay = (day: number) => {
+    if (!settings) return
+    const days = settings.work_days.includes(day) ? settings.work_days.filter((d) => d !== day) : [...settings.work_days, day]
+    void saveSettings({ work_days: days.sort((a, b) => a - b) })
+  }
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
@@ -160,7 +175,8 @@ export default function RemindersPage() {
               <div className="flex flex-col gap-0.5">
                 <h2 className="text-sm font-semibold">Quiet hours</h2>
                 <p className="text-sm text-muted">
-                  Stamina pings and event reminders wait until quiet hours end. The evening nudge is not affected.
+                  Stamina pings and event reminders wait until quiet hours end. If a meter would fill during them, you get one ping
+                  30 minutes before they start instead. The evening nudge is not affected.
                 </p>
               </div>
               <Switch
@@ -174,6 +190,53 @@ export default function RemindersPage() {
                 <TimeField id="quiet-start" label="From" value={hhmm(settings.quiet_start)} onChange={(v) => void saveSettings({ quiet_start: v })} />
                 <TimeField id="quiet-end" label="Until" value={hhmm(settings.quiet_end)} onChange={(v) => void saveSettings({ quiet_end: v })} />
               </div>
+            )}
+          </Card>
+
+          {/* SUP-4: work hours behave like quiet hours, on the days picked here */}
+          <Card as="section" className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-0.5">
+                <h2 className="text-sm font-semibold">Work hours</h2>
+                <p className="text-sm text-muted">
+                  Like quiet hours, on the days you pick: pings wait until work ends, and a meter that would fill during work is pinged
+                  30 minutes before it starts.
+                </p>
+              </div>
+              <Switch
+                label="Work hours"
+                on={workOn}
+                onChange={(on) => void saveSettings(on ? { work_start: '09:00', work_end: '18:00' } : { work_start: null, work_end: null })}
+              />
+            </div>
+            {workOn && (
+              <>
+                <div className="flex flex-wrap gap-4">
+                  <TimeField id="work-start" label="From" value={hhmm(settings.work_start)} onChange={(v) => void saveSettings({ work_start: v })} />
+                  <TimeField id="work-end" label="Until" value={hhmm(settings.work_end)} onChange={(v) => void saveSettings({ work_end: v })} />
+                </div>
+                <div role="group" aria-label="Work days" className="flex flex-wrap gap-1.5">
+                  {WORK_DAYS.map((d) => {
+                    const on = settings.work_days.includes(d.day)
+                    return (
+                      <button
+                        key={d.day}
+                        type="button"
+                        aria-pressed={on}
+                        aria-label={d.long}
+                        onClick={() => toggleWorkDay(d.day)}
+                        className={`min-h-9 rounded-full border px-3.5 text-sm font-medium transition-colors ${
+                          on ? 'border-accent bg-active text-accent' : 'border-edge text-muted hover:text-ink'
+                        }`}
+                      >
+                        {d.short}
+                      </button>
+                    )
+                  })}
+                </div>
+                {settings.work_days.length === 0 && <Notice>No days picked, so work hours never apply.</Notice>}
+                <p className="text-xs text-muted">A shift that runs past midnight counts as the day it starts on.</p>
+              </>
             )}
           </Card>
 

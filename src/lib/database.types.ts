@@ -469,6 +469,9 @@ export type Database = {
           show_web_events: boolean
           timezone: string
           user_id: string
+          work_days: number[]
+          work_end: string | null
+          work_start: string | null
         }
         Insert: {
           created_at?: string
@@ -483,6 +486,9 @@ export type Database = {
           show_web_events?: boolean
           timezone?: string
           user_id?: string
+          work_days?: number[]
+          work_end?: string | null
+          work_start?: string | null
         }
         Update: {
           created_at?: string
@@ -497,6 +503,9 @@ export type Database = {
           show_web_events?: boolean
           timezone?: string
           user_id?: string
+          work_days?: number[]
+          work_end?: string | null
+          work_start?: string | null
         }
         Relationships: []
       }
