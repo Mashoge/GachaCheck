@@ -295,6 +295,7 @@ export type Database = {
           id: string
           minutes_per_point: number
           name: string
+          ping_at: number | null
           preset_key: string | null
           sort_order: number
           spend_presets: number[]
@@ -311,6 +312,7 @@ export type Database = {
           id?: string
           minutes_per_point: number
           name: string
+          ping_at?: number | null
           preset_key?: string | null
           sort_order?: number
           spend_presets?: number[]
@@ -327,6 +329,7 @@ export type Database = {
           id?: string
           minutes_per_point?: number
           name?: string
+          ping_at?: number | null
           preset_key?: string | null
           sort_order?: number
           spend_presets?: number[]

@@ -6,7 +6,7 @@ import { findPreset, findServer, type GamePreset, type PresetTask } from '../dat
 export function fetchGames() {
   return supabase
     .from('games')
-    .select('id, name, server, timezone, daily_reset_time, weekly_reset_day, preset_id, preset_version, task_order_customized, skipped_until, tasks(id, title, frequency, category, hidden, optional, archived, preset_key, note, weekly_target, monthly_day, cycle_anchor, cycle_days, cycle_ends_at, due_at), stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at, preset_key, spend_presets)')
+    .select('id, name, server, timezone, daily_reset_time, weekly_reset_day, preset_id, preset_version, task_order_customized, skipped_until, tasks(id, title, frequency, category, hidden, optional, archived, preset_key, note, weekly_target, monthly_day, cycle_anchor, cycle_days, cycle_ends_at, due_at), stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at, preset_key, spend_presets, ping_at)')
     .order('created_at')
     .order('sort_order', { referencedTable: 'tasks' })
     .order('sort_order', { referencedTable: 'stamina_meters' })
@@ -219,6 +219,12 @@ export async function changeServer(gameId: string, preset: GamePreset, serverId:
     .from('games')
     .update({ server: server.id, timezone: server.timezone })
     .eq('id', gameId)
+  if (error) throw error
+}
+
+/** SUP-3: the stamina value a meter is pinged at (null = 90% of the cap). Preset sync never changes it. */
+export async function setPingAt(meterId: string, pingAt: number | null) {
+  const { error } = await supabase.from('stamina_meters').update({ ping_at: pingAt }).eq('id', meterId)
   if (error) throw error
 }
 

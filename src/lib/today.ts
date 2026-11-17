@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { loadGames, type GameSummary } from './games'
 import { messageOf } from './errors'
-import { meterStates, overCapBy, type MeterState } from './stamina'
+import { meterStates, overCapBy, pingThreshold, type MeterState } from './stamina'
 import { dailyPeriod, formatWhen, type ResetClock } from './time'
 import { progress } from '../../supabase/functions/_shared/progress.ts'
 import { useRefreshOnFocus } from './useRefreshOnFocus'
@@ -289,15 +289,16 @@ export function buildToday(data: TodayData, now: Date) {
       })
     }
 
-    // Stamina: full, or within 10% of cap
+    // Stamina: full, or at its ping threshold (SUP-3; default within 10% of cap)
     const meters = meterStates(game.stamina_meters, now)
     for (const m of meters) {
+      const threshold = pingThreshold(game.stamina_meters.find((r) => r.id === m.id) ?? m)
       if (m.full) {
         // Above the cap after a refill is allowed (STA-1), and said so, since it isn't the same as just full
         const over = overCapBy(m)
         const state = over > 0 ? `above cap (+${over})` : 'full'
         attention.push({ key: m.id, presetId, gameName: game.name, title: `${m.name} ${m.name.endsWith('s') ? 'are' : 'is'} ${state}`, at: now, urgent: true })
-      } else if (m.value >= m.cap * 0.9 && m.fullAt && m.fullAt.getTime() <= horizon) {
+      } else if (m.value >= threshold && m.fullAt && m.fullAt.getTime() <= horizon) {
         attention.push({ key: m.id, presetId, gameName: game.name, title: `${m.name} caps at ${formatWhen(m.fullAt, now)}`, at: m.fullAt, urgent: false })
       }
     }

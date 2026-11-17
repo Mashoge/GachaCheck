@@ -1,7 +1,7 @@
 // Decides which Discord reminders are due. Pure logic: no database or network here,
 // so it can be unit-tested. The "remind" function loads the rows and sends the result.
 
-import { meterStates, type MeterRow } from './stamina.ts'
+import { meterStates, pingThreshold, type MeterRow } from './stamina.ts'
 import { progress } from './progress.ts'
 import { dailyPeriod, weeklyPeriod, type ResetClock, type TaskRule } from './time.ts'
 
@@ -65,7 +65,7 @@ export type Reminder = {
 export type Completions = Map<string, string[]>
 
 const HOUR = 3_600_000
-export const STAMINA_WARN_RATIO = 0.9 // ping once a meter is within 10% of its cap
+export { STAMINA_WARN_RATIO } from './stamina.ts' // the default threshold, 90% of the cap (SUP-3 lets each meter set its own)
 export const NUDGE_WINDOW_MS = 3 * HOUR // a late run can still send the nudge up to 3 h after its time
 export const ENDGAME_HORIZON_MS = 24 * HOUR
 
@@ -141,7 +141,7 @@ export function inWorkHours(settings: ReminderSettings, now: Date): boolean {
 /** Stamina pings and event reminders wait while either window is running. */
 export const isHeld = (settings: ReminderSettings, now: Date) => inQuietHours(settings, now) || inWorkHours(settings, now)
 
-// ---- Stamina: one ping per fill-up, when a meter reaches 90% of its cap ----
+// ---- Stamina: one ping per fill-up, when a meter reaches its threshold (SUP-3; default 90% of the cap) ----
 
 export function staminaReminders(games: ReminderGame[], now: Date): Reminder[] {
   const out: Reminder[] = []
@@ -149,8 +149,8 @@ export function staminaReminders(games: ReminderGame[], now: Date): Reminder[] {
     if (!game.notify_stamina || isSkipped(game, now)) continue
     for (const m of meterStates(game.stamina_meters, now)) {
       if (m.isOverflow) continue
-      if (!m.full && m.value < m.cap * STAMINA_WARN_RATIO) continue
       const row = game.stamina_meters.find((r) => r.id === m.id)!
+      if (!m.full && m.value < pingThreshold(row)) continue
       const be = m.name.endsWith('s') ? 'are' : 'is'
       const text = m.full || !m.fullAt
         ? `**${game.name}**: ${m.name} ${be} full (${m.value}/${m.cap}).`

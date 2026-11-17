@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { meterStates, overCapBy, type MeterRow } from './stamina'
+import { meterStates, overCapBy, pingThreshold, type MeterRow } from './stamina'
 
 const MIN = 60_000
 const T0 = new Date('2026-11-09T06:00:00+08:00').getTime()
@@ -106,5 +106,18 @@ describe('overCapBy', () => {
     expect(overCapBy({ value: 260, cap: 200 })).toBe(60)
     expect(overCapBy({ value: 200, cap: 200 })).toBe(0)
     expect(overCapBy({ value: 150, cap: 200 })).toBe(0)
+  })
+})
+
+describe('pingThreshold (SUP-3)', () => {
+  it('defaults to 90% of the cap, rounded up', () => {
+    expect(pingThreshold({ cap: 200 })).toBe(180)
+    expect(pingThreshold({ cap: 240, ping_at: null })).toBe(216)
+    expect(pingThreshold({ cap: 155 })).toBe(140)
+  })
+
+  it("uses the player's own value, but never above the cap", () => {
+    expect(pingThreshold({ cap: 200, ping_at: 160 })).toBe(160)
+    expect(pingThreshold({ cap: 200, ping_at: 250 })).toBe(200)
   })
 })

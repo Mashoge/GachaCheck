@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PRESETS, findPreset, findServer, type GamePreset } from '../data/presets'
-import { addGameFromPreset, changeServer, deleteGame, loadGames, type GameSummary } from '../lib/games'
+import { addGameFromPreset, changeServer, deleteGame, loadGames, setPingAt, type GameSummary } from '../lib/games'
 import { messageOf } from '../lib/errors'
 import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
 import TaskManager from './TaskManager'
-import { Button, Card, Notice, Select, useConfirm } from './ui'
+import { pingThreshold } from '../lib/stamina'
+import { Button, Card, Input, Notice, Select, useConfirm } from './ui'
 
 export default function GamesScreen() {
   const [games, setGames] = useState<GameSummary[]>([])
@@ -123,13 +124,27 @@ export default function GamesScreen() {
               {server?.note && <p className="text-xs text-urgent">{server.note}</p>}
 
               {game.stamina_meters.length > 0 && (
-                <ul className="space-y-1 text-sm">
+                <ul className="space-y-2 text-sm">
                   {game.stamina_meters.map((meter) => {
                     const parent = game.stamina_meters.find((m) => m.id === meter.fills_when_full_of)
                     return (
-                      <li key={meter.id}>
-                        {meter.name}: cap {meter.cap}, 1 per {meter.minutes_per_point} min
-                        {parent && <span className="text-muted"> · overflow from {parent.name}</span>}
+                      <li key={meter.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                        <span>
+                          {meter.name}: cap {meter.cap}, 1 per {meter.minutes_per_point} min
+                          {parent && <span className="text-muted"> · overflow from {parent.name}</span>}
+                        </span>
+                        {/* Overflow meters never ping, so they have no threshold */}
+                        {!parent && (
+                          <PingAtField
+                            key={`${meter.id}:${meter.ping_at ?? ''}`}
+                            id={`ping-${meter.id}`}
+                            name={meter.name}
+                            cap={meter.cap}
+                            value={meter.ping_at}
+                            disabled={busyId !== null}
+                            onSave={(v) => void run(game.id, () => setPingAt(meter.id, v))}
+                          />
+                        )}
                       </li>
                     )
                   })}
@@ -183,5 +198,49 @@ export default function GamesScreen() {
 
       {error && <Notice tone="error">{error}</Notice>}
     </div>
+  )
+}
+// SUP-3: "Ping me at N" for one meter. Blank = the default (90% of the cap). Saves on Enter or when leaving the field.
+function PingAtField({ id, name, cap, value, disabled, onSave }: {
+  id: string; name: string; cap: number; value: number | null; disabled: boolean; onSave: (value: number | null) => void
+}) {
+  const [draft, setDraft] = useState(value === null ? '' : String(value))
+  const [problem, setProblem] = useState<string | null>(null)
+  const fallback = pingThreshold({ cap })
+
+  const commit = () => {
+    const text = draft.trim()
+    const next = text === '' ? null : Number(text)
+    if (next !== null && (!Number.isInteger(next) || next < 1 || next > cap)) {
+      setProblem(`Use a whole number from 1 to ${cap}, or leave it empty for ${fallback}.`)
+      return
+    }
+    setProblem(null)
+    if (next !== value) onSave(next)
+  }
+
+  return (
+    <span className="flex flex-col items-end gap-1">
+      <span className="flex items-center gap-2 text-muted">
+        <label htmlFor={id}>Ping at</label>
+        <Input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={cap}
+          value={draft}
+          placeholder={String(fallback)}
+          disabled={disabled}
+          aria-describedby={`${id}-hint`}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
+          className="w-24"
+        />
+        <span id={`${id}-hint`}>of {cap}{value === null ? ' (default 90%)' : ''}<span className="sr-only">, {name}</span></span>
+      </span>
+      {problem && <span role="alert" className="text-xs text-urgent">{problem}</span>}
+    </span>
   )
 }

@@ -473,3 +473,28 @@ describe('early stamina ping before a window (SUP-4)', () => {
     expect(earlyStaminaReminders(quiet, [g], at('2026-11-12T22:35:00+08:00'))).toEqual([])
   })
 })
+
+describe('stamina threshold per meter (SUP-3)', () => {
+  // Waveplates, 240 cap, 1 per 6 min. 190 recorded at noon.
+  const meter = (ping_at: number | null, value = 190) => ({ ...waveplates(value, '2026-11-12T12:00:00+08:00'), ping_at })
+
+  it('pings at the threshold you set, not at 90%', () => {
+    const g = game({ stamina_meters: [meter(200)] })
+    expect(staminaReminders([g], at('2026-11-12T12:54:00+08:00'))).toEqual([]) // 199
+    const [r] = staminaReminders([g], at('2026-11-12T13:00:00+08:00')) // 200
+    expect(r.text).toContain('Waveplates are at 200/240')
+  })
+
+  it('without a threshold, still pings at 90% (216 of 240)', () => {
+    const g = game({ stamina_meters: [meter(null)] })
+    expect(staminaReminders([g], at('2026-11-12T14:30:00+08:00'))).toEqual([]) // 215
+    expect(staminaReminders([g], at('2026-11-12T14:36:00+08:00'))).toHaveLength(1) // 216
+  })
+
+  it('pings once per fill-up, the same key whichever threshold fired', () => {
+    const g = game({ stamina_meters: [meter(200)] })
+    const [a] = staminaReminders([g], at('2026-11-12T13:00:00+08:00'))
+    const [b] = staminaReminders([g], at('2026-11-12T16:00:00+08:00'))
+    expect(a.key).toBe(b.key)
+  })
+})

@@ -83,7 +83,7 @@ async function importGenshin(db: Db, userId: string, game: FeedGame, result: Fee
 const GAME_COLUMNS =
   'id, user_id, name, preset_id, server, timezone, daily_reset_time, weekly_reset_day, notify_nudge, notify_stamina, notify_events, skipped_until, ' +
   'tasks(id, title, preset_key, frequency, category, hidden, optional, archived, weekly_target, monthly_day, cycle_anchor, cycle_days, cycle_ends_at), ' +
-  'stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at)'
+  'stamina_meters(id, name, cap, minutes_per_point, fills_when_full_of, current_value, value_recorded_at, ping_at)'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body, null, 2), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } })

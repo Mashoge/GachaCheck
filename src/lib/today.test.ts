@@ -126,3 +126,23 @@ describe('skip a game for today (TOD-7)', () => {
     expect(isSkippedNow({ skipped_until: '2026-11-16T12:01:00+08:00' }, now)).toBe(true)
   })
 })
+
+describe('Needs attention uses the stamina threshold (SUP-3)', () => {
+  const withMeter = (ping_at: number | null) => ({
+    ...game('genshin', []),
+    stamina_meters: [{
+      id: 'resin', name: 'Original Resin', cap: 200, minutes_per_point: 8, fills_when_full_of: null,
+      current_value: 170, value_recorded_at: '2026-11-16T12:00:00+08:00', ping_at,
+    }],
+  }) as unknown as Game
+  const titles = (ping_at: number | null) =>
+    buildToday({ games: [withMeter(ping_at)], completions: new Map(), events: [] }, now).attention.map((a) => a.title)
+
+  it('lists the meter once it reaches your threshold', () => {
+    expect(titles(160).some((t) => t.startsWith('Original Resin caps at'))).toBe(true) // 170 ≥ 160
+  })
+
+  it('waits for 90% when no threshold is set', () => {
+    expect(titles(null).some((t) => t.startsWith('Original Resin caps at'))).toBe(false) // 170 < 180
+  })
+})

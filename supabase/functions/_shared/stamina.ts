@@ -10,6 +10,7 @@ export type MeterRow = {
   current_value: number
   value_recorded_at: string
   spend_presets?: number[]
+  ping_at?: number | null // SUP-3: ping when the meter reaches this value; null = 90% of the cap
 }
 
 export type MeterState = {
@@ -68,4 +69,14 @@ export function meterStates(meters: MeterRow[], nowDate: Date): MeterState[] {
       nextPointAt: full || fillFrom === null ? null : new Date(fillFrom + (gained + 1) * step),
     }
   })
+}
+
+// ---- SUP-3: when a meter counts as "nearly full" (Discord ping and Today's Needs attention) ----
+
+export const STAMINA_WARN_RATIO = 0.9 // the default: within 10% of the cap
+
+/** The value at which a meter is pinged: the player's own threshold, else 90% of the cap. Never above the cap. */
+export function pingThreshold(meter: { cap: number; ping_at?: number | null }): number {
+  if (meter.ping_at != null && meter.ping_at > 0) return Math.min(meter.ping_at, meter.cap)
+  return Math.ceil(meter.cap * STAMINA_WARN_RATIO)
 }
