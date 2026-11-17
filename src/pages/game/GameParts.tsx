@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { MeterRow, MeterState } from '../../lib/stamina'
 import { zonedTime } from '../../lib/time'
 import type { Task } from '../../lib/today'
+import { Button, Input, Tag } from '../../components/ui'
 
 export function Check({ done }: { done: boolean }) {
   return (
@@ -20,22 +21,23 @@ export function Check({ done }: { done: boolean }) {
 
 export function TaskRow({ task, done, onToggle, meta }: { task: Task; done: boolean; onToggle: () => void; meta?: string }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="quiet"
       aria-pressed={done}
       onClick={onToggle}
-      className="flex min-h-12 w-full items-center gap-3 border-b border-line py-2 text-left"
+      className="flex min-h-12 w-full items-center justify-start gap-3 rounded-none border-b border-line py-2 text-left"
+      style={{ display: 'flex', justifyContent: 'flex-start', minHeight: 48, paddingInline: 0, borderRadius: 0 }}
     >
       <Check done={done} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex flex-wrap items-center gap-2">
           <span className={`text-sm ${done ? 'text-muted line-through' : ''}`}>{task.title}</span>
-          {task.optional && <span className="rounded-full border border-line px-1.5 text-[10px] text-muted">Optional</span>}
+          {task.optional && <Tag>Optional</Tag>}
         </span>
         {task.note && !done && <span className="text-xs text-muted">{task.note}</span>}
       </span>
       {meta && <span className="whitespace-nowrap text-xs text-muted">{meta}</span>}
-    </button>
+    </Button>
   )
 }
 
@@ -72,9 +74,9 @@ export function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }
 
   if (!editing) {
     return (
-      <button type="button" onClick={open} className="min-h-9 self-start px-3 pb-2 text-xs font-semibold text-accent hover:underline">
+      <Button variant="link" size="sm" className="self-start px-3 pb-2" onClick={open}>
         {active ? 'Change dates' : 'Set dates'}
-      </button>
+      </Button>
     )
   }
 
@@ -88,26 +90,26 @@ export function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }
     >
       <p className="w-full text-xs text-muted">Enter the dates in {zoneLabel} server time, as the game shows them.</p>
       <label htmlFor={id} className="w-14 text-xs text-muted">Ends</label>
-      <input
+      <Input
         id={id}
         type="datetime-local"
         autoFocus
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        className="min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-page px-3 text-sm text-ink [color-scheme:dark]"
+        className="min-w-0 flex-1"
       />
       <span className="w-full" />
       <label htmlFor={`${id}-start`} className="w-14 text-xs text-muted">Starts</label>
-      <input
+      <Input
         id={`${id}-start`}
         type="date"
         value={startDraft}
         onChange={(e) => setStartDraft(e.target.value)}
-        className="min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-page px-3 text-sm text-ink [color-scheme:dark]"
+        className="min-w-0 flex-1"
       />
       <p className="w-full text-xs text-muted">Starts is optional. Set it when the mode opens later, like Endstate Matrix 7 days into a version.</p>
-      <button type="submit" className="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent">Save</button>
-      <button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg px-2 text-sm text-muted hover:text-ink">Cancel</button>
+      <Button type="submit" variant="primary">Save</Button>
+      <Button type="button" variant="quiet" onClick={() => setEditing(false)}>Cancel</Button>
       {problem && <p className="w-full text-xs text-urgent">{problem}</p>}
     </form>
   )
@@ -128,24 +130,26 @@ export function CountedRow({ task, progress, onAdd, onUndo }: { task: Task; prog
         </span>
       </span>
       <span className="text-xs font-semibold text-muted">{progress.count} / {progress.target}</span>
-      <button
-        type="button"
+      <Button
+        size="sm"
+        variant="secondary"
+        icon
         onClick={onUndo}
         disabled={progress.count === 0}
         aria-label={`Remove one from ${task.title}`}
-        className="flex size-9 items-center justify-center rounded-lg border border-line text-muted disabled:opacity-40"
       >
         −
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        size="sm"
+        variant="secondary"
+        icon
         onClick={onAdd}
         disabled={progress.done || progress.today}
         aria-label={`Add one to ${task.title}`}
-        className="flex size-9 items-center justify-center rounded-lg border border-line text-ink disabled:opacity-40"
       >
         +
-      </button>
+      </Button>
     </div>
   )
 }
@@ -168,7 +172,7 @@ export function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterS
       <div className="flex items-baseline justify-between gap-3">
         <span className="flex items-center gap-2 text-sm text-muted">
           {state.name}
-          {estimated && <span className="rounded-full border border-line px-1.5 text-[10px]">estimated</span>}
+          {estimated && <Tag>estimated</Tag>}
         </span>
         <span className={`font-display text-xl font-semibold ${state.full ? 'text-urgent' : ''}`}>
           {state.value}
@@ -189,7 +193,7 @@ export function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterS
           }}
         >
           <label className="sr-only" htmlFor={`meter-${row.id}`}>{state.name} right now</label>
-          <input
+          <Input
             id={`meter-${row.id}`}
             type="number"
             inputMode="numeric"
@@ -198,35 +202,37 @@ export function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterS
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={`What the game shows (0–${state.cap})`}
-            className="min-h-10 w-0 min-w-0 flex-1 rounded-lg border border-line bg-page px-3 text-sm text-ink placeholder:text-muted"
+            className="w-0 min-w-0 flex-1"
           />
-          <button type="submit" className="min-h-10 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent">Save</button>
-          <button type="button" onClick={() => setEditing(false)} className="min-h-10 rounded-lg px-2 text-sm text-muted hover:text-ink">Cancel</button>
+          <Button type="submit" variant="primary">Save</Button>
+          <Button type="button" variant="quiet" onClick={() => setEditing(false)}>Cancel</Button>
         </form>
       ) : (
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           {!state.isOverflow &&
             spends.map((n) => (
-              <button
+              <Button
                 key={n}
-                type="button"
+                size="sm"
+                variant="secondary"
                 onClick={() => onSet(Math.max(0, state.value - n))}
                 aria-label={`Spent ${n} ${state.name}`}
-                className="min-h-9 rounded-lg border border-line px-2.5 text-xs font-semibold text-muted hover:text-ink"
+                className="px-2.5"
               >
                 −{n}
-              </button>
+              </Button>
             ))}
-          <button
-            type="button"
+          <Button
+            size="sm"
+            variant="secondary"
             onClick={() => {
               setDraft(String(state.value))
               setEditing(true)
             }}
-            className="min-h-9 rounded-lg border border-line px-2.5 text-xs font-semibold text-muted hover:text-ink"
+            className="px-2.5"
           >
             Set value
-          </button>
+          </Button>
         </div>
       )}
     </div>

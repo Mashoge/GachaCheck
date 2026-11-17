@@ -3,6 +3,7 @@ import { findPreset, findServer } from '../../data/presets'
 import type { EventInput, GameEvent } from '../../lib/events'
 import { minuteBefore, serverParts, toInstant } from '../../lib/eventTime'
 import type { Game } from '../../lib/today'
+import { Button, Card, Field, Input, Select, Switch, useConfirm } from '../../components/ui'
 
 // ---- Add / edit form. Dates are entered in the game's server time, as the game shows them. ----
 
@@ -31,7 +32,7 @@ export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave
   const [remind, setRemind] = useState(editing?.remind ?? true)
   const [problem, setProblem] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const confirm = useConfirm()
   const [added, setAdded] = useState(0)
   const imported = !!editing && editing.source !== 'manual'
   // Shared events from the official announcements: the name and dates are not yours to change
@@ -77,23 +78,37 @@ export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave
     }
   }
 
+  const removeOrHide = async () => {
+    if (!editing) return
+    if (!imported) {
+      const confirmed = await confirm({
+        title: `Delete "${editing.name}"?`,
+        message: 'This event will be permanently removed from your list. This cannot be undone.',
+        confirmLabel: 'Delete event',
+        danger: true,
+      })
+      if (!confirmed) return
+    }
+    await onDelete(editing)
+  }
+
   // Editing starts from a card or a timeline bar further down the page, so bring the form into view
   const formRef = useRef<HTMLFormElement>(null)
   useEffect(() => {
     formRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [])
 
-  const field = 'min-h-10 rounded-lg border border-line bg-page px-3 text-sm text-ink placeholder:text-muted [color-scheme:dark] disabled:opacity-60'
 
   return (
-    <form
-      ref={formRef}
-      className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5"
-      onSubmit={(e) => {
-        e.preventDefault()
-        void submit(false)
-      }}
-    >
+    <Card as="section" padding="none">
+      <form
+        ref={formRef}
+        className="flex flex-col gap-4 p-5"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void submit(false)
+        }}
+      >
       <h2 className="text-sm font-semibold">{editing ? 'Edit event' : 'Add event'}</h2>
       {official ? (
         <p className="-mt-2 text-xs text-muted">From the official announcements. The name and dates are kept up to date for you; the note and the reminder choice are yours.</p>
@@ -102,18 +117,16 @@ export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave
       )}
 
       <div className="grid gap-4 md:grid-cols-[200px_minmax(0,1fr)]">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="event-game" className="text-xs text-muted">Game</label>
-          <select id="event-game" value={gameId} onChange={(e) => changeGame(e.target.value)} disabled={official} className={field}>
+        <Field id="event-game" label="Game" labelSize="sm">
+          <Select value={gameId} onChange={(e) => changeGame(e.target.value)} disabled={official}>
             {games.map((g) => (
               <option key={g.id} value={g.id}>{g.name}</option>
             ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="event-name" className="text-xs text-muted">Event name</label>
-          <input id="event-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoFocus={!editing} disabled={official} className={field} />
-        </div>
+          </Select>
+        </Field>
+        <Field id="event-name" label="Event name" labelSize="sm">
+          <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoFocus={!editing} disabled={official} />
+        </Field>
       </div>
 
       <section aria-labelledby="event-schedule-title" className="rounded-xl border border-line bg-page p-4">
@@ -130,73 +143,76 @@ export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-lg border border-line bg-surface p-3">
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-              <label htmlFor="event-start-date" className="text-sm font-semibold text-ink">Starts</label>
+              <span className="text-sm font-semibold text-ink">Starts</span>
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Optional</span>
             </div>
             <p className="mb-3 text-xs leading-relaxed text-muted">Leave blank if the event is already running.</p>
-            <div className="flex gap-2">
-              <input id="event-start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} disabled={official} className={`${field} min-w-0 flex-1`} />
-              <input aria-label="Start time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} disabled={official} className={field} />
+            <div className="flex min-w-0 gap-2">
+              <Field id="event-start-date" label="Start date" hideLabel className="min-w-0 flex-1">
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} disabled={official} className="w-full min-w-0" />
+              </Field>
+              <Field id="event-start-time" label="Start time" hideLabel className="w-32 shrink-0">
+                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} disabled={official} className="w-full" />
+              </Field>
             </div>
           </div>
 
           <div className="rounded-lg border border-line bg-surface p-3">
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-              <label htmlFor="event-end-date" className="text-sm font-semibold text-ink">Ends</label>
+              <span className="text-sm font-semibold text-ink">Ends</span>
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Required</span>
             </div>
             <p className="mb-3 text-xs leading-relaxed text-muted">The final date and time players can participate.</p>
-            <div className="flex gap-2">
-              <input id="event-end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} disabled={official} className={`${field} min-w-0 flex-1`} />
-              <input aria-label="End time" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} disabled={official} className={field} />
+            <div className="flex min-w-0 gap-2">
+              <Field id="event-end-date" label="End date" hideLabel className="min-w-0 flex-1">
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} disabled={official} className="w-full min-w-0" />
+              </Field>
+              <Field id="event-end-time" label="End time" hideLabel className="w-32 shrink-0">
+                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} disabled={official} className="w-full" />
+              </Field>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="event-note" className="text-xs text-muted">Progress note (optional)</label>
-        <input id="event-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="e.g. 3 of 5 stages" className={field} />
-      </div>
+      <Field id="event-note" label="Progress note (optional)" labelSize="sm">
+        <Input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="e.g. 3 of 5 stages" />
+      </Field>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={remind} onChange={(e) => setRemind(e.target.checked)} className="size-4 accent-[var(--color-accent)]" />
-        Remind me on Discord before it ends
-      </label>
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <Switch label="Remind me on Discord before it ends" on={remind} onChange={setRemind} />
+        <span>Remind me on Discord before it ends</span>
+      </div>
 
       {problem && <p className="text-sm text-urgent">{problem}</p>}
       {added > 0 && !problem && <p className="text-sm text-muted">Added {added} {added === 1 ? 'event' : 'events'}. Enter the next one, or close.</p>}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" disabled={saving} className="min-h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent disabled:opacity-40">
+        <Button type="submit" variant="primary" disabled={saving}>
           {editing ? 'Save changes' : 'Add event'}
-        </button>
+        </Button>
         {!editing && (
-          <button type="button" disabled={saving} onClick={() => void submit(true)} className="min-h-10 rounded-lg border border-line px-4 text-sm font-semibold text-muted hover:text-ink disabled:opacity-40">
+          <Button type="button" variant="secondary" disabled={saving} onClick={() => void submit(true)}>
             Add and enter another
-          </button>
+          </Button>
         )}
-        <button type="button" onClick={onCancel} className="min-h-10 rounded-lg px-3 text-sm text-muted hover:text-ink">
+        <Button type="button" variant="quiet" onClick={onCancel}>
           {added > 0 ? 'Close' : 'Cancel'}
-        </button>
+        </Button>
 
-        {editing &&
-          (confirmDelete ? (
-            <span className="ml-auto flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted">{imported ? "Hide this event? It won't come back on its own." : 'Delete this event?'}</span>
-              <button type="button" onClick={() => void onDelete(editing)} className="min-h-10 rounded-lg border border-urgent px-3 font-semibold text-urgent">
-                {imported ? 'Yes, hide' : 'Yes, delete'}
-              </button>
-              <button type="button" onClick={() => setConfirmDelete(false)} className="min-h-10 rounded-lg px-2 text-muted hover:text-ink">
-                Keep
-              </button>
-            </span>
-          ) : (
-            <button type="button" onClick={() => setConfirmDelete(true)} className="ml-auto min-h-10 rounded-lg px-3 text-sm text-muted hover:text-urgent">
-              {imported ? 'Hide' : 'Delete'}
-            </button>
-          ))}
+        {editing && (
+          <Button
+            type="button"
+            variant={imported ? 'quiet' : 'danger'}
+            className="ml-auto"
+            disabled={saving}
+            onClick={() => void removeOrHide()}
+          >
+            {imported ? 'Hide from list' : 'Delete event'}
+          </Button>
+        )}
       </div>
-    </form>
+      </form>
+    </Card>
   )
 }

@@ -9,6 +9,7 @@ import { useNow } from '../lib/useNow'
 import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
 import { EventCard, Section, Timeline } from './events/EventDisplay'
 import { EventForm } from './events/EventForm'
+import { Button, Card, Switch, ToggleGroup } from '../components/ui'
 
 const SOON_MS = 3 * 86_400_000
 const FILTER_KEY = 'gachacheck.events.filter'
@@ -119,12 +120,12 @@ export default function EventsPage() {
         <h1 className="font-display text-3xl font-bold">Events</h1>
         {games.length > 0 && !form && (
           <div className="flex gap-2">
-            <button type="button" onClick={() => setForm({ mode: 'import' })} className="min-h-10 rounded-lg border border-line px-4 text-sm font-semibold text-muted hover:text-ink">
+            <Button variant="secondary" onClick={() => setForm({ mode: 'import' })}>
               Import list
-            </button>
-            <button type="button" onClick={() => setForm({ mode: 'add' })} className="min-h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent">
+            </Button>
+            <Button variant="primary" onClick={() => setForm({ mode: 'add' })}>
               Add event
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -175,48 +176,37 @@ export default function EventsPage() {
       )}
 
       {games.length > 1 && (
-        <div role="group" aria-label="Show events for" className="flex flex-wrap gap-1.5">
-          {[{ id: 'all', label: 'All' }, ...games.map((g) => ({ id: g.id, label: shortName(g) }))].map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              aria-pressed={activeFilter === chip.id}
-              onClick={() => chooseFilter(chip.id)}
-              className={`min-h-9 rounded-full border px-3.5 text-sm font-semibold ${
-                activeFilter === chip.id ? 'border-accent bg-accent text-on-accent' : 'border-line text-muted hover:text-ink'
-              }`}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
+        <ToggleGroup
+          label="Show events for"
+          value={activeFilter}
+          onChange={chooseFilter}
+          options={[{ id: 'all', label: 'All' }, ...games.map((g) => ({ id: g.id, label: shortName(g) }))]}
+        />
       )}
 
       {/* Web events are played in a browser, outside the game, so they can be switched off as a group.
           The switch covers every game, so whether it shows must not depend on the game filter. */}
       {events !== null && (!showWeb || events.some((e) => e.kind === 'web_event')) && (
-        <label className="flex min-h-9 w-fit items-center gap-2 text-sm text-muted">
-          <input
-            type="checkbox"
-            checked={showWeb}
-            onChange={(e) => {
-              const next = e.target.checked
+        <div className="flex min-h-9 w-fit items-center gap-2 text-sm text-muted">
+          <Switch
+            label="Show web events (all games)"
+            on={showWeb}
+            onChange={(next) => {
               setShowWeb(next)
               void run(() => setShowWebEvents(next))
             }}
-            className="size-4 accent-[var(--color-accent)]"
           />
-          Show web events (all games)
-        </label>
+          <span>Show web events (all games)</span>
+        </div>
       )}
 
       {events !== null && data && games.length > 0 && (
         <>
           {open.length === 0 && (
-            <p className="rounded-2xl border border-line bg-surface p-5 text-sm text-muted">
+            <Card as="p" className="text-sm text-muted">
               No events to track{activeFilter === 'all' ? '' : ' for this game'}. Add one with the end date the game shows, and it will count down here, on Today
               and in your reminders.
-            </p>
+            </Card>
           )}
 
           {soon.length > 0 && <Section title="Ending soon" hint="Within 3 days">{soon.map(card)}</Section>}
@@ -227,9 +217,9 @@ export default function EventsPage() {
 
           {done.length > 0 && (
             <div className="flex flex-col gap-3">
-              <button type="button" onClick={() => setShowDone(!showDone)} aria-expanded={showDone} className="min-h-9 self-start text-sm font-semibold text-accent hover:underline">
+              <Button variant="link" size="sm" className="self-start" onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>
                 {showDone ? 'Hide' : 'Show'} finished ({done.length})
-              </button>
+              </Button>
               {showDone && <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{done.map(card)}</div>}
             </div>
           )}

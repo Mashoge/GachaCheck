@@ -6,6 +6,7 @@ import { useTodayData, type Task } from '../lib/today'
 import GameDashboard from './game/GameDashboard'
 import { SHORT_NAMES } from '../lib/useGames'
 import { useNow } from '../lib/useNow'
+import { buttonClass, ToggleGroup } from '../components/ui'
 
 // Phone opens on "What's left", PC on "Everything"
 const startsQuick = () => typeof window !== 'undefined' && !window.matchMedia('(min-width: 768px)').matches
@@ -42,32 +43,21 @@ export default function GamePage() {
               <NavLink
                 key={g.id}
                 to={`/game/${g.preset_id}`}
-                className={({ isActive }) =>
-                  `flex min-h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-semibold ${
-                    isActive ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink'
-                  }`
-                }
+                className={({ isActive }) => `${buttonClass({ variant: isActive ? 'primary' : 'quiet', size: 'lg' })} flex-1`}
+                style={{ borderRadius: '0.5rem' }}
               >
                 {SHORT_NAMES[g.preset_id ?? ''] ?? g.name}
               </NavLink>
             ))}
           </div>
         )}
-        <div role="group" aria-label="Show" className="ml-auto flex gap-0.5 rounded-full border border-line bg-surface p-1">
-          {[
-            { label: "What's left", on: quick, set: true },
-            { label: 'Everything', on: !quick, set: false },
-          ].map((b) => (
-            <button
-              key={b.label}
-              type="button"
-              aria-pressed={b.on}
-              onClick={() => setQuick(b.set)}
-              className={`min-h-9 rounded-full px-4 text-sm font-semibold ${b.on ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink'}`}
-            >
-              {b.label}
-            </button>
-          ))}
+        <div className="ml-auto rounded-full border border-line bg-surface p-1">
+          <ToggleGroup
+            label="Show tasks"
+            value={quick ? 'left' : 'all'}
+            onChange={(value) => setQuick(value === 'left')}
+            options={[{ id: 'left', label: "What's left" }, { id: 'all', label: 'Everything' }]}
+          />
         </div>
       </div>
 

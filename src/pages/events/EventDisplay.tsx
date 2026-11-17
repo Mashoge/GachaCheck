@@ -4,6 +4,7 @@ import { formatDuration, formatWhen, taskPeriod } from '../../lib/time'
 import { clockOf, isVisible, type Game } from '../../lib/today'
 import { PHONE, useMedia } from '../../lib/useMedia'
 import { SHORT_NAMES } from '../../lib/useGames'
+import { Button, Card, Tag, buttonClass } from '../../components/ui'
 
 const DAY = 86_400_000
 const SOON_MS = 3 * DAY
@@ -34,13 +35,13 @@ export function EventCard({ event, game, now, onEdit, onDone }: { event: GameEve
   const passed = start && !upcoming ? Math.min(100, Math.max(0, ((now.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * 100)) : null
 
   return (
-    <article className={`flex flex-col gap-2 rounded-2xl border bg-surface p-4 ${urgent ? 'border-urgent' : 'border-line'}`}>
+    <Card as="article" padding="md" tone={urgent ? 'urgent' : 'default'} className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3 text-xs text-muted">
         <span className="flex items-center gap-2">
           <span aria-hidden="true" className={`size-2.5 rounded-sm ${gameBg(game)}`} />
           {shortName(game)}
-          {event.kind === 'web_event' && <span className="rounded-full border border-line px-1.5 text-[10px]">Web event</span>}
-          {event.source !== 'manual' && <span className="rounded-full border border-line px-1.5 text-[10px]">{event.origin === 'catalog' ? 'Official' : 'Auto-added'}</span>}
+          {event.kind === 'web_event' && <Tag>Web event</Tag>}
+          {event.source !== 'manual' && <Tag tone={event.origin === 'catalog' ? 'accent' : 'outline'}>{event.origin === 'catalog' ? 'Official' : 'Auto-added'}</Tag>}
         </span>
         <span className={`font-semibold ${urgent ? 'text-urgent' : ''}`}>
           {isDone ? 'Done' : upcoming ? `Starts in ${formatDuration(start.getTime() - now.getTime())}` : `Ends in ${formatDuration(left)}`}
@@ -50,7 +51,7 @@ export function EventCard({ event, game, now, onEdit, onDone }: { event: GameEve
       <h3 className={`font-display text-lg font-semibold leading-snug ${isDone ? 'text-muted line-through' : ''}`}>{event.name}</h3>
       {event.note && <p className="text-sm text-muted">{event.note}</p>}
       {event.official_url && (
-        <a href={event.official_url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 w-fit items-center text-xs font-semibold text-accent hover:underline">
+        <a href={event.official_url} target="_blank" rel="noreferrer" className={`${buttonClass({ variant: 'link', size: 'sm' })} min-h-11 w-fit`}>
           Open the event page
         </a>
       )}
@@ -70,16 +71,16 @@ export function EventCard({ event, game, now, onEdit, onDone }: { event: GameEve
 
         <div className="flex gap-1.5">
           {!upcoming && (
-            <button type="button" onClick={() => onDone(!isDone)} className="min-h-9 rounded-lg border border-line px-3 text-xs font-semibold text-muted hover:text-ink">
+            <Button size="sm" variant="secondary" onClick={() => onDone(!isDone)}>
               {isDone ? 'Not done' : 'Mark done'}
-            </button>
+            </Button>
           )}
-          <button type="button" onClick={onEdit} className="min-h-9 rounded-lg border border-line px-3 text-xs font-semibold text-muted hover:text-ink">
+          <Button size="sm" variant="secondary" onClick={onEdit}>
             Edit
-          </button>
+          </Button>
         </div>
       </div>
-    </article>
+    </Card>
   )
 }
 
@@ -167,23 +168,24 @@ export function Timeline({ games, events, now, onOpen }: { games: Game[]; events
                     <div key={bar.key} className="relative h-11 md:h-7">
                       {bar.event ? (
                         <>
-                          <button
-                            type="button"
+                          <Button
+                            variant="quiet"
+                            size="sm"
                             onClick={() => onOpen(bar.event!)}
                             title={title}
                             aria-label={inside ? undefined : bar.label}
-                            style={style}
-                            className={`absolute inset-y-0 z-10 truncate px-2 text-left text-xs font-semibold text-on-accent ${gameBg(game)} ${bar.openStart ? 'rounded-r-md pl-6' : 'rounded-md'}`}
+                            style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', height: '100%', minHeight: 0, paddingInline: 8, color: 'var(--color-on-accent)', borderRadius: bar.openStart ? '0 0.375rem 0.375rem 0' : '0.375rem' }}
+                            className={`absolute inset-y-0 z-10 w-auto justify-start truncate rounded-md text-left text-xs font-semibold ${gameBg(game)} ${bar.openStart ? 'rounded-r-md pl-6' : 'rounded-md'}`}
                           >
                             {bar.openStart && (
                               <span aria-hidden="true" className="absolute inset-y-0 left-0 w-5" style={{ background: 'linear-gradient(to right, var(--color-surface), transparent)' }} />
                             )}
                             {inside && bar.label}
-                          </button>
+                          </Button>
                           {!inside && (
-                            <button type="button" tabIndex={-1} aria-hidden="true" onClick={() => onOpen(bar.event!)} style={outsideStyle} className={`${outsideClass} font-semibold text-ink`}>
+                            <Button variant="quiet" size="sm" tabIndex={-1} aria-hidden="true" onClick={() => onOpen(bar.event!)} style={{ ...outsideStyle, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', height: '100%', minHeight: 0, paddingInline: 8, color: 'var(--color-ink)', borderRadius: 0 }} className={`${outsideClass} w-auto rounded-none justify-start font-semibold`}>
                               <span className="truncate">{bar.label}</span>
-                            </button>
+                            </Button>
                           )}
                         </>
                       ) : (

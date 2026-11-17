@@ -5,6 +5,7 @@ import { meterStates } from '../../lib/stamina'
 import { dailyPeriod, formatDuration, formatWhen, weeklyPeriod } from '../../lib/time'
 import { clockOf, dailiesLeft, isVisible, periodCompletionIds, taskProgress, type Task, type TodayData } from '../../lib/today'
 import { useBulkUndo } from '../../components/bulkUndo/useBulkUndo'
+import { Button, Card } from '../../components/ui'
 import { Check, CountedRow, EndDateEditor, MeterCard, TaskRow } from './GameParts'
 
 type Props = {
@@ -90,7 +91,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
   }
 
   return (
-    <section className="rounded-2xl border border-line bg-surface p-5">
+    <Card as="section">
       <header className="flex flex-col gap-1.5">
         <h1 className="font-display text-2xl font-bold">{game.name}</h1>
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
@@ -143,14 +144,14 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
                   <h2 className="text-sm font-semibold">{group.label}</h2>
                   <span className="flex items-center gap-3 text-xs text-muted">
                     {group.label === 'Daily' && bulk && (
-                      <button type="button" onClick={() => void undoAll()} disabled={bulkSaving} className="min-h-8 rounded-lg px-2 font-semibold text-accent hover:underline disabled:opacity-50">
+                      <Button size="sm" variant="link" onClick={() => void undoAll()} disabled={bulkSaving}>
                         {bulkSaving ? 'Saving…' : `Undo (${bulk.entries.length})`}
-                      </button>
+                      </Button>
                     )}
                     {group.label === 'Daily' && !bulk && left.length > 1 && (
-                      <button type="button" onClick={() => void tickAll()} className="min-h-8 rounded-lg border border-line px-2.5 font-semibold text-muted hover:text-ink">
+                      <Button size="sm" variant="secondary" onClick={() => void tickAll()}>
                         All done
-                      </button>
+                      </Button>
                     )}
                     {done} / {group.items.length} done
                   </span>
@@ -198,12 +199,13 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
                   const soon = !notStarted && left !== null && left < 3 * 86_400_000 && !p.done
                   return (
                     <div key={t.id} className={`flex flex-col rounded-xl border bg-raised ${soon ? 'border-urgent' : 'border-transparent'}`}>
-                      <button
-                        type="button"
+                      <Button
+                        variant="quiet"
                         aria-pressed={p.done}
                         disabled={!p.period || notStarted}
                         onClick={() => toggle(t)}
-                        className="flex min-h-12 items-center gap-3 px-3 py-2 text-left disabled:cursor-default"
+                        className="flex min-h-12 w-full items-center gap-3 rounded-none py-2 text-left disabled:cursor-default"
+                        style={{ display: 'flex', justifyContent: 'flex-start', minHeight: 48, paddingInline: 12, borderRadius: 0 }}
                       >
                         <Check done={p.done} />
                         <span className="flex min-w-0 flex-1 flex-col">
@@ -221,7 +223,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
                             ? `Starts in ${formatDuration(p.period!.start.getTime() - now.getTime())}`
                             : left !== null ? `Resets in ${formatDuration(left)}` : '—'}
                         </span>
-                      </button>
+                      </Button>
                       {/* Modes without a fixed schedule: you enter when the current cycle ends */}
                       {t.frequency === 'dated' && (
                         <EndDateEditor
@@ -274,7 +276,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
           )}
         </div>
       </div>
-    </section>
+    </Card>
   )
 }
 
