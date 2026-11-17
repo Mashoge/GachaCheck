@@ -29,7 +29,7 @@ export default function SpendPrompt({ meter, onSave, onSkip }: { meter: MeterSta
         autoFocus
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        placeholder={`0–${meter.cap}`}
+        placeholder={`cap ${meter.cap}`}
         className="w-28"
       />
       <Button type="submit" variant="primary" disabled={!valid}>Save</Button>

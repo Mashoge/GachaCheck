@@ -6,16 +6,20 @@ import { useTodayData, type Task } from '../lib/today'
 import GameDashboard from './game/GameDashboard'
 import { SHORT_NAMES } from '../lib/useGames'
 import { useNow } from '../lib/useNow'
+import { initialGameView, saveGameView, type GameView } from '../lib/gameView'
 import { buttonClass, ToggleGroup } from '../components/ui'
-
-// Phone opens on "What's left", PC on "Everything"
-const startsQuick = () => typeof window !== 'undefined' && !window.matchMedia('(min-width: 768px)').matches
 
 export default function GamePage() {
   const { presetId } = useParams()
   const { data, error, loading, refresh, addCompletion, removeCompletions, setMeterValue } = useTodayData()
   const now = useNow()
-  const [quick, setQuick] = useState(startsQuick)
+  // Phone opens on "What's left", PC on "Everything"; after that, the last choice on this device
+  const [view, setView] = useState<GameView>(() => initialGameView())
+  const quick = view === 'left'
+  const chooseView = (next: GameView) => {
+    setView(next)
+    saveGameView(next)
+  }
   const [saveError, setSaveError] = useState<string | null>(null)
 
   // `cycleOver` = the old end date has passed, so this is a new cycle. Without a start date it counts from
@@ -54,8 +58,8 @@ export default function GamePage() {
         <div className="ml-auto rounded-full border border-line bg-surface p-1">
           <ToggleGroup
             label="Show tasks"
-            value={quick ? 'left' : 'all'}
-            onChange={(value) => setQuick(value === 'left')}
+            value={view}
+            onChange={(value) => chooseView(value === 'left' ? 'left' : 'all')}
             options={[{ id: 'left', label: "What's left" }, { id: 'all', label: 'Everything' }]}
           />
         </div>

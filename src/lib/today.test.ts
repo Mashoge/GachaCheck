@@ -72,3 +72,23 @@ describe('buildToday overall daily progress', () => {
     expect(today.dailyProgress).toEqual({ done: 0, total: 0 })
   })
 })
+
+describe('buildToday stamina above the cap (STA-1)', () => {
+  const withResin = (current_value: number) => ({
+    ...game('genshin', []),
+    stamina_meters: [{
+      id: 'resin', name: 'Original Resin', cap: 200, minutes_per_point: 8, fills_when_full_of: null,
+      current_value, value_recorded_at: '2026-11-16T10:00:00+08:00',
+    }],
+  }) as unknown as Game
+  const titles = (current: number) =>
+    buildToday({ games: [withResin(current)], completions: new Map(), events: [] }, now).attention.map((a) => a.title)
+
+  it('says how far above the cap a refill took it', () => {
+    expect(titles(260)).toContain('Original Resin is above cap (+60)')
+  })
+
+  it('still says "full" when it is exactly at the cap', () => {
+    expect(titles(200)).toContain('Original Resin is full')
+  })
+})

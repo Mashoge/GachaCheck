@@ -5,6 +5,7 @@ import { buildToday, clockOf, dailiesLeft, useTodayData } from '../lib/today'
 import { dailyPeriod, formatClock, formatDuration, formatWhen } from '../lib/time'
 import { useBulkUndo } from '../components/bulkUndo/useBulkUndo'
 import { useNow } from '../lib/useNow'
+import { overCapBy } from '../lib/stamina'
 
 // Small colour cue per game; the only game-specific colour in the neutral look.
 const DOT: Record<string, string> = { genshin: 'bg-game-genshin', wuwa: 'bg-game-wuwa', nte: 'bg-game-nte' }
@@ -165,7 +166,9 @@ export default function TodayPage() {
                           </span>
                         </span>
                         <span className={`text-right text-xs ${card.meter.full ? 'text-urgent' : 'text-muted'}`}>
-                          {card.meter.full ? 'Full now' : card.meter.fullAt ? `Full ${formatWhen(card.meter.fullAt, now)}` : ''}
+                          {card.meter.full
+                            ? overCapBy(card.meter) > 0 ? `Above cap (+${overCapBy(card.meter)})` : 'Full now'
+                            : card.meter.fullAt ? `Full ${formatWhen(card.meter.fullAt, now)}` : ''}
                         </span>
                       </span>
                     )}

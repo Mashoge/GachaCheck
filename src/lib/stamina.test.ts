@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { meterStates, type MeterRow } from './stamina'
+import { meterStates, overCapBy, type MeterRow } from './stamina'
 
 const MIN = 60_000
 const T0 = new Date('2026-11-09T06:00:00+08:00').getTime()
@@ -99,5 +99,12 @@ describe('overflow meter (Waveplate Crystals fill only while Waveplates is full)
   it('works whichever order the meters come in', () => {
     const [cr] = meterStates([crystals(10), waveplates(230)], after(60 + 24))
     expect(cr.value).toBe(12)
+  })
+})
+describe('overCapBy', () => {
+  it('is how far a refill took the meter past its cap, never negative', () => {
+    expect(overCapBy({ value: 260, cap: 200 })).toBe(60)
+    expect(overCapBy({ value: 200, cap: 200 })).toBe(0)
+    expect(overCapBy({ value: 150, cap: 200 })).toBe(0)
   })
 })

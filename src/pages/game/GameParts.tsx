@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { MeterRow, MeterState } from '../../lib/stamina'
+import { overCapBy, type MeterRow, type MeterState } from '../../lib/stamina'
 import { zonedTime } from '../../lib/time'
 import type { Task } from '../../lib/today'
 import { Button, Input, Tag } from '../../components/ui'
@@ -170,11 +170,14 @@ export function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterS
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="flex items-center gap-2 text-sm text-muted">
+        {/* The name and its tags wrap onto a second line when space is short; the number never breaks */}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
           {state.name}
           {estimated && <Tag>estimated</Tag>}
+          {/* STA-1: going over the cap after a refill is allowed, and shown as such */}
+          {overCapBy(state) > 0 && <Tag tone="accent">+{overCapBy(state)} over cap</Tag>}
         </span>
-        <span className={`font-display text-xl font-semibold ${state.full ? 'text-urgent' : ''}`}>
+        <span className={`shrink-0 whitespace-nowrap font-display text-xl font-semibold ${state.full ? 'text-urgent' : ''}`}>
           {state.value}
           <span className="font-sans text-sm font-normal text-muted"> / {state.cap}</span>
         </span>
@@ -201,7 +204,7 @@ export function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterS
             autoFocus
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={`What the game shows (0–${state.cap})`}
+            placeholder={`What the game shows (cap ${state.cap})`}
             className="w-0 min-w-0 flex-1"
           />
           <Button type="submit" variant="primary">Save</Button>
