@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
 import SpendPrompt from '../components/SpendPrompt'
-import { Button, Card, Loading, Notice, PageTitle } from '../components/ui'
+import { Button, Card, CheckIcon, ChevronIcon, Loading, Notice, PageTitle } from '../components/ui'
 import { buildToday, clockOf, dailiesLeft, useTodayData } from '../lib/today'
 import { dailyPeriod, formatClock, formatDuration, formatWhen } from '../lib/time'
 import { useBulkUndo } from '../components/bulkUndo/useBulkUndo'
@@ -130,72 +130,82 @@ export default function TodayPage() {
                 const mine = batches[card.id] ?? null
                 const saving = mine?.status === 'saving'
                 return (
-                  // The whole card opens the game page; the buttons inside sit above that link.
-                  // The focus ring goes round the whole card, since the whole card is the link.
+                  // NAV-1 / A2: the card body opens the game page (a chevron says so, and it lights up on hover).
+                  // The quick "all dailies done" action sits in its own footer, outside the link, so the two never mix.
+                  // The focus ring goes round the whole card when the link has keyboard focus.
                   <Card
                     key={card.id}
-                    padding="md"
-                    className="relative flex min-w-0 flex-[1_1_300px] flex-col gap-3 hover:border-muted has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-accent"
+                    padding="none"
+                    className="flex min-w-0 flex-[1_1_300px] flex-col overflow-hidden has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-accent"
                   >
-                    <span className="flex items-center gap-2">
-                      <span aria-hidden="true" className={`size-2.5 rounded-[3px] ${dot(card.presetId)}`} />
-                      <Link to={`/game/${card.presetId}`} className="flex-1 font-semibold after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none">
-                        {card.name}
-                      </Link>
-                      <span className="text-xs text-muted">Reset in {formatDuration(card.resetAt.getTime() - now.getTime())}</span>
-                    </span>
-
-                    <span className="flex flex-col gap-1.5">
-                      <span className="flex justify-between text-sm">
-                        <span className="text-muted">
-                          Dailies <span className="font-semibold text-ink">{card.dailyDone} / {card.dailyTotal}</span> done
+                    <div className="group/open relative flex flex-1 flex-col gap-3 p-4 transition-colors hover:bg-raised">
+                      <span className="flex items-center gap-2">
+                        <span aria-hidden="true" className={`size-2.5 rounded-[3px] ${dot(card.presetId)}`} />
+                        <Link to={`/game/${card.presetId}`} className="flex-1 font-semibold after:absolute after:inset-0 focus-visible:outline-none">
+                          <span className="sr-only">Open </span>
+                          {card.name}
+                        </Link>
+                        <span className="text-xs text-muted">Reset in {formatDuration(card.resetAt.getTime() - now.getTime())}</span>
+                        <span aria-hidden="true" className="-mr-1 text-muted transition-[color,translate] group-hover/open:translate-x-0.5 group-hover/open:text-ink">
+                          <ChevronIcon size={16} />
                         </span>
-                        <span className="font-semibold">{left === 0 ? 'All done' : `${left} left`}</span>
                       </span>
-                      <span aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-line">
-                        <span className={`block h-full ${dot(card.presetId)}`} style={{ width: `${pct}%` }} />
-                      </span>
-                    </span>
 
-                    {card.meter && (
-                      <span className="flex flex-col gap-0.5 text-sm">
-                        <span className="flex justify-between gap-3">
-                          <span className="text-muted">{card.meter.name}</span>
-                          <span className={`whitespace-nowrap font-semibold ${card.meter.full ? 'text-urgent' : ''}`}>
-                            {card.meter.value} / {card.meter.cap}
+                      <span className="flex flex-col gap-1.5">
+                        <span className="flex justify-between text-sm">
+                          <span className="text-muted">
+                            Dailies <span className="font-semibold text-ink">{card.dailyDone} / {card.dailyTotal}</span> done
+                          </span>
+                          <span className="font-semibold">{left === 0 ? 'All done' : `${left} left`}</span>
+                        </span>
+                        <span aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-line">
+                          <span className={`block h-full ${dot(card.presetId)}`} style={{ width: `${pct}%` }} />
+                        </span>
+                      </span>
+
+                      {card.meter && (
+                        <span className="flex flex-col gap-0.5 text-sm">
+                          <span className="flex justify-between gap-3">
+                            <span className="text-muted">{card.meter.name}</span>
+                            <span className={`whitespace-nowrap font-semibold ${card.meter.full ? 'text-urgent' : ''}`}>
+                              {card.meter.value} / {card.meter.cap}
+                            </span>
+                          </span>
+                          <span className={`text-right text-xs ${card.meter.full ? 'text-urgent' : 'text-muted'}`}>
+                            {card.meter.full
+                              ? overCapBy(card.meter) > 0 ? `Above cap (+${overCapBy(card.meter)})` : 'Full now'
+                              : card.meter.fullAt ? `Full ${formatWhen(card.meter.fullAt, now)}` : ''}
                           </span>
                         </span>
-                        <span className={`text-right text-xs ${card.meter.full ? 'text-urgent' : 'text-muted'}`}>
-                          {card.meter.full
-                            ? overCapBy(card.meter) > 0 ? `Above cap (+${overCapBy(card.meter)})` : 'Full now'
-                            : card.meter.fullAt ? `Full ${formatWhen(card.meter.fullAt, now)}` : ''}
+                      )}
+
+                      {card.note && (
+                        <span className={`text-xs ${card.note.soon ? 'text-urgent' : 'text-muted'}`}>
+                          {card.note.text}
+                          {card.note.at ? ` · resets in ${formatDuration(card.note.at.getTime() - now.getTime())}` : ''}
                         </span>
-                      </span>
-                    )}
+                      )}
 
-                    {card.note && (
-                      <span className={`text-xs ${card.note.soon ? 'text-urgent' : 'text-muted'}`}>
-                        {card.note.text}
-                        {card.note.at ? ` · resets in ${formatDuration(card.note.at.getTime() - now.getTime())}` : ''}
-                      </span>
-                    )}
+                    </div>
 
-                    {/* One tap for a quick session: tick the rest, then say how much stamina is left */}
+                    {/* One tap for a quick session: tick the rest, then say how much stamina is left.
+                        A footer of its own, outside the link: tapping around it never opens the game. */}
                     {(toTick > 1 || mine) && (
-                      <div className="relative z-10 flex items-center gap-2">
+                      <div className="flex items-center gap-2 border-t border-line px-4 py-2.5">
                         {mine ? (
                           <Button variant="link" size="sm" onClick={() => void undoAll(card.id)} disabled={saving}>
                             {saving ? 'Saving…' : `Undo (${mine.entries.length})`}
                           </Button>
                         ) : (
                           <Button size="sm" onClick={() => void tickAll(card.id, card.meter?.id ?? null)}>
+                            <CheckIcon size={14} />
                             All {toTick} dailies done
                           </Button>
                         )}
                       </div>
                     )}
                     {mine?.promptVisible && card.meter && (
-                      <div className="relative z-10 -mx-4 -mb-4 overflow-hidden rounded-b-2xl">
+                      <div className="border-t border-line">
                         <SpendPrompt
                           meter={card.meter}
                           onSave={(v) => {
