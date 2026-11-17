@@ -39,6 +39,80 @@ export type Database = {
   }
   public: {
     Tables: {
+      // Added by hand to match migration 20261113020000_event_catalog.sql (no later migration changes its columns).
+      // Signed-in users may only read it (confirmed rows); the collector writes it with the service role.
+      catalog_events: {
+        Row: {
+          created_at: string
+          derived_from: string | null
+          ends_local: string | null
+          game: string
+          id: string
+          kind: string
+          locked_at: string | null
+          name: string
+          name_key: string
+          occurrence_key: string
+          official_url: string | null
+          review_note: string | null
+          server_scope: string
+          start_rule: string
+          starts_local: string | null
+          status: string
+          task_preset_key: string | null
+          time_basis: string
+          updated_at: string
+          utc_offset_minutes: number | null
+          version: string
+        }
+        Insert: {
+          created_at?: string
+          derived_from?: string | null
+          ends_local?: string | null
+          game: string
+          id?: string
+          kind: string
+          locked_at?: string | null
+          name: string
+          name_key: string
+          occurrence_key?: string
+          official_url?: string | null
+          review_note?: string | null
+          server_scope?: string
+          start_rule?: string
+          starts_local?: string | null
+          status?: string
+          task_preset_key?: string | null
+          time_basis?: string
+          updated_at?: string
+          utc_offset_minutes?: number | null
+          version?: string
+        }
+        Update: {
+          created_at?: string
+          derived_from?: string | null
+          ends_local?: string | null
+          game?: string
+          id?: string
+          kind?: string
+          locked_at?: string | null
+          name?: string
+          name_key?: string
+          occurrence_key?: string
+          official_url?: string | null
+          review_note?: string | null
+          server_scope?: string
+          start_rule?: string
+          starts_local?: string | null
+          status?: string
+          task_preset_key?: string | null
+          time_basis?: string
+          updated_at?: string
+          utc_offset_minutes?: number | null
+          version?: string
+        }
+        Relationships: []
+      }
       completions: {
         Row: {
           amount: number

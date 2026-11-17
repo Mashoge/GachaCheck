@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { HiddenEvent, HiddenRows } from './hiddenEvents'
 
 export type GameEvent = {
   id: string // a catalog event's id starts with 'cat:'
@@ -77,6 +78,47 @@ export async function updateEvent(event: GameEvent, input: EventInput) {
 export async function hideEvent(event: GameEvent) {
   if (event.origin === 'catalog') return saveCatalogMark(event, { hidden: true })
   const { error } = await supabase.from('events').update({ hidden: true }).eq('id', event.id)
+  if (error) throw error
+}
+
+/**
+ * Everything you have hidden, for the Hidden events list. Official events are read from the shared
+ * catalog (only your hidden marks are yours); imported events from your own list.
+ * Events that already ended are left out, like on the main list.
+ */
+export async function fetchHiddenEvents(): Promise<HiddenRows> {
+  const nowIso = new Date().toISOString()
+  const [marks, own] = await Promise.all([
+    supabase.from('user_event_state').select('event_id').eq('hidden', true),
+    supabase.from('events').select('id, game_id, name, ends_at').eq('hidden', true).gte('ends_at', nowIso),
+  ])
+  if (marks.error) throw marks.error
+  if (own.error) throw own.error
+
+  const ids = marks.data.map((m) => m.event_id)
+  if (ids.length === 0) return { catalog: [], own: own.data }
+
+  const { data: catalog, error } = await supabase
+    .from('catalog_events')
+    .select('id, game, server_scope, kind, name, ends_local, time_basis, utc_offset_minutes, status')
+    .in('id', ids)
+  if (error) throw error
+  return { catalog, own: own.data }
+}
+
+/** Puts a hidden event back on your list. A done mark, note and reminder choice you had are kept. */
+export async function restoreEvent(event: HiddenEvent) {
+  if (event.origin === 'catalog') {
+    const userId = await currentUserId()
+    const { error } = await supabase
+      .from('user_event_state')
+      .update({ hidden: false, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('event_id', event.id)
+    if (error) throw error
+    return
+  }
+  const { error } = await supabase.from('events').update({ hidden: false }).eq('id', event.id)
   if (error) throw error
 }
 

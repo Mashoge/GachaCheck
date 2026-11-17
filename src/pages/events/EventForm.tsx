@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { findPreset, findServer } from '../../data/presets'
 import type { EventInput, GameEvent } from '../../lib/events'
 import { minuteBefore, serverParts, toInstant } from '../../lib/eventTime'
+import type { HiddenEvent } from '../../lib/hiddenEvents'
 import type { Game } from '../../lib/today'
 import { Button, Card, Field, Input, Select, Switch, useConfirm } from '../../components/ui'
 
@@ -15,9 +16,13 @@ type FormProps = {
   onCancel: () => void
   onSave: (input: EventInput, keepOpen: boolean) => Promise<boolean>
   onDelete: (event: GameEvent) => Promise<void>
+  /** The hidden official event a new event would be swallowed by (the list never shows a copy of an official event) */
+  findHidden?: (input: EventInput) => HiddenEvent | null
+  /** Puts a hidden event back. Returns false if it failed. */
+  onRestore?: (event: HiddenEvent) => Promise<boolean>
 }
 
-export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDelete }: FormProps) {
+export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDelete, findHidden, onRestore }: FormProps) {
   const first = games.find((g) => g.id === (editing?.game_id ?? defaultGameId)) ?? games[0]
   const initialEnd = editing ? serverParts(editing.ends_at, first.timezone) : { date: '', time: minuteBefore(first.daily_reset_time) }
   const initialStart = editing?.starts_at ? serverParts(editing.starts_at, first.timezone) : { date: '', time: '10:00' }
@@ -67,8 +72,30 @@ export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave
     if (startsAt && startsAt >= endsAt) return setProblem('The start has to be before the end.')
 
     setProblem(null)
+    const input: EventInput = { game_id: game.id, name: title, starts_at: startsAt, ends_at: endsAt, note: note.trim() || null, remind }
+
+    // A new event that matches an official one you hid would be saved but never shown, so offer the official one back
+    const hiddenOfficial = !editing && onRestore ? (findHidden?.(input) ?? null) : null
+    if (hiddenOfficial && onRestore) {
+      const restore = await confirm({
+        title: `"${hiddenOfficial.name}" is hidden`,
+        message: 'You hid this official event earlier. An event you add with the same name and end date won’t show while the official one exists. Restore the official event instead?',
+        confirmLabel: 'Restore event',
+        cancelLabel: 'Keep editing',
+      })
+      if (!restore) return
+      setSaving(true)
+      const ok = await onRestore(hiddenOfficial)
+      setSaving(false)
+      if (!ok) return
+      if (!keepOpen) return onCancel()
+      setName('')
+      setNote('')
+      return
+    }
+
     setSaving(true)
-    const ok = await onSave({ game_id: game.id, name: title, starts_at: startsAt, ends_at: endsAt, note: note.trim() || null, remind }, keepOpen)
+    const ok = await onSave(input, keepOpen)
     setSaving(false)
     if (ok && keepOpen) {
       // Ready for the next event of the same game

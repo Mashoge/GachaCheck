@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { messageOf } from '../lib/errors'
-import { addEvent, addEvents, deleteEvent, fetchEvents, fetchShowWebEvents, hideEvent, setEventDone, setShowWebEvents, updateEvent, type GameEvent } from '../lib/events'
+import {
+  addEvent, addEvents, deleteEvent, fetchEvents, fetchHiddenEvents, fetchShowWebEvents, hideEvent, restoreEvent, setEventDone, setShowWebEvents, updateEvent,
+  type EventInput, type GameEvent,
+} from '../lib/events'
+import { hiddenFromEvent, hiddenMatch, toHiddenEvents, type HiddenEvent, type HiddenRows } from '../lib/hiddenEvents'
+import { formatWhen } from '../lib/time'
 import { useTodayData, type Game } from '../lib/today'
 import { SHORT_NAMES } from '../lib/useGames'
 import EventImport from './EventImport'
@@ -9,7 +14,7 @@ import { useNow } from '../lib/useNow'
 import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
 import { EventCard, Section, Timeline } from './events/EventDisplay'
 import { EventForm } from './events/EventForm'
-import { Button, Card, Switch, ToggleGroup } from '../components/ui'
+import { Button, Card, Notice, Switch, Tag, ToggleGroup, cx } from '../components/ui'
 
 const SOON_MS = 3 * 86_400_000
 const FILTER_KEY = 'gachacheck.events.filter'
@@ -34,14 +39,22 @@ export default function EventsPage() {
   const [form, setForm] = useState<{ mode: 'add' } | { mode: 'import' } | { mode: 'edit'; event: GameEvent } | null>(null)
   const [showDone, setShowDone] = useState(false)
   const [showWeb, setShowWeb] = useState(true)
+  // null = still loading; 'failed' = the rest of the page still works, only the hidden list is missing
+  const [hiddenRows, setHiddenRows] = useState<HiddenRows | 'failed' | null>(null)
+  const [showHidden, setShowHidden] = useState(false)
+  const [justHidden, setJustHidden] = useState<HiddenEvent | null>(null)
 
-  const fetchData = useCallback(() => Promise.all([fetchEvents(), fetchShowWebEvents()]), [])
+  const fetchData = useCallback(
+    () => Promise.all([fetchEvents(), fetchShowWebEvents(), fetchHiddenEvents().catch((): 'failed' => 'failed')]),
+    [],
+  )
 
   const refresh = useCallback(async () => {
     try {
-      const [list, web] = await fetchData()
+      const [list, web, hidden] = await fetchData()
       setEvents(list)
       setShowWeb(web)
+      setHiddenRows(hidden)
       setError(null)
     } catch (err) {
       setError(messageOf(err))
@@ -53,10 +66,11 @@ export default function EventsPage() {
     let active = true
     const load = () => {
       void fetchData()
-        .then(([list, web]) => {
+        .then(([list, web, hidden]) => {
           if (!active) return
           setEvents(list)
           setShowWeb(web)
+          setHiddenRows(hidden)
           setError(null)
         })
         .catch((err: unknown) => {
@@ -102,6 +116,21 @@ export default function EventsPage() {
   const running = open.filter((e) => !e.starts_at || new Date(e.starts_at) <= now)
   const soon = running.filter((e) => new Date(e.ends_at).getTime() - now.getTime() <= SOON_MS)
   const later = running.filter((e) => new Date(e.ends_at).getTime() - now.getTime() > SOON_MS)
+
+  const hidden = hiddenRows && hiddenRows !== 'failed' ? toHiddenEvents(hiddenRows, games, showWeb, now) : []
+  const shownHidden = hidden.filter((e) => activeFilter === 'all' || e.game_id === activeFilter)
+
+  // Every official event on the list, for spotting a new event that would be taken for a copy of a hidden one
+  const visibleCatalog = (events ?? []).flatMap((e) =>
+    e.origin === 'catalog' && e.catalog_event_id ? [{ catalogId: e.catalog_event_id, game_id: e.game_id, name: e.name, ends_at: e.ends_at }] : [],
+  )
+  const findHidden = (input: EventInput) => hiddenMatch(input, visibleCatalog, hidden)
+
+  const restore = async (event: HiddenEvent) => {
+    const ok = await run(() => restoreEvent(event))
+    if (ok && justHidden?.key === event.key) setJustHidden(null)
+    return ok
+  }
 
   const card = (e: GameEvent) => (
     <EventCard
@@ -169,11 +198,32 @@ export default function EventsPage() {
           }}
           onDelete={async (event) => {
             // Only events you typed in yourself are deleted; imported and official ones are hidden
-            const remove = event.source === 'manual' ? deleteEvent : hideEvent
-            if (await run(() => remove(event))) setForm(null)
+            const manual = event.source === 'manual'
+            if (!(await run(() => (manual ? deleteEvent(event) : hideEvent(event))))) return
+            setForm(null)
+            setJustHidden(manual ? null : hiddenFromEvent(event))
           }}
+          findHidden={findHidden}
+          onRestore={restore}
         />
       )}
+
+      {/* Right after hiding: a way straight back. Kept until dismissed, so there is no timer to race. */}
+      <div aria-live="polite">
+        {justHidden && !form && (
+          <Card padding="md" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span className="min-w-0 flex-1">
+              Hid “{justHidden.name}”. You can restore it later from “Show hidden” at the bottom of this page.
+            </span>
+            <Button variant="link" size="sm" onClick={() => void restore(justHidden)}>
+              Undo
+            </Button>
+            <Button variant="quiet" size="sm" onClick={() => setJustHidden(null)}>
+              Dismiss
+            </Button>
+          </Card>
+        )}
+      </div>
 
       {games.length > 1 && (
         <ToggleGroup
@@ -223,6 +273,44 @@ export default function EventsPage() {
               {showDone && <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{done.map(card)}</div>}
             </div>
           )}
+
+          {shownHidden.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <Button variant="link" size="sm" className="self-start" onClick={() => setShowHidden(!showHidden)} aria-expanded={showHidden}>
+                {showHidden ? 'Collapse' : 'Show'} hidden ({shownHidden.length})
+              </Button>
+              {showHidden && (
+                <>
+                  <Card as="ul" padding="none" aria-label="Hidden events" className="overflow-hidden">
+                    {shownHidden.map((h, i) => {
+                      const game = games.find((g) => g.id === h.game_id)
+                      return (
+                        <li key={h.key} className={cx('flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3', i > 0 && 'border-t border-line')}>
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="text-sm font-medium">{h.name}</span>
+                            <span className="text-xs text-muted">
+                              {game ? shortName(game) : 'Unknown game'} · Ends {formatWhen(new Date(h.ends_at), now)}
+                            </span>
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Tag>{h.origin === 'catalog' ? 'Official' : 'Imported'}</Tag>
+                            {h.kind === 'web_event' && <Tag>Web event</Tag>}
+                          </span>
+                          <Button size="sm" onClick={() => void restore(h)} aria-label={`Restore ${h.name}`}>
+                            Restore
+                          </Button>
+                        </li>
+                      )
+                    })}
+                  </Card>
+                  <p className="text-xs text-muted">
+                    Hidden events don't count down or send reminders. Restoring one brings back its done mark and note.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+          {hiddenRows === 'failed' && <Notice>Hidden events couldn't be loaded right now. The rest of the list is up to date.</Notice>}
         </>
       )}
     </div>
