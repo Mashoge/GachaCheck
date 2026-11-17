@@ -16,6 +16,7 @@ import {
   type Completions, type Reminder, type ReminderEvent, type ReminderGame, type ReminderSettings,
 } from '../_shared/reminders.ts'
 import { meterStates } from '../_shared/stamina.ts'
+import { endgameCycleUpdates, type CatalogCycle, type CycleGame } from '../_shared/endgameCycles.ts'
 import { FEED_REGIONS, feedUrl, laterEndDate, pickFeedEvents, type FeedResult } from '../_shared/genshinFeed.ts'
 
 const IMPORT_EVERY_MS = 20 * 3_600_000 // about once a day; a failed read is retried on the next run
@@ -135,6 +136,16 @@ Deno.serve(async (req) => {
     if (gamesRes.error) throw gamesRes.error
     if (completionsRes.error) throw completionsRes.error
     if (eventsRes.error) throw eventsRes.error
+
+    // EVT-10: confirmed endgame cycles from the shared catalog (e.g. WuWa Endstate Matrix from the Patch Notes)
+    const { data: cycleRows, error: cyclesError } = await db
+      .from('catalog_events')
+      .select('game, server_scope, task_preset_key, ends_local, time_basis, utc_offset_minutes')
+      .eq('status', 'confirmed')
+      .eq('kind', 'endgame_cycle')
+      .not('ends_local', 'is', null)
+    if (cyclesError) throw cyclesError
+    const cycles = (cycleRows ?? []) as CatalogCycle[]
     // A catalog event is shared, so its id is the same for every user. The "already sent" key is
     // built from the id, so the user is added to it here; own events keep the keys they always had.
     const allEvents = (eventsRes.data as unknown as (ReminderEvent & { user_id: string; origin: string })[]).map((e) =>
@@ -154,6 +165,24 @@ Deno.serve(async (req) => {
       // One user's problem must not stop the others.
       try {
         const games = allGames.filter((g) => g.user_id === settings.user_id)
+
+        // EVT-10: fill in endgame end dates from the catalog before the reminders are built, so tonight's
+        // nudge already uses them. A dry run only reports them.
+        const cycleUpdates = endgameCycleUpdates(cycles, games as unknown as CycleGame[], now)
+        for (const u of cycleUpdates) {
+          if (!dry) {
+            const { error } = await db
+              .from('tasks')
+              .update({ cycle_ends_at: u.cycle_ends_at, ...(u.cycle_anchor ? { cycle_anchor: u.cycle_anchor } : {}) })
+              .eq('id', u.taskId)
+            if (error) throw error
+          }
+          const task = games.find((g) => g.id === u.gameId)?.tasks.find((t) => t.id === u.taskId)
+          if (task) {
+            task.cycle_ends_at = u.cycle_ends_at
+            if (u.cycle_anchor) task.cycle_anchor = u.cycle_anchor
+          }
+        }
         const events = allEvents.filter((e) => e.user_id === settings.user_id)
         const due = buildReminders(settings, games, completions, now, events)
 
@@ -201,6 +230,7 @@ Deno.serve(async (req) => {
               })),
               openEvents: events.length,
               genshinFeed: feed,
+              endgameDates: cycleUpdates.map((u) => `${u.presetKey}: ends ${u.cycle_ends_at}${u.cycle_anchor ? ` (from ${u.cycle_anchor})` : ''}`),
             },
           })
           continue
