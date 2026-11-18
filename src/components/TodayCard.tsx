@@ -25,6 +25,7 @@ export function TodayCard({ card, now, iconUrl, images, footer, after }: {
 }) {
   const ref = useRef<HTMLElement>(null)
   const awake = useAwake(ref)
+  usePageGlow(ref, awake, card.presetId)
   const headline = cardHeadline(card, now)
   const m = card.meter
   const left = card.dailyTotal - card.dailyDone
@@ -223,6 +224,25 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
       {children}
     </span>
   )
+}
+
+/**
+ * THM-9: the page reacts to the woken card. Its game's colour takes over the backdrop's glow, centred
+ * above the card, and fades back when the card sleeps (CSS: .gc-backdrop::after). The last game's
+ * colour stays set while it fades out, so the glow never snaps to grey.
+ */
+function usePageGlow(ref: React.RefObject<HTMLElement | null>, awake: boolean, game: string) {
+  useEffect(() => {
+    const root = document.documentElement
+    if (!awake) return
+    const r = ref.current?.getBoundingClientRect()
+    if (r) root.style.setProperty('--wake-x', `${Math.round(((r.left + r.width / 2) / window.innerWidth) * 100)}%`)
+    root.dataset.wakeGame = game
+    root.setAttribute('data-wake', '')
+    return () => {
+      if (root.dataset.wakeGame === game) root.removeAttribute('data-wake')
+    }
+  }, [ref, awake, game])
 }
 
 /**
