@@ -1,10 +1,11 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, ViewTransition, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { Button, EventsIcon, GamesIcon, RemindersIcon, TodayIcon } from './ui'
 import type { usePwaInstall } from '../lib/usePwaInstall'
 import { useDataSaver } from '../lib/dataSaver'
 import { forgetPictureLinks } from '../lib/characterImages'
+import { pageTransitionClass } from '../lib/pageTransition'
 
 type NavItem = { to: string; label: string; icon: ReactNode }
 
@@ -67,7 +68,14 @@ export default function AppShell({ email, pwaInstall }: { email: string; pwaInst
 
       {/* Room for the bottom bar, plus the iPhone home line */}
       <main className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-6 md:px-5 md:pb-12">
-        <Outlet />
+        {/* THM-10: navigating animates only the page, in the entrance of the page you are going to. The
+            header, bottom bar and backdrop stay put. Router navigations run in React Transitions, which is
+            what lets <ViewTransition> animate them; ticking a task and other updates switch instantly. */}
+        <ViewTransition default={pageTransitionClass(pathname)}>
+          <div>
+            <Outlet />
+          </div>
+        </ViewTransition>
       </main>
 
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-line bg-surface px-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-1.5 md:hidden">

@@ -159,6 +159,41 @@
 @media (forced-colors: active) { .gc-backdrop { display: none; } }
 
 /* =============================================================================================
+   THM-10: page transitions. Only the page area animates (AppShell's <ViewTransition>), and only on
+   navigation. Every page fades up; a game page enters in its game's way: Genshin rises out of a soft
+   blur, WuWa wipes in from the left like a scan, NTE snaps in at a slant. The old page is gone in about
+   0.1 s before the new one enters (no double text), and every entrance is done within 0.4 s. Off with reduced motion (above), Data saver and high contrast.
+   ============================================================================================= */
+::view-transition-group(.gc-page), ::view-transition-group(.gc-page-genshin),
+::view-transition-group(.gc-page-wuwa), ::view-transition-group(.gc-page-nte) { animation: none; }
+::view-transition-old(.gc-page), ::view-transition-old(.gc-page-genshin),
+::view-transition-old(.gc-page-wuwa), ::view-transition-old(.gc-page-nte) {
+  animation: gc-page-out 110ms ease-in both;
+}
+::view-transition-new(.gc-page) { animation: gc-page-up 220ms var(--ease-standard) 90ms both; }
+::view-transition-new(.gc-page-genshin) { animation: gc-page-genshin 300ms cubic-bezier(0.2, 0.7, 0.2, 1) 90ms both; }
+::view-transition-new(.gc-page-wuwa) { animation: gc-page-wuwa 280ms cubic-bezier(0.7, 0, 0.2, 1) 90ms both; }
+::view-transition-new(.gc-page-nte) { animation: gc-page-nte 240ms cubic-bezier(0.2, 0.9, 0.25, 1.15) 90ms both; }
+::view-transition-old(.gc-page-nte) { animation-name: gc-page-out-nte; }
+
+@keyframes gc-page-out { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes gc-page-out-nte { to { opacity: 0; transform: translateX(-18px) skewX(4deg); } }
+@keyframes gc-page-up { from { opacity: 0; transform: translateY(10px); } }
+@keyframes gc-page-genshin { from { opacity: 0; transform: translateY(16px) scale(0.985); filter: blur(4px) brightness(1.25); } }
+@keyframes gc-page-wuwa {
+  from { opacity: 0.35; clip-path: inset(0 100% 0 0); transform: translateX(-12px); }
+  to { opacity: 1; clip-path: inset(0 0 0 0); transform: none; }
+}
+@keyframes gc-page-nte { from { opacity: 0; transform: translateX(28px) skewX(-7deg); } }
+
+:root[data-saver]::view-transition-group(*), :root[data-saver]::view-transition-old(*), :root[data-saver]::view-transition-new(*) {
+  animation: none !important;
+}
+@media (forced-colors: active) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
+/* =============================================================================================
    THM-8: Today cards. One GachaCheck voice at rest (shared structure, labels, slanted tags,
    one typeface for numbers), and the card you point at wakes into its game's world: Genshin's night sky
    and cream pills, WuWa's slate, frost and pale-gold numerals, NTE's charcoal, pink and italic snap.
