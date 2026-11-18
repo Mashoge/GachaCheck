@@ -101,3 +101,104 @@
     min-height: 44px;
   }
 }
+
+/* ---------------------------------------------------------------------------------------------
+   THM-6: Today "roster" cards. On hover (mouse), keyboard focus on the card link, or a press on a
+   touch screen, a game card wakes up in its game's colours: a pale flash, a colour wipe, its name
+   as a giant outline and an original line motif (RosterMotif.tsx). Everything is decoration
+   behind the text, so the numbers stay on top and readable. Original shapes and the app's own
+   fonts only: no official logos, art or game fonts (THM-2).
+   --------------------------------------------------------------------------------------------- */
+.gc-roster-card {
+  --ga: var(--color-accent);     /* the game's colour (the same one as its dot on Today) */
+  --g1: var(--color-raised);     /* background wipe: gradient start */
+  --g2: var(--color-surface);    /*                  gradient end */
+}
+.gc-roster-card[data-game="genshin"] { --ga: var(--color-game-genshin); --g1: #1b2442; --g2: #0e1222; } /* night sky, gold */
+.gc-roster-card[data-game="wuwa"]    { --ga: var(--color-game-wuwa);    --g1: #0f2729; --g2: #0a1213; } /* deep sea, teal */
+.gc-roster-card[data-game="nte"]     { --ga: var(--color-game-nte);     --g1: #2b0c20; --g2: #12070f; } /* neon night, pink */
+
+.gc-roster {
+  container-type: inline-size;   /* lets the giant name size itself to this card (cqi units) */
+}
+.gc-roster-bg,
+.gc-roster-flash,
+.gc-roster-title,
+.gc-roster-motif {
+  position: absolute;
+  z-index: -1;                   /* behind the card's text; .gc-roster isolates its own stacking */
+  pointer-events: none;
+}
+.gc-roster-bg {
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 90% 0%, color-mix(in oklab, var(--ga) 30%, transparent), transparent 60%),
+    linear-gradient(160deg, var(--g1), var(--g2));
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 420ms var(--ease-standard);
+}
+.gc-roster-flash {
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+}
+.gc-roster-title {
+  right: -0.5rem;
+  top: 50%;
+  translate: 1.5rem -50%;
+  font-family: var(--font-display);
+  font-weight: 700;
+  /* Fills the card's width whatever the name's length (--len = number of letters, set inline) */
+  font-size: min(8rem, calc(145cqi / var(--len, 7)));
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--ga);
+  opacity: 0;
+  transition: opacity 360ms 90ms var(--ease-standard), translate 560ms 90ms var(--ease-standard);
+}
+.gc-roster-motif {
+  left: -1.25rem;
+  bottom: -1.25rem;
+  width: 7.5rem;
+  height: 7.5rem;
+  fill: none;
+  stroke: var(--ga);
+  stroke-width: 1.2;
+  opacity: 0;
+  transition: opacity 400ms 140ms var(--ease-standard);
+}
+.gc-roster-motif .gc-pixel-on { fill: var(--ga); fill-opacity: 0.35; }
+
+/* Awake: mouse hover (only on devices that can hover), keyboard focus on the card link, or a press */
+@media (hover: hover) {
+  .gc-roster:hover .gc-roster-bg { clip-path: inset(0 0 0 0); }
+  .gc-roster:hover .gc-roster-flash { animation: gc-flash 380ms ease-out; }
+  .gc-roster:hover .gc-roster-title { opacity: 0.22; translate: 0 -50%; }
+  .gc-roster:hover .gc-roster-motif { opacity: 0.3; }
+  .gc-roster:hover .gc-spin { animation: gc-spin 40s linear infinite; }
+  .gc-roster:hover .gc-drift { animation: gc-drift 6s ease-in-out infinite alternate; }
+  .gc-roster:hover .gc-roster-chevron { color: var(--ga); }
+  .gc-roster-card:has(.gc-roster:hover) { border-color: color-mix(in oklab, var(--ga) 70%, transparent); }
+}
+.gc-roster:is(:has(a:focus-visible), :active) .gc-roster-bg { clip-path: inset(0 0 0 0); }
+.gc-roster:is(:has(a:focus-visible), :active) .gc-roster-title { opacity: 0.22; translate: 0 -50%; }
+.gc-roster:is(:has(a:focus-visible), :active) .gc-roster-motif { opacity: 0.3; }
+.gc-roster-card:has(.gc-roster a:focus-visible) { border-color: color-mix(in oklab, var(--ga) 70%, transparent); }
+
+/* Less motion: the card still changes colour, but at once, with no flash and nothing moving */
+@media (prefers-reduced-motion: reduce) {
+  .gc-roster-bg, .gc-roster-title, .gc-roster-motif { transition-delay: 0s !important; }
+  .gc-roster-flash { display: none; }
+  .gc-roster .gc-spin, .gc-roster .gc-drift { animation: none !important; }
+}
+/* High-contrast mode (Windows): drop the decoration and keep the plain card */
+@media (forced-colors: active) {
+  .gc-roster-bg, .gc-roster-flash, .gc-roster-title, .gc-roster-motif { display: none; }
+}
+
+@keyframes gc-flash { 0% { opacity: 0; } 25% { opacity: 0.16; } 100% { opacity: 0; } }
+@keyframes gc-spin { to { rotate: 360deg; } }
+@keyframes gc-drift { from { translate: -6px 0; } to { translate: 6px 0; } }

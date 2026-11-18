@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { Link } from 'react-router'
 import SpendPrompt from '../components/SpendPrompt'
 import { Button, Card, CheckIcon, ChevronIcon, Loading, Notice, PageTitle } from '../components/ui'
@@ -6,6 +7,8 @@ import { dailyPeriod, formatClock, formatDuration, formatWhen } from '../lib/tim
 import { useBulkUndo } from '../components/bulkUndo/useBulkUndo'
 import { useNow } from '../lib/useNow'
 import { overCapBy } from '../lib/stamina'
+import { SHORT_NAMES } from '../lib/useGames'
+import { RosterMotif } from '../components/RosterMotif'
 
 // Small colour cue per game; the only game-specific colour in the neutral look.
 const DOT: Record<string, string> = { genshin: 'bg-game-genshin', wuwa: 'bg-game-wuwa', nte: 'bg-game-nte' }
@@ -136,9 +139,17 @@ export default function TodayPage() {
                   <Card
                     key={card.id}
                     padding="none"
-                    className="flex min-w-0 flex-[1_1_300px] flex-col overflow-hidden has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-accent"
+                    data-game={card.presetId}
+                    className="gc-roster-card flex min-w-0 flex-[1_1_300px] flex-col overflow-hidden transition-colors has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-accent"
                   >
-                    <div className="group/open relative flex flex-1 flex-col gap-3 p-4 transition-colors hover:bg-raised">
+                    <div className="gc-roster group/open relative isolate flex flex-1 flex-col gap-3 overflow-hidden p-4 transition-colors hover:bg-raised">
+                      {/* THM-6 roster layers: decoration only, behind the text */}
+                      <span aria-hidden="true" className="gc-roster-bg" />
+                      <span aria-hidden="true" className="gc-roster-flash" />
+                      <span aria-hidden="true" className="gc-roster-title" style={{ '--len': (SHORT_NAMES[card.presetId] ?? card.name).length } as CSSProperties}>
+                        {SHORT_NAMES[card.presetId] ?? card.name}
+                      </span>
+                      <RosterMotif game={card.presetId} />
                       <span className="flex items-center gap-2">
                         <span aria-hidden="true" className={`size-2.5 rounded-[3px] ${dot(card.presetId)}`} />
                         <Link to={`/game/${card.presetId}`} className="flex-1 font-semibold after:absolute after:inset-0 focus-visible:outline-none">
@@ -146,7 +157,7 @@ export default function TodayPage() {
                           {card.name}
                         </Link>
                         <span className="text-xs text-muted">Reset in {formatDuration(card.resetAt.getTime() - now.getTime())}</span>
-                        <span aria-hidden="true" className="-mr-1 text-muted transition-[color,translate] group-hover/open:translate-x-0.5 group-hover/open:text-ink">
+                        <span aria-hidden="true" className="gc-roster-chevron -mr-1 text-muted transition-[color,translate] group-hover/open:translate-x-0.5">
                           <ChevronIcon size={16} />
                         </span>
                       </span>
