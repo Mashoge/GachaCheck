@@ -23,13 +23,13 @@ export function TaskRow({ task, done, onToggle, meta }: { task: Task; done: bool
       variant="quiet"
       aria-pressed={done}
       onClick={onToggle}
-      className="flex min-h-12 w-full items-center justify-start gap-3 rounded-none border-b border-line py-2 text-left"
+      className="gc-task flex min-h-12 w-full items-center justify-start gap-3 rounded-none border-b border-line py-2 text-left"
       style={{ display: 'flex', justifyContent: 'flex-start', minHeight: 48, paddingInline: 0, borderRadius: 0 }}
     >
       <Check done={done} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex flex-wrap items-center gap-2">
-          <span className={`text-sm ${done ? 'text-muted line-through' : ''}`}>{task.title}</span>
+          <span className={`gc-task-title text-sm ${done ? 'text-muted line-through' : ''}`}>{task.title}</span>
           {task.optional && <span className="gc-tag" data-tone="rest">Optional</span>}
         </span>
         {task.note && !done && <span className="text-xs text-muted">{task.note}</span>}
@@ -115,7 +115,7 @@ export function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }
 
 export function CountedRow({ task, progress, onAdd, onUndo }: { task: Task; progress: { count: number; target: number; done: boolean; today: boolean; doneForNow: boolean }; onAdd: () => void; onUndo: () => void }) {
   return (
-    <div className="flex min-h-12 items-center gap-3 border-b border-line py-2">
+    <div className="gc-task flex min-h-12 items-center gap-3 border-b border-line py-2">
       <Check done={progress.doneForNow} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className={`text-sm ${progress.doneForNow ? 'text-muted' : ''}`}>
@@ -131,6 +131,7 @@ export function CountedRow({ task, progress, onAdd, onUndo }: { task: Task; prog
       <Button
         size="sm"
         variant="secondary"
+        className="gc-btn"
         icon
         onClick={onUndo}
         disabled={progress.count === 0}
@@ -141,6 +142,7 @@ export function CountedRow({ task, progress, onAdd, onUndo }: { task: Task; prog
       <Button
         size="sm"
         variant="secondary"
+        className="gc-btn"
         icon
         onClick={onAdd}
         disabled={progress.done || progress.today}
@@ -166,7 +168,7 @@ export function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterS
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="gc-meter-card flex flex-col gap-2">
       {/* The name and its tags wrap onto a second line when space is short; the number never breaks */}
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <span className="gc-label">{state.name}</span>
@@ -175,7 +177,7 @@ export function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterS
         {overCapBy(state) > 0 && <span className="gc-tag">+{overCapBy(state)} over cap</span>}
       </span>
       <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-        <span className={`font-display text-4xl font-bold leading-none tracking-tight ${state.full ? 'text-urgent' : ''}`}>{state.value}</span>
+        <span className={`gc-meter-num font-display text-4xl font-bold leading-none tracking-tight ${state.full ? 'text-urgent' : ''}`}>{state.value}</span>
         <span className="font-display text-base font-semibold text-muted">/{state.cap}</span>
       </span>
       <span aria-hidden="true" className="gc-meter" style={{ '--p': `${pct}%` } as CSSProperties}>
@@ -216,7 +218,7 @@ export function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterS
                 variant="secondary"
                 onClick={() => onSet(Math.max(0, state.value - n))}
                 aria-label={`Spent ${n} ${state.name}`}
-                className="px-2.5"
+                className="gc-btn px-2.5"
               >
                 −{n}
               </Button>
@@ -228,7 +230,7 @@ export function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterS
               setDraft(String(state.value))
               setEditing(true)
             }}
-            className="px-2.5"
+            className="gc-btn px-2.5"
           >
             Set value
           </Button>

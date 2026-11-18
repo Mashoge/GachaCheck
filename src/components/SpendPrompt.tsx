@@ -12,7 +12,7 @@ export default function SpendPrompt({ meter, onSave, onSkip }: { meter: MeterSta
 
   return (
     <form
-      className="flex flex-wrap items-center gap-2 border-b border-line bg-raised px-3 py-2.5"
+      className="gc-prompt flex flex-wrap items-center gap-2 border-b border-line bg-raised px-3 py-2.5"
       onSubmit={(e) => {
         e.preventDefault()
         if (valid) onSave(value)

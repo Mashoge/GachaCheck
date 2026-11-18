@@ -9,6 +9,9 @@ import { Button, cx } from '../../components/ui'
 import { Check, CountedRow, EndDateEditor, MeterCard, TaskRow } from './GameParts'
 import { GameIcon } from '../../components/GameIcon'
 import { useGameIcons } from '../../lib/useGameIcons'
+import { useGameFonts } from '../../lib/gameFonts'
+import { useMedia } from '../../lib/useMedia'
+import { useDataSaver } from '../../lib/dataSaver'
 
 type Props = {
   game: TodayData['games'][number]
@@ -25,6 +28,10 @@ type Props = {
 
 export default function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, onSetEndDate, onSetSkipped }: Props) {
   const icons = useGameIcons([game]) // LTR-8
+  // THM-11: the game's own numerals on its themed page, on the same terms as Today (mouse devices, not Data saver)
+  const canHover = useMedia('(hover: hover) and (pointer: fine)')
+  const dataSaver = useDataSaver()
+  useGameFonts(canHover && !dataSaver.on)
   const skipped = isSkippedNow(game, now)
   const clock = clockOf(game)
   const preset = game.preset_id ? findPreset(game.preset_id) : undefined
@@ -99,10 +106,12 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
   // THM-9 (step 3): the page in the Today page's voice. A title with the reset times as numbers, then one
   // panel per section with a spaced label; ticks, bars and tags in the game's colour (.gc-set).
   return (
-    <section data-game={game.preset_id ?? undefined} aria-labelledby="game-title" className="gc-set flex flex-col gap-6">
+    <section data-game={game.preset_id ?? undefined} aria-labelledby="game-title" className="gc-set gc-theme flex flex-col gap-6">
+      {/* THM-11: the game's world behind its page (index.css; only Genshin so far) */}
+      <div aria-hidden="true" className="gc-world" />
       <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2">
         <GameIcon presetId={game.preset_id} url={icons[game.id]} size={52} className="sm:row-span-2" />
-        <h1 id="game-title" className="font-display text-2xl font-bold leading-tight sm:self-end sm:text-3xl">{game.name}</h1>
+        <h1 id="game-title" className="gc-title font-display text-2xl font-bold leading-tight sm:self-end sm:text-3xl">{game.name}</h1>
         <p className="col-span-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 sm:col-span-1 sm:col-start-2 sm:row-start-2 sm:self-start">
           <Stat label="Daily reset" value={formatDuration(day.end!.getTime() - now.getTime())} />
           <Stat label="Weekly" value={formatDuration(week.end!.getTime() - now.getTime())} />
@@ -125,7 +134,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-5 [grid-template-areas:'stamina'_'checklist'_'side'] md:grid-cols-[minmax(0,1fr)_340px] md:grid-rows-[auto_1fr] md:[grid-template-areas:'checklist_stamina'_'checklist_side']">
         {/* Stamina: values come from the last recorded snapshot, or what you enter */}
-        <Panel label="Stamina" className="[grid-area:stamina]">
+        <Panel label="Stamina" className="gc-panel-stamina [grid-area:stamina]">
           <div className="flex flex-col divide-y divide-line">
             {meters.length === 0 && <p className="py-3 text-sm text-muted">This game has no stamina meter.</p>}
             {meters.map((m) => {
@@ -182,12 +191,12 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
                       </Button>
                     )}
                     {group.label === 'Daily' && !bulk && left.length > 1 && (
-                      <Button size="sm" variant="secondary" onClick={() => void tickAll()}>
+                      <Button size="sm" variant="secondary" className="gc-btn" onClick={() => void tickAll()}>
                         All done
                       </Button>
                     )}
                     {optionalCount > 0 && <span className="gc-tag" data-tone="rest">{optionalCount} optional</span>}
-                    <span className="font-display text-lg font-semibold leading-none" aria-label={`${done} of ${required.length} done`}>
+                    <span className="gc-count font-display text-lg font-semibold leading-none" aria-label={`${done} of ${required.length} done`}>
                       {done}<span className="text-muted">/{required.length}</span>
                     </span>
                   </>
@@ -237,7 +246,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
                     const left = p.period?.end ? p.period.end.getTime() - now.getTime() : null
                     const soon = !notStarted && left !== null && left < 3 * 86_400_000 && !p.done
                     return (
-                      <div key={t.id} className="flex flex-col">
+                      <div key={t.id} className="gc-end-row flex flex-col">
                         <Button
                           variant="quiet"
                           aria-pressed={p.done}
@@ -248,7 +257,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
                         >
                           <Check done={p.done} />
                           <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="text-sm font-medium text-ink">{t.title}</span>
+                            <span className="gc-end-title text-sm font-medium text-ink">{t.title}</span>
                             <span className={`text-xs ${soon ? 'text-urgent' : 'text-muted'}`}>
                               {!p.period
                                 ? 'Dates not set yet'
@@ -260,7 +269,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
                           {(notStarted || left !== null) && (
                             <span className="flex shrink-0 flex-col items-end">
                               <span className="gc-label">{notStarted ? 'Starts in' : 'Resets in'}</span>
-                              <span className={`font-display text-base font-semibold leading-tight ${soon ? 'text-urgent' : 'text-ink'}`}>
+                              <span className={`gc-end-time font-display text-base font-semibold leading-tight ${soon ? 'text-urgent' : 'text-ink'}`}>
                                 {formatDuration(notStarted ? p.period!.start.getTime() - now.getTime() : left!)}
                               </span>
                             </span>
@@ -292,7 +301,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
                 {events.map((ev) => {
                   const left = new Date(ev.ends_at).getTime() - now.getTime()
                   return (
-                    <div key={ev.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
+                    <div key={ev.id} className="gc-event-row flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
                       <span className="min-w-0">{ev.name}</span>
                       <span className="gc-tag shrink-0" data-tone={left < 86_400_000 ? 'urgent' : undefined}>Ends in {formatDuration(left)}</span>
                     </div>
@@ -330,7 +339,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <span className="flex items-baseline gap-2">
       <span className="gc-label">{label}</span>
-      <span className="font-display text-base font-semibold">{value}</span>
+      <span className="gc-stat-num font-display text-base font-semibold">{value}</span>
     </span>
   )
 }
@@ -338,9 +347,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 /** One section of the page: a panel with a spaced label, and its numbers or buttons on the right. */
 function Panel({ label, aside, className, children }: { label: string; aside?: ReactNode; className?: string; children: ReactNode }) {
   return (
-    <section className={cx('overflow-hidden rounded-2xl border border-line bg-surface px-4', className)}>
-      <div className="-mx-4 flex min-h-12 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-4 py-2">
-        <h2 className="gc-label">{label}</h2>
+    <section className={cx('gc-panel overflow-hidden rounded-2xl border border-line bg-surface px-4', className)}>
+      <div className="gc-panel-head -mx-4 flex min-h-12 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-4 py-2">
+        <h2 className="gc-label gc-panel-label">{label}</h2>
         {aside && <span className="flex items-center gap-3">{aside}</span>}
       </div>
       {children}
