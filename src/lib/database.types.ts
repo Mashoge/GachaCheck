@@ -250,6 +250,7 @@ export type Database = {
         Row: {
           created_at: string
           daily_reset_time: string
+          icon_path: string | null
           id: string
           name: string
           notify_events: boolean
@@ -268,6 +269,7 @@ export type Database = {
         Insert: {
           created_at?: string
           daily_reset_time?: string
+          icon_path?: string | null
           id?: string
           name: string
           notify_events?: boolean
@@ -286,6 +288,7 @@ export type Database = {
         Update: {
           created_at?: string
           daily_reset_time?: string
+          icon_path?: string | null
           id?: string
           name?: string
           notify_events?: boolean

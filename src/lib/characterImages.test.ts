@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_PER_GAME, fileProblem, fitWithin, focusFromPoint, imagePath, linkStillGood, nudgeFocus, roomFor } from './characterImages'
+import { MAX_PER_GAME, centerSquare, fileProblem, fitWithin, focusFromPoint, iconPath, imagePath, linkStillGood, nudgeFocus, roomFor } from './characterImages'
 
 describe('character pictures (LTR-8)', () => {
   it('shrinks the longest side to 1280 px, keeping the shape, and never enlarges', () => {
@@ -52,5 +52,16 @@ describe('character pictures (LTR-8)', () => {
     expect(linkStillGood({ url: 'u', expires: now + 30 * 60_000 }, now)).toBe(false)
     expect(linkStillGood({ url: 'u', expires: now - 1 }, now)).toBe(false)
     expect(linkStillGood(undefined, now)).toBe(false)
+  })
+
+  it('cuts game icons from the middle square of a picture', () => {
+    expect(centerSquare(512, 512)).toEqual({ sx: 0, sy: 0, side: 512 })
+    expect(centerSquare(1920, 1080)).toEqual({ sx: 420, sy: 0, side: 1080 })
+    expect(centerSquare(1000, 1500)).toEqual({ sx: 0, sy: 250, side: 1000 })
+  })
+
+  it('names icon files so the database accepts them as icons (icon-…)', () => {
+    expect(iconPath('u1', 'g1', 'abc', 'image/webp')).toBe('u1/g1/icon-abc.webp')
+    expect(iconPath('u1', 'g1', 'abc', 'image/jpeg')).toBe('u1/g1/icon-abc.jpg')
   })
 })

@@ -58,6 +58,18 @@ export function nudgeFocus(focus: { x: number; y: number }, key: string, big = f
   return move ? { x: clamp(focus.x + move[0]), y: clamp(focus.y + move[1]) } : null
 }
 
+/** The largest square in the middle of a picture (for game icons). */
+export function centerSquare(width: number, height: number) {
+  const side = Math.min(width, height)
+  return { sx: Math.round((width - side) / 2), sy: Math.round((height - side) / 2), side }
+}
+
+export const ICON_SIZE = 256
+
+export function iconPath(userId: string, gameId: string, id: string, type: string) {
+  return `${userId}/${gameId}/icon-${id}.${type === 'image/jpeg' ? 'jpg' : 'webp'}`
+}
+
 /** Why a chosen file cannot be used, or null if it can. */
 export function fileProblem(file: { type: string; size: number; name: string }) {
   if (!ACCEPT.split(',').includes(file.type)) return `${file.name} is not a PNG, JPEG or WebP picture.`
@@ -72,16 +84,23 @@ export function roomFor(existing: number, chosen: number) {
 
 // ---------- browser work ----------
 
-/** Shrink a picture so its longest side is at most LONG_SIDE, as WebP (JPEG if WebP is not possible). */
-export async function shrinkImage(file: Blob): Promise<Blob> {
+/**
+ * Shrink a picture so its longest side is at most LONG_SIDE, as WebP (JPEG if WebP is not possible).
+ * With `square`, the middle square is cut out first and made that many pixels wide (game icons).
+ */
+export async function shrinkImage(file: Blob, square?: number): Promise<Blob> {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  const size = fitWithin(bitmap.width, bitmap.height)
+  const crop = square ? centerSquare(bitmap.width, bitmap.height) : { sx: 0, sy: 0, side: 0 }
+  const size = square
+    ? { width: Math.min(square, crop.side), height: Math.min(square, crop.side) }
+    : fitWithin(bitmap.width, bitmap.height)
   const canvas = document.createElement('canvas')
   canvas.width = size.width
   canvas.height = size.height
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('This browser cannot resize pictures.')
-  ctx.drawImage(bitmap, 0, 0, size.width, size.height)
+  if (square) ctx.drawImage(bitmap, crop.sx, crop.sy, crop.side, crop.side, 0, 0, size.width, size.height)
+  else ctx.drawImage(bitmap, 0, 0, size.width, size.height)
   bitmap.close()
   const encode = (type: string, quality: number) =>
     new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality))
@@ -134,6 +153,26 @@ function storeLinks(links: Record<string, SavedLink>) {
   }
 }
 
+/**
+ * Signed links for files in the bucket, reusing saved ones while they last (THM-7). Expired links are
+ * dropped from the saved list, so it stays small. Pictures and game icons share it.
+ */
+async function signPaths(paths: string[]): Promise<Map<string, string>> {
+  const now = Date.now()
+  const saved: Record<string, SavedLink> = {}
+  for (const [path, link] of Object.entries(loadLinks())) if (linkStillGood(link, now)) saved[path] = link
+  const missing = [...new Set(paths)].filter((path) => !saved[path])
+  if (missing.length > 0) {
+    const { data: links, error } = await supabase.storage.from(BUCKET).createSignedUrls(missing, LINK_SECONDS)
+    if (error) throw error
+    for (const l of links) {
+      if (l.path && l.signedUrl) saved[l.path] = { url: l.signedUrl, expires: now + LINK_SECONDS * 1000 }
+    }
+  }
+  storeLinks(saved)
+  return new Map(paths.filter((path) => saved[path]).map((path) => [path, saved[path].url]))
+}
+
 /** All your pictures, grouped by game, with signed links. */
 export async function fetchCharacterImages(): Promise<Record<string, CharacterImage[]>> {
   const { data, error } = await supabase
@@ -144,21 +183,7 @@ export async function fetchCharacterImages(): Promise<Record<string, CharacterIm
   if (error) throw error
   if (data.length === 0) return {}
 
-  const now = Date.now()
-  const saved = loadLinks()
-  const missing = data.map((r) => r.path).filter((path) => !linkStillGood(saved[path], now))
-  if (missing.length > 0) {
-    const { data: links, error: linkError } = await supabase.storage.from(BUCKET).createSignedUrls(missing, LINK_SECONDS)
-    if (linkError) throw linkError
-    for (const l of links) {
-      if (l.path && l.signedUrl) saved[l.path] = { url: l.signedUrl, expires: now + LINK_SECONDS * 1000 }
-    }
-  }
-  // Keep only links for pictures that still exist
-  const kept: Record<string, SavedLink> = {}
-  for (const r of data) if (saved[r.path]) kept[r.path] = saved[r.path]
-  storeLinks(kept)
-  const urlFor = new Map(Object.entries(kept).map(([path, l]) => [path, l.url]))
+  const urlFor = await signPaths(data.map((r) => r.path))
 
   const byGame: Record<string, CharacterImage[]> = {}
   for (const r of data) {
@@ -205,4 +230,45 @@ export async function removeGameImages(gameId: string) {
   const { data, error } = await bucket.list(folder, { limit: 100 })
   if (error || !data?.length) return
   await bucket.remove(data.map((f) => `${folder}/${f.name}`))
+}
+
+// ---------- game icons (LTR-8, second half) ----------
+
+/** Signed links for the games that have an icon, by game id. */
+export async function fetchGameIcons(games: { id: string; icon_path?: string | null }[]): Promise<Record<string, string>> {
+  const withIcon = games.filter((g): g is { id: string; icon_path: string } => !!g.icon_path)
+  if (withIcon.length === 0) return {}
+  const urlFor = await signPaths(withIcon.map((g) => g.icon_path))
+  const out: Record<string, string> = {}
+  for (const g of withIcon) {
+    const url = urlFor.get(g.icon_path)
+    if (url) out[g.id] = url
+  }
+  return out
+}
+
+/**
+ * Upload a new icon (cut to the middle square, 256 px) and point the game at it, then remove the old
+ * file. A new file name each time, so no device keeps showing a cached old icon.
+ */
+export async function setGameIcon(game: { id: string; icon_path?: string | null }, file: File) {
+  const problem = fileProblem(file)
+  if (problem) throw new Error(problem)
+  const blob = await shrinkImage(file, ICON_SIZE)
+  const path = iconPath(await userId(), game.id, crypto.randomUUID(), blob.type)
+  const bucket = supabase.storage.from(BUCKET)
+  const { error: uploadError } = await bucket.upload(path, blob, { contentType: blob.type, cacheControl: '31536000' })
+  if (uploadError) throw uploadError
+  const { error } = await supabase.from('games').update({ icon_path: path }).eq('id', game.id)
+  if (error) {
+    await bucket.remove([path])
+    throw error
+  }
+  if (game.icon_path) await bucket.remove([game.icon_path]) // a leftover file is only wasted space
+}
+
+export async function removeGameIcon(game: { id: string; icon_path?: string | null }) {
+  const { error } = await supabase.from('games').update({ icon_path: null }).eq('id', game.id)
+  if (error) throw error
+  if (game.icon_path) await supabase.storage.from(BUCKET).remove([game.icon_path])
 }

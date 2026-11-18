@@ -7,6 +7,8 @@ import { clockOf, dailiesLeft, isSkippedNow, isVisible, periodCompletionIds, tas
 import { useBulkUndo } from '../../components/bulkUndo/useBulkUndo'
 import { Button, Card, Tag } from '../../components/ui'
 import { Check, CountedRow, EndDateEditor, MeterCard, TaskRow } from './GameParts'
+import { GameIcon } from '../../components/GameIcon'
+import { useGameIcons } from '../../lib/useGameIcons'
 
 type Props = {
   game: TodayData['games'][number]
@@ -22,6 +24,7 @@ type Props = {
 }
 
 export default function GameDashboard({ game, data, now, quick, onTick, onRemove, onSetMeter, onSetEndDate, onSetSkipped }: Props) {
+  const icons = useGameIcons([game]) // LTR-8
   const skipped = isSkippedNow(game, now)
   const clock = clockOf(game)
   const preset = game.preset_id ? findPreset(game.preset_id) : undefined
@@ -97,6 +100,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
     <Card as="section">
       <header className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <GameIcon presetId={game.preset_id} url={icons[game.id]} size={36} />
           <h1 className="font-display text-2xl font-bold">{game.name}</h1>
           {skipped && <Tag>Resting today</Tag>}
           {onSetSkipped && (

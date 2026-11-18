@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PRESETS, findPreset, findServer, type GamePreset } from '../data/presets'
 import { addGameFromPreset, changeServer, deleteGame, loadGames, setPingAt, type GameSummary } from '../lib/games'
 import { messageOf } from '../lib/errors'
 import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
 import TaskManager from './TaskManager'
 import CharacterPictures from './CharacterPictures'
-import { fetchCharacterImages, type CharacterImage } from '../lib/characterImages'
+import { ACCEPT, fetchCharacterImages, removeGameIcon, setGameIcon, type CharacterImage } from '../lib/characterImages'
+import { useGameIcons } from '../lib/useGameIcons'
+import { GameIcon } from './GameIcon'
 import { pingThreshold } from '../lib/stamina'
 import { Button, Card, Input, Notice, Select, Switch, useConfirm } from './ui'
 import { setDataSaver, useDataSaver } from '../lib/dataSaver'
@@ -19,6 +21,7 @@ export default function GamesScreen() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [picsOpenId, setPicsOpenId] = useState<string | null>(null)
   const [images, setImages] = useState<Record<string, CharacterImage[]>>({})
+  const icons = useGameIcons(games)
   const confirm = useConfirm()
 
   useEffect(() => {
@@ -111,11 +114,20 @@ export default function GamesScreen() {
           return (
             <Card as="article" key={game.id} padding="md" className="space-y-3">
               <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                <IconPicker
+                  game={game}
+                  url={icons[game.id] ?? null}
+                  disabled={busyId !== null}
+                  onSet={(file) => void run(game.id, () => setGameIcon(game, file))}
+                  onRemove={() => void run(game.id, () => removeGameIcon(game))}
+                />
                 <div className="space-y-1">
                   <h3 className="font-semibold">{game.name}</h3>
                   <p className="text-xs text-muted">
                     Resets {game.daily_reset_time.slice(0, 5)} server time · {summary}
                   </p>
+                </div>
                 </div>
                 <Button variant="secondary" className="shrink-0" onClick={() => void handleDelete(game)} disabled={busyId !== null}>
                   Delete
@@ -224,6 +236,53 @@ export default function GamesScreen() {
       <DeviceSettings />
 
       {error && <Notice tone="error">{error}</Notice>}
+    </div>
+  )
+}
+
+// LTR-8: your own icon for this game. Cut to the middle square and shown as a circle; without one the
+// game keeps its coloured badge. Private to your account, like character pictures.
+function IconPicker({ game, url, disabled, onSet, onRemove }: {
+  game: GameSummary
+  url: string | null
+  disabled: boolean
+  onSet: (file: File) => void
+  onRemove: () => void
+}) {
+  const input = useRef<HTMLInputElement>(null)
+  return (
+    <div className="flex shrink-0 flex-col items-center gap-1">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => input.current?.click()}
+        aria-label={`${game.icon_path ? 'Change' : 'Choose'} the icon for ${game.name}`}
+        className="rounded-full transition-opacity hover:opacity-80 disabled:opacity-50"
+      >
+        <GameIcon presetId={game.preset_id} url={url} size={44} />
+      </button>
+      {game.icon_path ? (
+        <Button variant="link" size="sm" className="min-h-0 text-xs" disabled={disabled} onClick={onRemove} aria-label={`Remove the icon for ${game.name}`}>
+          Remove
+        </Button>
+      ) : (
+        <Button variant="link" size="sm" className="min-h-0 text-xs" disabled={disabled} onClick={() => input.current?.click()} aria-label={`Choose an icon for ${game.name}`}>
+          Icon
+        </Button>
+      )}
+      <input
+        ref={input}
+        type="file"
+        accept={ACCEPT}
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (file) onSet(file)
+        }}
+      />
     </div>
   )
 }

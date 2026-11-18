@@ -1,6 +1,6 @@
--- LTR-8 scenario test: character pictures are private to their owner, tied to the owner's own game,
--- limited to 12 per game, and removed with the game.
--- Run after 20261118130000_character_images.sql in the Supabase SQL Editor (or psql). Uses the first
+-- LTR-8 scenario test: character pictures and game icons are private to their owner, tied to the
+-- owner's own game, pictures limited to 12 per game, and removed with the game.
+-- Run after 20261118140000_game_icons.sql in the Supabase SQL Editor (or psql). Uses the first
 -- account in auth.users, only touches the picture list (not real files), and rolls everything back.
 
 begin;
@@ -82,6 +82,29 @@ begin
   end;
 end $$;
 
+-- 3b. The game's icon must be an icon file in your own folder for this game
+do $$
+declare
+  v_game uuid := (select id from ltr8 where k = 'game');
+begin
+  update public.games set icon_path = auth.uid() || '/' || v_game || '/icon-abc.webp' where id = v_game;
+  if (select icon_path from public.games where id = v_game) is null then
+    raise exception 'LTR-8 failure: a valid icon path was not saved';
+  end if;
+  begin
+    update public.games set icon_path = auth.uid() || '/' || v_game || '/pic-1.webp' where id = v_game;
+    raise exception 'LTR-8 failure: a non-icon file was accepted as the icon';
+  exception when check_violation then
+    null;
+  end;
+  begin
+    update public.games set icon_path = gen_random_uuid() || '/' || v_game || '/icon-x.webp' where id = v_game;
+    raise exception 'LTR-8 failure: an icon in someone else''s folder was accepted';
+  exception when check_violation then
+    null;
+  end;
+end $$;
+
 -- 4. Another player sees nothing and cannot add pictures to this game
 do $$
 declare
@@ -114,6 +137,6 @@ begin
 end $$;
 
 reset role;
-do $$ begin raise notice 'LTR-8 passed: private bucket, own folder only, 12 per game, other players blocked, removed with the game.'; end $$;
+do $$ begin raise notice 'LTR-8 passed: private bucket, own folder only, icons in place, 12 per game, other players blocked, removed with the game.'; end $$;
 
 rollback;

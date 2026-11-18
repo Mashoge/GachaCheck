@@ -13,6 +13,8 @@ import { RosterArt } from '../components/RosterArt'
 import { useCharacterImages } from '../lib/useCharacterImages'
 import { useMedia } from '../lib/useMedia'
 import { useDataSaver } from '../lib/dataSaver'
+import { GameIcon } from '../components/GameIcon'
+import { useGameIcons } from '../lib/useGameIcons'
 
 // Small colour cue per game; the only game-specific colour in the neutral look.
 const DOT: Record<string, string> = { genshin: 'bg-game-genshin', wuwa: 'bg-game-wuwa', nte: 'bg-game-nte' }
@@ -27,6 +29,8 @@ export default function TodayPage() {
   const canHover = useMedia('(hover: hover) and (pointer: fine)')
   const dataSaver = useDataSaver()
   const { images: characterImages } = useCharacterImages(canHover && !dataSaver.on)
+  // LTR-8: your game icons (tiny, and they identify the game, so shown everywhere, Data saver included)
+  const icons = useGameIcons(data?.games ?? [])
 
   // Bulk undo state lives above the route switch, so it survives navigation between tabs.
   const { batches, begin, complete, dismiss, dismissPrompt } = useBulkUndo()
@@ -161,7 +165,7 @@ export default function TodayPage() {
                       <RosterArt images={characterImages[card.id] ?? []} />
                       <RosterMotif game={card.presetId} />
                       <span className="flex items-center gap-2">
-                        <span aria-hidden="true" className={`size-2.5 rounded-[3px] ${dot(card.presetId)}`} />
+                        <GameIcon presetId={card.presetId} url={icons[card.id]} size={22} />
                         <Link to={`/game/${card.presetId}`} className="flex-1 font-semibold after:absolute after:inset-0 focus-visible:outline-none">
                           <span className="sr-only">Open </span>
                           {card.name}
