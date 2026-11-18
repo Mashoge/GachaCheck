@@ -152,8 +152,8 @@ export const PRESETS: GamePreset[] = [
   },
   {
     id: 'nte',
-    version: 4,
-    lastChecked: '2026-11-09',
+    version: 5,
+    lastChecked: '2026-11-18',
     name: 'Neverness to Everness',
     taskExample: 'e.g. Upgrade my Arcs',              // NTE
     dailyResetTime: '05:00',
@@ -165,8 +165,10 @@ export const PRESETS: GamePreset[] = [
       { id: 'america', label: 'America (US Eastern)', timezone: 'America/New_York', note: UNVERIFIED },
       { id: 'europe', label: 'Europe (UTC+1)', timezone: UTC_PLUS_1, note: UNVERIFIED },
     ],
-    // Cap seen in game on Nov 9 (360/360). Refill rate still to be confirmed.
-    meters: [{ key: 'pixels', name: 'Character Pixels', cap: 360, minutesPerPoint: 6, estimated: true }],
+    // Cap seen in game on Nov 9 and Nov 18 (360/360, the highest cap; it starts at 240 and grows with
+    // progress). Refill rate of 1 per 6 minutes from GameWith and Gaming ProMax (Nov 18).
+    // City Stamina is not a meter: it refills to full once a week, so it is the weekly task below.
+    meters: [{ key: 'pixels', name: 'Character Pixels', cap: 360, minutesPerPoint: 6 }],
     tasks: [
       daily('commissions', 'Daily commissions (Exploration Guide)'),
       daily('spend-pixels', 'Spend Character Pixels', { meter: 'pixels' }),
@@ -177,7 +179,7 @@ export const PRESETS: GamePreset[] = [
       daily('bp-daily', 'Battle Pass dailies'),
       daily('mail', 'Check mail', { optional: true }),
       weekly('anomaly', 'Anomaly Pilgrimage (weekly bosses)'),
-      weekly('city-stamina', 'Spend City Stamina'),
+      weekly('city-stamina', 'Spend City Stamina', { note: 'Refills to full at the weekly reset, so anything left unspent is wasted' }),
       weekly('auction', "Ebisu's Auction House"),
       weekly('realm-greed', 'Realm of Greed'),
       weekly('special-delivery', 'Special Delivery Commissions'),
