@@ -90,6 +90,16 @@
     min-width: 44px;
   }
 
+  /* A switch keeps its pill shape; an invisible margin around it makes the 44px touch area */
+  button[role="switch"] {
+    min-height: 0;
+  }
+  button[role="switch"]::before {
+    content: "";
+    position: absolute;
+    inset: -8px -2px;
+  }
+
   input:not([type="checkbox"]):not([type="radio"]),
   select,
   textarea {
@@ -173,16 +183,17 @@
 .gc-slant-bar > i { display: block; height: 100%; background: var(--color-accent); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); transition: width 0.4s var(--ease-standard); }
 
 /* ---------- Card structure ---------- */
+.gc-set { --gc: var(--color-accent); }
 .gc-card { --gc: var(--color-accent); position: relative; isolation: isolate; transition: border-color 0.35s; }
-.gc-card[data-game="genshin"] { --gc: var(--color-game-genshin); }
-.gc-card[data-game="wuwa"]    { --gc: var(--color-game-wuwa); }
-.gc-card[data-game="nte"]     { --gc: var(--color-game-nte); }
+:is(.gc-card, .gc-set)[data-game="genshin"] { --gc: var(--color-game-genshin); }
+:is(.gc-card, .gc-set)[data-game="wuwa"]    { --gc: var(--color-game-wuwa); }
+:is(.gc-card, .gc-set)[data-game="nte"]     { --gc: var(--color-game-nte); }
 .gc-body { position: relative; isolation: isolate; }
 .gc-skin, .gc-frame, .gc-mark, .gc-sweep, .gc-lines, .gc-spark, .gc-ticker, .gc-roster-motif, .gc-roster-art {
   position: absolute; pointer-events: none;
 }
 .gc-skin { inset: 0; z-index: -3; opacity: 0; transition: opacity 0.45s ease; }
-.gc-card .gc-tag:not([data-tone]) { background: color-mix(in oklab, var(--gc) 16%, transparent); color: color-mix(in oklab, var(--gc) 75%, white); }
+:is(.gc-card, .gc-set) .gc-tag:not([data-tone]) { background: color-mix(in oklab, var(--gc) 16%, transparent); color: color-mix(in oklab, var(--gc) 75%, white); }
 .gc-reset, .gc-sub, .gc-endsub, .gc-label, .gc-cap { transition: color 0.35s; }
 
 .gc-hero { display: flex; align-items: baseline; gap: 6px; font-size: 52px; }
@@ -195,6 +206,15 @@
 .gc-meter { position: relative; display: block; height: 8px; border-radius: 99px; background: var(--color-line); transition: background 0.35s; }
 .gc-meter > i { position: absolute; inset: 0 auto 0 0; width: var(--p); border-radius: 99px; background: var(--gc); }
 .gc-meter::before, .gc-meter::after { content: ""; position: absolute; opacity: 0; transition: opacity 0.35s; }
+.gc-tick { display: inline-block; width: 3px; height: 0.8em; margin-right: 8px; vertical-align: -0.05em; background: var(--gc); transform: skewX(-20deg); }
+/* A tick box in the game's colour (game pages); the app's accent elsewhere */
+.gc-check { display: flex; width: 20px; height: 20px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 5px; border: 1.5px solid var(--gc, var(--color-accent)); color: #111; }
+.gc-check[data-done] { background: var(--gc, var(--color-accent)); }
+/* Day chips and other on/off picks: slanted like the tags, the text kept upright */
+.gc-chip { min-height: 36px; padding: 0 14px; border: 1px solid var(--color-edge); border-radius: 3px; transform: skewX(-14deg); font-size: 13px; font-weight: 600; color: var(--color-muted); transition: color 0.2s, border-color 0.2s, background-color 0.2s; }
+.gc-chip > span { display: inline-flex; align-items: center; gap: 8px; transform: skewX(14deg); }
+.gc-chip:hover { color: var(--color-ink); }
+.gc-chip[aria-pressed="true"], .gc-chip[aria-current="page"] { border-color: var(--color-accent); background: color-mix(in oklab, var(--color-accent) 16%, transparent); color: var(--color-accent); }
 .gc-rule { height: 1px; background: var(--color-line); transition: background 0.35s; }
 .gc-pips { display: flex; gap: 5px; }
 .gc-pips > i { width: 14px; height: 8px; background: #333; transform: skewX(-20deg); transition: background 0.35s, border-color 0.35s, border-radius 0.35s, transform 0.35s; }

@@ -152,16 +152,14 @@ export default function TodayPage() {
                   </>
                 )
                 const after = mine?.promptVisible && card.meter ? (
-                  <div className="border-t border-line">
-                    <SpendPrompt
-                      meter={card.meter}
-                      onSave={(v) => {
-                        if (game) void setMeterValue(game, card.meter!.id, v)
-                        dismissPrompt(card.id, mine.operationId)
-                      }}
-                      onSkip={() => dismissPrompt(card.id, mine.operationId)}
-                    />
-                  </div>
+                  <SpendPrompt
+                    meter={card.meter}
+                    onSave={(v) => {
+                      if (game) void setMeterValue(game, card.meter!.id, v)
+                      dismissPrompt(card.id, mine.operationId)
+                    }}
+                    onSkip={() => dismissPrompt(card.id, mine.operationId)}
+                  />
                 ) : null
                 return (
                   <TodayCard

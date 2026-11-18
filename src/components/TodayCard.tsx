@@ -21,7 +21,7 @@ export function TodayCard({ card, now, iconUrl, images, footer, after }: {
   iconUrl?: string
   images: CharacterImage[]
   footer: ReactNode
-  after?: ReactNode
+  after?: ReactNode // opens over the card's bottom, above the footer
 }) {
   const ref = useRef<HTMLElement>(null)
   const awake = useAwake(ref)
@@ -186,10 +186,18 @@ export function TodayCard({ card, now, iconUrl, images, footer, after }: {
         )}
       </div>
 
-      <div className="gc-foot flex min-h-14 flex-wrap items-center gap-2 border-t border-line px-4 py-2.5" onPointerDown={ripple}>
-        {footer}
+      {/* Something asked after an action (the spend prompt) opens over the bottom of this card, just
+          above the footer, so the other cards in the row keep their size and Undo stays in reach */}
+      <div className="relative">
+        {after && (
+          <div className="absolute inset-x-0 bottom-full z-10 border-t border-line shadow-[0_-16px_24px_-12px_rgb(0_0_0/0.7)] [&_form]:border-b-0">
+            {after}
+          </div>
+        )}
+        <div className="gc-foot flex min-h-14 flex-wrap items-center gap-2 border-t border-line px-4 py-2.5" onPointerDown={ripple}>
+          {footer}
+        </div>
       </div>
-      {after}
     </article>
   )
 }

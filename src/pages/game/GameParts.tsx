@@ -1,17 +1,15 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { overCapBy, type MeterRow, type MeterState } from '../../lib/stamina'
 import { zonedTime } from '../../lib/time'
 import type { Task } from '../../lib/today'
-import { Button, Input, Tag } from '../../components/ui'
+import { Button, Input } from '../../components/ui'
 
+// Ticks, bars and tags take the game's colour on its page (--gc, from .gc-set in GameDashboard)
 export function Check({ done }: { done: boolean }) {
   return (
-    <span
-      aria-hidden="true"
-      className={`flex size-5 shrink-0 items-center justify-center rounded-md ${done ? 'bg-accent' : 'border-[1.5px] border-accent'}`}
-    >
+    <span aria-hidden="true" className="gc-check" data-done={done ? '' : undefined}>
       {done && (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" className="text-on-accent">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
           <path d="M5 12l5 5L20 7" />
         </svg>
       )}
@@ -32,7 +30,7 @@ export function TaskRow({ task, done, onToggle, meta }: { task: Task; done: bool
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex flex-wrap items-center gap-2">
           <span className={`text-sm ${done ? 'text-muted line-through' : ''}`}>{task.title}</span>
-          {task.optional && <Tag>Optional</Tag>}
+          {task.optional && <span className="gc-tag" data-tone="rest">Optional</span>}
         </span>
         {task.note && !done && <span className="text-xs text-muted">{task.note}</span>}
       </span>
@@ -74,7 +72,7 @@ export function EndDateEditor({ task, active, timezone, zoneLabel, now, onSave }
 
   if (!editing) {
     return (
-      <Button variant="link" size="sm" className="self-start px-3 pb-2" onClick={open}>
+      <Button variant="link" size="sm" className="self-start px-4 pb-2" onClick={open}>
         {active ? 'Change dates' : 'Set dates'}
       </Button>
     )
@@ -125,11 +123,11 @@ export function CountedRow({ task, progress, onAdd, onUndo }: { task: Task; prog
           {progress.today && !progress.done && <span className="ml-2 text-xs">· done today</span>}
         </span>
         {task.note && !progress.done && <span className="text-xs text-muted">{task.note}</span>}
-        <span aria-hidden="true" className="block h-1 max-w-48 overflow-hidden rounded-full bg-line">
-          <span className="block h-full bg-accent" style={{ width: `${Math.min(100, (progress.count / progress.target) * 100)}%` }} />
+        <span aria-hidden="true" className="gc-slant-bar block max-w-48 !h-1.5">
+          <i style={{ width: `${Math.min(100, (progress.count / progress.target) * 100)}%`, background: 'var(--gc, var(--color-accent))' }} />
         </span>
       </span>
-      <span className="text-xs font-semibold text-muted">{progress.count} / {progress.target}</span>
+      <span className="font-display text-sm font-semibold">{progress.count}<span className="text-muted">/{progress.target}</span></span>
       <Button
         size="sm"
         variant="secondary"
@@ -168,23 +166,21 @@ export function MeterCard({ state, row, sub, estimated, onSet }: { state: MeterS
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-3">
-        {/* The name and its tags wrap onto a second line when space is short; the number never breaks */}
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-          {state.name}
-          {estimated && <Tag>estimated</Tag>}
-          {/* STA-1: going over the cap after a refill is allowed, and shown as such */}
-          {overCapBy(state) > 0 && <Tag tone="accent">+{overCapBy(state)} over cap</Tag>}
-        </span>
-        <span className={`shrink-0 whitespace-nowrap font-display text-xl font-semibold ${state.full ? 'text-urgent' : ''}`}>
-          {state.value}
-          <span className="font-sans text-sm font-normal text-muted"> / {state.cap}</span>
-        </span>
-      </div>
-      <div aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-line">
-        <div className={`h-full ${state.full ? 'bg-urgent' : 'bg-accent'}`} style={{ width: `${pct}%` }} />
-      </div>
+    <div className="flex flex-col gap-2">
+      {/* The name and its tags wrap onto a second line when space is short; the number never breaks */}
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="gc-label">{state.name}</span>
+        {estimated && <span className="gc-tag" data-tone="rest">Estimated</span>}
+        {/* STA-1: going over the cap after a refill is allowed, and shown as such */}
+        {overCapBy(state) > 0 && <span className="gc-tag">+{overCapBy(state)} over cap</span>}
+      </span>
+      <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+        <span className={`font-display text-4xl font-bold leading-none tracking-tight ${state.full ? 'text-urgent' : ''}`}>{state.value}</span>
+        <span className="font-display text-base font-semibold text-muted">/{state.cap}</span>
+      </span>
+      <span aria-hidden="true" className="gc-meter" style={{ '--p': `${pct}%` } as CSSProperties}>
+        <i style={state.full ? { background: 'var(--color-urgent)' } : undefined} />
+      </span>
       <span className={`text-xs ${state.full ? 'text-urgent' : 'text-muted'}`}>{sub}</span>
 
       {editing ? (

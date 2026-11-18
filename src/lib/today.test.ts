@@ -199,7 +199,12 @@ describe('which number leads a Today card (THM-8)', () => {
   })
 
   it('tags the meter with when it fills, and flags it near or above the cap', () => {
-    expect(meterTag(base, now)).toEqual({ text: 'Full 11:50 PM', urgent: false })
+    // The tag shows the device's own clock, so these times are made in local time: the test then passes
+    // in any timezone (CI runs on UTC). new Date(y, monthIndex, d, h, m) is local time.
+    const noon = new Date(2026, 10, 16, 12, 0)
+    const local = (d: number, h: number, m: number) => ({ ...base, meter: { ...base.meter!, fullAt: new Date(2026, 10, d, h, m) } })
+    expect(meterTag(local(16, 23, 50), noon)).toEqual({ text: 'Full 11:50 PM', urgent: false })
+    expect(meterTag(local(17, 6, 30), noon)).toEqual({ text: 'Full tmrw 6:30 AM', urgent: false })
     expect(meterTag({ ...base, meterSoon: true }, now)).toEqual({ text: 'Caps in 11h 50m', urgent: true })
     expect(meterTag({ ...base, meter: { ...base.meter!, value: 200, full: true, fullAt: null } }, now)).toEqual({ text: 'Full now', urgent: true })
     expect(meterTag({ ...base, meter: { ...base.meter!, value: 230, full: true, fullAt: null } }, now)).toEqual({ text: 'Above cap +30', urgent: true })

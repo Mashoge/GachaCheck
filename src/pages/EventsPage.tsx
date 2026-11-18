@@ -14,7 +14,9 @@ import { useNow } from '../lib/useNow'
 import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
 import { EventCard, Section, Timeline } from './events/EventDisplay'
 import { EventForm } from './events/EventForm'
-import { Button, Card, Notice, Switch, Tag, ToggleGroup, cx } from '../components/ui'
+import { GameIcon } from '../components/GameIcon'
+import { Button, Card, ChevronIcon, Loading, Notice, PageTitle, Switch, ToggleGroup, cx } from '../components/ui'
+import { useGameIcons } from '../lib/useGameIcons'
 
 const SOON_MS = 3 * 86_400_000
 const FILTER_KEY = 'gachacheck.events.filter'
@@ -32,6 +34,7 @@ export default function EventsPage() {
   const now = useNow()
   const { data, error: gamesError, loading } = useTodayData()
   const games = data?.games ?? []
+  const icons = useGameIcons(games)
 
   const [events, setEvents] = useState<GameEvent[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -137,6 +140,7 @@ export default function EventsPage() {
       key={e.id}
       event={e}
       game={gameOf(e)}
+      iconUrl={icons[e.game_id]}
       now={now}
       onEdit={() => setForm({ mode: 'edit', event: e })}
       onDone={(isDone) => void run(() => setEventDone(e, isDone))}
@@ -145,8 +149,11 @@ export default function EventsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl font-bold">Events</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <PageTitle>Events</PageTitle>
+          <p className="text-sm text-muted">Each one counts down here, on Today and in your reminders.</p>
+        </div>
         {games.length > 0 && !form && (
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setForm({ mode: 'import' })}>
@@ -159,8 +166,8 @@ export default function EventsPage() {
         )}
       </div>
 
-      {(error || gamesError) && <p className="text-urgent">{error ?? gamesError}</p>}
-      {(loading || events === null) && !error && !gamesError && <p className="text-muted">Loading…</p>}
+      {(error || gamesError) && <Notice tone="error" size="md">{error ?? gamesError}</Notice>}
+      {(loading || events === null) && !error && !gamesError && <Loading />}
       {data && games.length === 0 && (
         <p className="text-muted">
           Add a game first. <Link to="/games" className="text-accent underline">Manage games</Link>
@@ -225,59 +232,66 @@ export default function EventsPage() {
         )}
       </div>
 
-      {games.length > 1 && (
-        <ToggleGroup
-          label="Show events for"
-          value={activeFilter}
-          onChange={chooseFilter}
-          options={[{ id: 'all', label: 'All' }, ...games.map((g) => ({ id: g.id, label: shortName(g) }))]}
-        />
-      )}
-
-      {/* Web events are played in a browser, outside the game, so they can be switched off as a group.
-          The switch covers every game, so whether it shows must not depend on the game filter. */}
-      {events !== null && (!showWeb || events.some((e) => e.kind === 'web_event')) && (
-        <div className="flex min-h-9 w-fit items-center gap-2 text-sm text-muted">
-          <Switch
-            label="Show web events (all games)"
-            on={showWeb}
-            onChange={(next) => {
-              setShowWeb(next)
-              void run(() => setShowWebEvents(next))
-            }}
-          />
-          <span>Show web events (all games)</span>
+      {/* The game filter, and the web events switch. Web events are played in a browser, outside the game,
+          so they can be switched off as a group; the switch covers every game, so whether it shows must not
+          depend on the game filter. */}
+      {(games.length > 1 || (events !== null && (!showWeb || events.some((e) => e.kind === 'web_event')))) && (
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          {games.length > 1 ? (
+            <ToggleGroup
+              label="Show events for"
+              shape="slant"
+              value={activeFilter}
+              onChange={chooseFilter}
+              options={[{ id: 'all', label: 'All' }, ...games.map((g) => ({ id: g.id, label: shortName(g) }))]}
+            />
+          ) : <span />}
+          {events !== null && (!showWeb || events.some((e) => e.kind === 'web_event')) && (
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="gc-label">Web events · all games</span>
+              <Switch
+                label="Show web events (all games)"
+                on={showWeb}
+                onChange={(next) => {
+                  setShowWeb(next)
+                  void run(() => setShowWebEvents(next))
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
 
       {events !== null && data && games.length > 0 && (
         <>
           {open.length === 0 && (
-            <Card as="p" className="text-sm text-muted">
+            <p className="rounded-2xl border border-dashed border-line px-4 py-3 text-sm text-muted">
               No events to track{activeFilter === 'all' ? '' : ' for this game'}. Add one with the end date the game shows, and it will count down here, on Today
               and in your reminders.
-            </Card>
+            </p>
           )}
 
-          {soon.length > 0 && <Section title="Ending soon" hint="Within 3 days">{soon.map(card)}</Section>}
+          {soon.length > 0 && <Section title="Ending soon" hint="Within 3 days" urgent>{soon.map(card)}</Section>}
           {later.length > 0 && <Section title="Current">{later.map(card)}</Section>}
           {upcoming.length > 0 && <Section title="Upcoming">{upcoming.map(card)}</Section>}
 
-          <Timeline games={shownGames} events={open} now={now} onOpen={(e) => setForm({ mode: 'edit', event: e })} />
+          <Timeline games={shownGames} events={open} icons={icons} now={now} onOpen={(e) => setForm({ mode: 'edit', event: e })} />
 
           {done.length > 0 && (
             <div className="flex flex-col gap-3">
-              <Button variant="link" size="sm" className="self-start" onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>
+              <Button size="sm" className="self-start" onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>
                 {showDone ? 'Hide' : 'Show'} finished ({done.length})
+                <span className={cx('transition-transform', showDone && 'rotate-90')}><ChevronIcon size={14} /></span>
               </Button>
-              {showDone && <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{done.map(card)}</div>}
+              {showDone && <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{done.map(card)}</div>}
             </div>
           )}
 
           {shownHidden.length > 0 && (
             <div className="flex flex-col gap-3">
-              <Button variant="link" size="sm" className="self-start" onClick={() => setShowHidden(!showHidden)} aria-expanded={showHidden}>
+              <Button size="sm" className="self-start" onClick={() => setShowHidden(!showHidden)} aria-expanded={showHidden}>
                 {showHidden ? 'Collapse' : 'Show'} hidden ({shownHidden.length})
+                <span className={cx('transition-transform', showHidden && 'rotate-90')}><ChevronIcon size={14} /></span>
               </Button>
               {showHidden && (
                 <>
@@ -286,15 +300,18 @@ export default function EventsPage() {
                       const game = games.find((g) => g.id === h.game_id)
                       return (
                         <li key={h.key} className={cx('flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3', i > 0 && 'border-t border-line')}>
-                          <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="flex min-w-0 flex-1 items-center gap-3">
+                            <GameIcon presetId={game?.preset_id ?? null} url={icons[h.game_id]} size={24} />
+                            <span className="flex min-w-0 flex-col">
                             <span className="text-sm font-medium">{h.name}</span>
                             <span className="text-xs text-muted">
                               {game ? shortName(game) : 'Unknown game'} · Ends {formatWhen(new Date(h.ends_at), now)}
                             </span>
+                            </span>
                           </span>
                           <span className="flex items-center gap-1.5">
-                            <Tag>{h.origin === 'catalog' ? 'Official' : 'Imported'}</Tag>
-                            {h.kind === 'web_event' && <Tag>Web event</Tag>}
+                            <span className="gc-tag" data-tone="rest">{h.origin === 'catalog' ? 'Official' : 'Imported'}</span>
+                            {h.kind === 'web_event' && <span className="gc-tag" data-tone="rest">Web event</span>}
                           </span>
                           <Button size="sm" onClick={() => void restore(h)} aria-label={`Restore ${h.name}`}>
                             Restore

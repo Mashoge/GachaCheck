@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { messageOf } from '../lib/errors'
 import { supabase } from '../lib/supabase'
-import { formatWhen } from '../lib/time'
+import { formatDuration, formatWhen } from '../lib/time'
 import { useNow } from '../lib/useNow'
 import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
-import { Card, Input, Loading, Notice, PageTitle, Select, Switch } from '../components/ui'
+import { GameIcon } from '../components/GameIcon'
+import { buttonClass, ChevronIcon, Input, Loading, Notice, PageTitle, Select, SheetRow, Switch } from '../components/ui'
+import { useGameIcons } from '../lib/useGameIcons'
 
 type Settings = {
   user_id: string
@@ -20,7 +23,7 @@ type Settings = {
   last_reminder_run_at: string | null
 }
 
-type GameSwitches = { id: string; name: string; notify_nudge: boolean; notify_stamina: boolean; notify_events: boolean }
+type GameSwitches = { id: string; name: string; preset_id: string | null; icon_path: string | null; notify_nudge: boolean; notify_stamina: boolean; notify_events: boolean }
 
 const SETTINGS_COLUMNS = 'user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, work_start, work_end, work_days, event_reminder_days, last_reminder_run_at'
 // Work days, shown Monday first. Stored as 0 = Sunday ... 6 = Saturday, like a game's weekly reset day.
@@ -36,7 +39,7 @@ const hhmm = (time: string | null) => (time ?? '').slice(0, 5)
 async function load() {
   const [settingsRes, gamesRes] = await Promise.all([
     supabase.from('user_settings').select(SETTINGS_COLUMNS).maybeSingle(),
-    supabase.from('games').select('id, name, notify_nudge, notify_stamina, notify_events').order('created_at'),
+    supabase.from('games').select('id, name, preset_id, icon_path, notify_nudge, notify_stamina, notify_events').order('created_at'),
   ])
   if (settingsRes.error) throw settingsRes.error
   if (gamesRes.error) throw gamesRes.error
@@ -49,6 +52,7 @@ export default function RemindersPage() {
   const [games, setGames] = useState<GameSwitches[]>([])
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const icons = useGameIcons(games)
 
   const refresh = useCallback(async () => {
     try {
@@ -121,9 +125,11 @@ export default function RemindersPage() {
     void saveSettings({ work_days: days.sort((a, b) => a - b) })
   }
 
+  // THM-9 (step 3): the Today page's voice here too. The schedule is one settings sheet (labels on the
+  // left, hairline rows), the status sits beside it (first on a phone), then the switches per game.
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5">
-      <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
         <PageTitle>Reminders</PageTitle>
         <p className="text-sm text-muted">Sent to your Discord channel. GachaCheck checks every 15 minutes.</p>
       </div>
@@ -133,171 +139,187 @@ export default function RemindersPage() {
       {loaded && !settings && !error && <Notice size="md">No settings found for this account.</Notice>}
 
       {settings && (
-        <>
-          <Card as="section" padding="md" tone={stale ? 'urgent' : 'default'}>
-            {!lastRun ? (
-              <p className="text-sm text-muted">Not checked yet. The first check happens within 15 minutes of turning the schedule on.</p>
-            ) : stale ? (
-              <>
-                <p className="text-sm font-semibold text-urgent">No check since {formatWhen(lastRun, now)}</p>
-                <p className="mt-1 text-sm text-muted">
-                  Reminders may have stopped. Check that the Supabase project isn't paused and that the schedule is still active.
-                </p>
-              </>
-            ) : (
-              <p className="text-sm">
-                <span className="font-semibold">Reminders are running.</span>{' '}
-                <span className="text-muted">Last checked {formatWhen(lastRun, now)}.</span>
+        <div className="grid items-start gap-x-6 gap-y-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="flex min-w-0 flex-col gap-4 lg:order-last">
+            <section aria-labelledby="status-h" className={`rounded-2xl border bg-surface p-4 ${stale ? 'border-urgent' : 'border-line'}`}>
+              <div className="flex items-center justify-between gap-3">
+                <h2 id="status-h" className="gc-label">Status</h2>
+                <span className="gc-tag" data-tone={stale ? 'urgent' : !lastRun ? 'rest' : undefined}>
+                  {stale ? 'Not checking' : lastRun ? 'Running' : 'Waiting'}
+                </span>
+              </div>
+              {!lastRun ? (
+                <p className="mt-3 text-sm text-muted">Not checked yet. The first check happens within 15 minutes of turning the schedule on.</p>
+              ) : (
+                <>
+                  <p className="mt-3 text-xs text-muted">Last checked</p>
+                  <p className={`font-display text-3xl font-bold leading-tight ${stale ? 'text-urgent' : ''}`}>
+                    {formatDuration(Math.max(60_000, now.getTime() - lastRun.getTime()))} ago
+                  </p>
+                  <p className="text-xs text-muted">{formatWhen(lastRun, now)}</p>
+                  {stale && (
+                    <p className="mt-3 text-sm text-muted">
+                      Reminders may have stopped. Check that the Supabase project isn&apos;t paused and that the schedule is still active.
+                    </p>
+                  )}
+                </>
+              )}
+              <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-line pt-3">
+                <span className="gc-label">Your timezone</span>
+                <span className="text-sm">{settings.timezone}</span>
+              </div>
+              <p className="mt-1 text-xs text-muted">Every time on this page uses it.</p>
+            </section>
+
+            <section aria-labelledby="pings-h" className="rounded-2xl border border-line bg-surface p-4">
+              <h2 id="pings-h" className="gc-label">Stamina pings</h2>
+              <p className="mt-2 text-sm text-muted">
+                Sent once per fill-up, when a meter reaches 90% or the number you set for it in Games.
               </p>
-            )}
-          </Card>
+              <Link to="/games" className={`${buttonClass({ variant: 'link', size: 'sm' })} mt-1 -ml-1`}>
+                Set ping levels in Games <ChevronIcon size={14} />
+              </Link>
+            </section>
+          </div>
 
-          <Card as="section" className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-col gap-0.5">
-                <h2 className="text-sm font-semibold">Evening nudge</h2>
-                <p className="text-sm text-muted">One message listing unticked dailies, plus endgame and events that end within 24 hours.</p>
+          <div className="flex min-w-0 flex-col gap-8">
+            <section aria-labelledby="schedule-h" className="flex flex-col gap-3">
+              <h2 id="schedule-h" className="text-base font-semibold">Schedule</h2>
+              <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+                <SheetRow label="Evening nudge">
+                  <Setting text="One message listing unticked dailies, plus endgame and events that end within 24 hours.">
+                    <Switch label="Evening nudge" on={settings.nudge_enabled} onChange={(on) => void saveSettings({ nudge_enabled: on })} />
+                  </Setting>
+                  {settings.nudge_enabled && (
+                    <div className="mt-3">
+                      <TimeField id="nudge-time" label="Send at" value={hhmm(settings.nudge_time)} onChange={(v) => void saveSettings({ nudge_time: v })} />
+                    </div>
+                  )}
+                </SheetRow>
+
+                <SheetRow label="Quiet hours">
+                  <Setting text="Stamina pings and event reminders wait until quiet hours end. If a meter would fill during them, you get one ping 30 minutes before they start instead. The evening nudge is not affected.">
+                    <Switch
+                      label="Quiet hours"
+                      on={quietOn}
+                      onChange={(on) => void saveSettings(on ? { quiet_start: '23:00', quiet_end: '07:00' } : { quiet_start: null, quiet_end: null })}
+                    />
+                  </Setting>
+                  {quietOn && (
+                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
+                      <TimeField id="quiet-start" label="From" value={hhmm(settings.quiet_start)} onChange={(v) => void saveSettings({ quiet_start: v })} />
+                      <TimeField id="quiet-end" label="Until" value={hhmm(settings.quiet_end)} onChange={(v) => void saveSettings({ quiet_end: v })} />
+                    </div>
+                  )}
+                </SheetRow>
+
+                {/* SUP-4: work hours behave like quiet hours, on the days picked here */}
+                <SheetRow label="Work hours">
+                  <Setting text="Like quiet hours, on the days you pick: pings wait until work ends, and a meter that would fill during work is pinged 30 minutes before it starts.">
+                    <Switch
+                      label="Work hours"
+                      on={workOn}
+                      onChange={(on) => void saveSettings(on ? { work_start: '09:00', work_end: '18:00' } : { work_start: null, work_end: null })}
+                    />
+                  </Setting>
+                  {workOn && (
+                    <div className="mt-3 flex flex-col gap-3">
+                      <div className="flex flex-wrap gap-x-6 gap-y-3">
+                        <TimeField id="work-start" label="From" value={hhmm(settings.work_start)} onChange={(v) => void saveSettings({ work_start: v })} />
+                        <TimeField id="work-end" label="Until" value={hhmm(settings.work_end)} onChange={(v) => void saveSettings({ work_end: v })} />
+                      </div>
+                      <div role="group" aria-label="Work days" className="flex flex-wrap gap-2 pl-1">
+                        {WORK_DAYS.map((d) => (
+                          <button
+                            key={d.day}
+                            type="button"
+                            aria-pressed={settings.work_days.includes(d.day)}
+                            aria-label={d.long}
+                            onClick={() => toggleWorkDay(d.day)}
+                            className="gc-chip"
+                          >
+                            <span>{d.short}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {settings.work_days.length === 0 && <Notice>No days picked, so work hours never apply.</Notice>}
+                      <p className="text-xs text-muted">A shift that runs past midnight counts as the day it starts on.</p>
+                    </div>
+                  )}
+                </SheetRow>
+
+                <SheetRow label="Events">
+                  <Setting stack text="One message per event before it ends, with your progress note. Events marked as done are skipped.">
+                    <label htmlFor="event-days" className="sr-only">Event reminder</label>
+                    <Select
+                      id="event-days"
+                      value={settings.event_reminder_days}
+                      onChange={(e) => void saveSettings({ event_reminder_days: Number(e.target.value) })}
+                    >
+                      {(EVENT_DAY_CHOICES.includes(settings.event_reminder_days) ? EVENT_DAY_CHOICES : [...EVENT_DAY_CHOICES, settings.event_reminder_days]).map((n) => (
+                        <option key={n} value={n}>
+                          {n === 0 ? 'Never' : n === 1 ? '1 day before' : `${n} days before`}
+                        </option>
+                      ))}
+                    </Select>
+                  </Setting>
+                </SheetRow>
               </div>
-              <Switch label="Evening nudge" on={settings.nudge_enabled} onChange={(on) => void saveSettings({ nudge_enabled: on })} />
-            </div>
-            {settings.nudge_enabled && (
-              <TimeField
-                id="nudge-time"
-                label="Send at"
-                value={hhmm(settings.nudge_time)}
-                onChange={(v) => void saveSettings({ nudge_time: v })}
-              />
-            )}
-          </Card>
+            </section>
 
-          <Card as="section" className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-col gap-0.5">
-                <h2 className="text-sm font-semibold">Quiet hours</h2>
-                <p className="text-sm text-muted">
-                  Stamina pings and event reminders wait until quiet hours end. If a meter would fill during them, you get one ping
-                  30 minutes before they start instead. The evening nudge is not affected.
-                </p>
-              </div>
-              <Switch
-                label="Quiet hours"
-                on={quietOn}
-                onChange={(on) => void saveSettings(on ? { quiet_start: '23:00', quiet_end: '07:00' } : { quiet_start: null, quiet_end: null })}
-              />
-            </div>
-            {quietOn && (
-              <div className="flex flex-wrap gap-4">
-                <TimeField id="quiet-start" label="From" value={hhmm(settings.quiet_start)} onChange={(v) => void saveSettings({ quiet_start: v })} />
-                <TimeField id="quiet-end" label="Until" value={hhmm(settings.quiet_end)} onChange={(v) => void saveSettings({ quiet_end: v })} />
-              </div>
-            )}
-          </Card>
-
-          {/* SUP-4: work hours behave like quiet hours, on the days picked here */}
-          <Card as="section" className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-col gap-0.5">
-                <h2 className="text-sm font-semibold">Work hours</h2>
-                <p className="text-sm text-muted">
-                  Like quiet hours, on the days you pick: pings wait until work ends, and a meter that would fill during work is pinged
-                  30 minutes before it starts.
-                </p>
-              </div>
-              <Switch
-                label="Work hours"
-                on={workOn}
-                onChange={(on) => void saveSettings(on ? { work_start: '09:00', work_end: '18:00' } : { work_start: null, work_end: null })}
-              />
-            </div>
-            {workOn && (
-              <>
-                <div className="flex flex-wrap gap-4">
-                  <TimeField id="work-start" label="From" value={hhmm(settings.work_start)} onChange={(v) => void saveSettings({ work_start: v })} />
-                  <TimeField id="work-end" label="Until" value={hhmm(settings.work_end)} onChange={(v) => void saveSettings({ work_end: v })} />
-                </div>
-                <div role="group" aria-label="Work days" className="flex flex-wrap gap-1.5">
-                  {WORK_DAYS.map((d) => {
-                    const on = settings.work_days.includes(d.day)
-                    return (
-                      <button
-                        key={d.day}
-                        type="button"
-                        aria-pressed={on}
-                        aria-label={d.long}
-                        onClick={() => toggleWorkDay(d.day)}
-                        className={`min-h-9 rounded-full border px-3.5 text-sm font-medium transition-colors ${
-                          on ? 'border-accent bg-active text-accent' : 'border-edge text-muted hover:text-ink'
-                        }`}
-                      >
-                        {d.short}
-                      </button>
-                    )
-                  })}
-                </div>
-                {settings.work_days.length === 0 && <Notice>No days picked, so work hours never apply.</Notice>}
-                <p className="text-xs text-muted">A shift that runs past midnight counts as the day it starts on.</p>
-              </>
-            )}
-          </Card>
-
-          <Card as="section" className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-col gap-0.5">
-              <h2 className="text-sm font-semibold">Event reminder</h2>
-              <p className="text-sm text-muted">One message per event before it ends, with your progress note. Events marked as done are skipped.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <label htmlFor="event-days" className="text-sm text-muted">Remind me</label>
-              <Select
-                id="event-days"
-                value={settings.event_reminder_days}
-                onChange={(e) => void saveSettings({ event_reminder_days: Number(e.target.value) })}
-              >
-                {(EVENT_DAY_CHOICES.includes(settings.event_reminder_days) ? EVENT_DAY_CHOICES : [...EVENT_DAY_CHOICES, settings.event_reminder_days]).map((n) => (
-                  <option key={n} value={n}>
-                    {n === 0 ? 'Never' : n === 1 ? '1 day before' : `${n} days before`}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </Card>
-
-          <Card as="section" className="flex flex-col">
-            <h2 className="text-sm font-semibold">Per game</h2>
-            <p className="pb-2 text-sm text-muted">Stamina pings are sent once per fill-up, when a meter reaches 90% or the number you set for it in Games.</p>
-            {games.length === 0 && <Notice>No games added yet.</Notice>}
-            {games.map((g) => (
-              <div key={g.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line py-3">
-                <span className="text-sm font-medium">{g.name}</span>
-                {/* Three even columns on a phone, one row on wider screens */}
-                <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:items-center sm:gap-5">
-                  <span className="flex flex-col items-start gap-1.5 text-sm text-muted sm:flex-row sm:items-center sm:gap-2">
-                    Nudge
-                    <Switch label={`${g.name} in the evening nudge`} on={g.notify_nudge} onChange={(on) => void saveGame(g.id, { notify_nudge: on })} />
-                  </span>
-                  <span className="flex flex-col items-start gap-1.5 text-sm text-muted sm:flex-row sm:items-center sm:gap-2">
-                    Stamina
-                    <Switch label={`${g.name} stamina pings`} on={g.notify_stamina} onChange={(on) => void saveGame(g.id, { notify_stamina: on })} />
-                  </span>
-                  <span className="flex flex-col items-start gap-1.5 text-sm text-muted sm:flex-row sm:items-center sm:gap-2">
-                    Events
-                    <Switch label={`${g.name} event reminders`} on={g.notify_events} onChange={(on) => void saveGame(g.id, { notify_events: on })} />
-                  </span>
-                </div>
-              </div>
-            ))}
-          </Card>
-
-          <p className="text-xs text-muted">Times use your timezone: {settings.timezone}.</p>
-        </>
+            <section aria-labelledby="per-game-h" className="flex flex-col gap-3">
+              <h2 id="per-game-h" className="text-base font-semibold">Per game</h2>
+              {games.length === 0 ? (
+                <Notice>No games added yet.</Notice>
+              ) : (
+                <ul className="overflow-hidden rounded-2xl border border-line bg-surface">
+                  {games.map((g) => (
+                    <li key={g.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-line px-4 py-3 first:border-t-0 sm:px-5">
+                      <span className="flex min-w-0 items-center gap-3">
+                        <GameIcon presetId={g.preset_id} url={icons[g.id]} size={28} />
+                        <span className="text-sm font-semibold">{g.name}</span>
+                      </span>
+                      {/* Three even columns on a phone, one row on wider screens */}
+                      <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:items-center sm:gap-6">
+                        <GameSwitch label="Nudge" name={`${g.name} in the evening nudge`} on={g.notify_nudge} onChange={(on) => void saveGame(g.id, { notify_nudge: on })} />
+                        <GameSwitch label="Stamina" name={`${g.name} stamina pings`} on={g.notify_stamina} onChange={(on) => void saveGame(g.id, { notify_stamina: on })} />
+                        <GameSwitch label="Events" name={`${g.name} event reminders`} on={g.notify_events} onChange={(on) => void saveGame(g.id, { notify_events: on })} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
+/** A setting's explanation, with its control on the right (with `stack`, below it on a phone). */
+function Setting({ text, stack = false, children }: { text: string; stack?: boolean; children: ReactNode }) {
+  return (
+    <div className={`flex items-start justify-between gap-x-4 gap-y-3 ${stack ? 'max-sm:flex-col' : ''}`}>
+      <p className="text-sm text-muted">{text}</p>
+      <div className="flex shrink-0 items-center">{children}</div>
+    </div>
+  )
+}
+
+function GameSwitch({ label, name, on, onChange }: { label: string; name: string; on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <span className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-2.5">
+      <span aria-hidden="true" className="gc-label">{label}</span>
+      <Switch label={name} on={on} onChange={onChange} />
+    </span>
+  )
+}
+
 function TimeField({ id, label, value, onChange }: { id: string; label: string; value: string; onChange: (value: string) => void }) {
   return (
-    <div className="flex items-center gap-2">
-      <label htmlFor={id} className="text-sm text-muted">{label}</label>
+    <div className="flex items-center gap-3">
+      <label htmlFor={id} className="gc-label">{label}</label>
       <Input
         id={id}
         type="time"

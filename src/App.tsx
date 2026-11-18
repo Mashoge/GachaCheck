@@ -44,11 +44,7 @@ export default function App() {
             <Route path="game/:presetId" element={page(<GamePage />)} />
             <Route
               path="games"
-              element={page(
-                <div className="mx-auto max-w-3xl">
-                  <GamesScreen />
-                </div>,
-              )}
+              element={page(<GamesScreen />)}
             />
             <Route path="events" element={page(<EventsPage />)} />
             <Route path="reminders" element={page(<RemindersPage />)} />

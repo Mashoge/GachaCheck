@@ -11,14 +11,21 @@ export function ToggleGroup<T extends string>({ label, options, value, onChange,
   options: ToggleOption<T>[]
   value: T
   onChange: (id: T) => void
-  /** pill = separate rounded chips; segmented = joined in one bar */
-  shape?: 'pill' | 'segmented'
+  /** pill = separate rounded chips; segmented = joined in one bar; slant = the slanted chips of THM-9 */
+  shape?: 'pill' | 'segmented' | 'slant'
   className?: string
 }) {
   return (
-    <div role="group" aria-label={label} className={cx(shape === 'segmented' ? 'flex gap-1 rounded-xl border border-line bg-surface p-1' : 'flex flex-wrap gap-1.5', className)}>
+    <div role="group" aria-label={label} className={cx(shape === 'segmented' ? 'flex gap-1 rounded-xl border border-line bg-surface p-1' : shape === 'slant' ? 'flex flex-wrap gap-2 pl-1' : 'flex flex-wrap gap-1.5', className)}>
       {options.map((o) => {
         const on = o.id === value
+        if (shape === 'slant') {
+          return (
+            <button key={o.id} type="button" aria-pressed={on} onClick={() => onChange(o.id)} className="gc-chip">
+              <span>{o.label}</span>
+            </button>
+          )
+        }
         return (
           <button
             key={o.id}
