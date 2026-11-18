@@ -678,6 +678,147 @@
 :root[data-saver] .gc-theme[data-game="wuwa"] .gc-panel { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(30 36 44 / 0.92); }
 :root[data-saver] .gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel { background: rgb(250 251 252 / 0.92); }
 
+/* --- Neverness to Everness ---
+   Night: charcoal with a faint pink slash, halftone dots and a big slanted watermark of our own words;
+   flat dark panels with a black heading band led by a pink slanted bar, italic headings and numbers
+   (Barlow Condensed on mouse devices), a blue slanted bar, pink ticks, cream pill rows for endgame and
+   light pills for buttons, pink to save. Day: NTE's white dialog boxes, the heading band still black,
+   black pills, pink accents. Static. Our own shapes and words; no official art. */
+.gc-theme[data-game="nte"] { --gc: #ff3d88; --nt-pink: #ff3d88; --nt-blue: #2ca5f9; --nt-cream: #e7e0da; }
+.gc-theme[data-game="nte"] .gc-world {
+  display: block; position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
+  background:
+    linear-gradient(115deg, transparent 58%, rgb(255 61 136 / 0.08) 58% 63%, transparent 63% 64.5%, rgb(255 61 136 / 0.05) 64.5% 66%, transparent 66%),
+    radial-gradient(circle at center, rgb(255 255 255 / 0.05) 1.2px, transparent 1.6px) 0 0 / 14px 14px,
+    linear-gradient(180deg, #1d1d1f 0%, #151516 100%);
+}
+.gc-theme[data-game="nte"] .gc-world::after {
+  content: "DAILIES DAILIES DAILIES\A   TODAY TODAY TODAY\A DAILIES DAILIES DAILIES\A   TODAY TODAY TODAY\A DAILIES DAILIES DAILIES";
+  white-space: pre; position: absolute; left: -10%; top: 8%; rotate: -14deg;
+  font: italic 900 clamp(64px, 11vw, 150px)/0.92 var(--font-display); color: rgb(255 255 255 / 0.018);
+}
+.gc-theme[data-game="nte"] .gc-title { color: #fff; letter-spacing: -0.01em; }
+.gc-theme[data-game="nte"] .gc-label { color: #b9b9b9; }
+.gc-theme[data-game="nte"] .gc-stat-num { color: var(--nt-pink); font-style: italic; }
+.gc-theme[data-game="nte"] .text-muted { color: #a3a3a3; }
+.gc-theme[data-game="nte"] .text-accent { color: #ff7fae; }
+.gc-theme[data-game="nte"] :is(.gc-count, .gc-meter-num) { font-style: italic; }
+.gc-theme[data-game="nte"] .gc-count { color: #fff; }
+:root[data-gamefonts] .gc-theme[data-game="nte"] :is(.gc-meter-num, .gc-count) { font-family: "Barlow Condensed", var(--font-display); font-weight: 900; letter-spacing: 0.01em; }
+
+/* Panels: flat charcoal, a black heading band with a pink slanted bar and an italic heading */
+.gc-theme[data-game="nte"] .gc-panel { border-color: #343434; border-radius: 6px; background: #1f1f20; box-shadow: 0 8px 22px -14px rgb(0 0 0 / 0.8); }
+.gc-theme[data-game="nte"] .gc-panel .gc-panel-head { border-color: #2c2c2c; background: #141414; }
+.gc-theme[data-game="nte"] .gc-panel-label { display: flex; align-items: center; gap: 10px; font-style: italic; font-weight: 800; color: #f2f2f2; }
+.gc-theme[data-game="nte"] .gc-panel-label::before { content: ""; width: 5px; height: 14px; flex-shrink: 0; background: var(--nt-pink); transform: skewX(-18deg); }
+.gc-theme[data-game="nte"] :is(.divide-line > *, .gc-task, .border-line) { border-color: #2e2e2e; }
+.gc-theme[data-game="nte"] .gc-task-title { color: #f2f2f2; }
+.gc-theme[data-game="nte"] .gc-task-title.line-through { color: #7b7b7b; }
+
+/* Ticks: rounded squares, pink when done */
+.gc-theme[data-game="nte"] .gc-check { border-radius: 4px; border-color: #8a8a8a; color: #111; }
+.gc-theme[data-game="nte"] .gc-check[data-done] { border-color: var(--nt-pink); background: var(--nt-pink); }
+
+/* Tags: dark italic pills; urgent in deep pink with a pink ring; light pills for buttons, pink to save */
+.gc-theme[data-game="nte"] .gc-tag { clip-path: none; border-radius: 99px; font-style: italic; }
+.gc-theme[data-game="nte"] .gc-tag:not([data-tone]) { background: #2e2e2e; color: #fff; }
+.gc-theme[data-game="nte"] .gc-tag[data-tone="rest"] { background: rgb(255 255 255 / 0.08); color: #bdbdbd; }
+.gc-theme[data-game="nte"] .gc-tag[data-tone="urgent"] { background: #6f354e; color: #ffd0e2; box-shadow: inset 0 0 0 1.5px var(--nt-pink); }
+.gc-theme[data-game="nte"] .gc-btn { border-color: transparent; border-radius: 99px; background: #d6d6d6; color: #111; }
+.gc-theme[data-game="nte"] .gc-btn:hover:not(:disabled) { background: #fff; color: #111; }
+.gc-theme[data-game="nte"] .gc-panel button.bg-accent { border-radius: 99px; background: var(--nt-pink); color: #111; }
+.gc-theme[data-game="nte"] .gc-panel button.border-edge:not(.gc-btn) { border-radius: 99px; }
+.gc-theme[data-game="nte"] .gc-panel .gc-prompt { background: #191919; border-color: #2e2e2e; }
+
+/* Stamina: white italic numbers, a blue slanted bar */
+.gc-theme[data-game="nte"] .gc-panel .gc-meter-num:not(.text-urgent) { color: #fff; }
+.gc-theme[data-game="nte"] .gc-panel .gc-meter, .gc-theme[data-game="nte"] .gc-panel .gc-meter > i { border-radius: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+.gc-theme[data-game="nte"] .gc-panel .gc-meter { background: #343434; }
+.gc-theme[data-game="nte"] .gc-panel .gc-meter > i:not([style*="urgent"]) { background: var(--nt-blue); }
+
+/* Endgame: cream pill rows with dark italic text */
+.gc-theme[data-game="nte"] .gc-end-row { border-color: transparent; }
+.gc-theme[data-game="nte"] .gc-panel .gc-end-row > button:first-child { margin: 6px 14px; width: calc(100% - 28px); border-radius: 99px !important; background: var(--nt-cream); color: #1a1a1a; }
+.gc-theme[data-game="nte"] .gc-panel .gc-end-row > button:first-child:hover:not(:disabled) { background: #f3eee9; }
+.gc-theme[data-game="nte"] .gc-panel .gc-end-row > button:first-child .text-muted { color: #4a4a4a; }
+.gc-theme[data-game="nte"] .gc-panel .gc-end-row > button:first-child .gc-label { color: #4a4a4a; }
+.gc-theme[data-game="nte"] .gc-panel .gc-end-row > button:first-child .gc-check { border-color: #6a6a6a; }
+.gc-theme[data-game="nte"] .gc-panel .gc-end-row > button:first-child .text-urgent { color: #b0124f; }
+.gc-theme[data-game="nte"] .gc-end-title { color: #1a1a1a; }
+.gc-theme[data-game="nte"] .gc-end-time { font-style: italic; }
+.gc-theme[data-game="nte"] .gc-end-time:not(.text-urgent) { color: #1a1a1a; }
+
+/* The switch and the chips above the page */
+.gc-theme[data-game="nte"] .gc-look { border-color: #444; background: rgb(20 20 20 / 0.7); }
+.gc-theme[data-game="nte"] .gc-look > button { color: #bdbdbd; }
+.gc-theme[data-game="nte"] .gc-look > button:hover { color: #fff; }
+.gc-theme[data-game="nte"] .gc-look > button[aria-pressed="true"] { background: var(--nt-pink); color: #111; }
+:root:has(.gc-theme[data-game="nte"]) .gc-chip:is([aria-pressed="true"], [aria-current="page"]) { border-color: #ff3d88; background: rgb(255 61 136 / 0.14); color: #ff8ab5; }
+
+/* ---------- NTE by day: white dialog boxes ---------- */
+.gc-theme[data-game="nte"][data-mode="day"] .gc-world {
+  background:
+    linear-gradient(115deg, transparent 58%, rgb(255 61 136 / 0.12) 58% 63%, transparent 63% 64.5%, rgb(255 61 136 / 0.08) 64.5% 66%, transparent 66%),
+    radial-gradient(circle at center, rgb(0 0 0 / 0.06) 1.2px, transparent 1.6px) 0 0 / 14px 14px,
+    linear-gradient(180deg, #f2f0ed 0%, #e4e1dd 100%);
+}
+.gc-theme[data-game="nte"][data-mode="day"] .gc-world::after { color: rgb(0 0 0 / 0.025); }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-title { color: #111; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-label { color: #3b3b3b; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-stat-num { color: #b0124f; }
+.gc-theme[data-game="nte"][data-mode="day"] .text-muted { color: #4d4d4d; }
+.gc-theme[data-game="nte"][data-mode="day"] .text-accent { color: #b0124f; }
+.gc-theme[data-game="nte"][data-mode="day"] .text-urgent { color: #b0124f; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-count { color: #111; }
+.gc-theme[data-game="nte"][data-mode="day"] :focus-visible { outline-color: #111; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-head-btn { border-radius: 99px; background: rgb(255 255 255 / 0.75); color: #111; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-head-btn:hover { background: #fff; }
+.gc-theme[data-game="nte"][data-mode="day"] header .gc-tag[data-tone="rest"] { background: #fff; color: #3b3b3b; }
+
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel { border-color: #1a1a1a; background: #fff; color: #1a1a1a; box-shadow: 5px 5px 0 rgb(26 26 26 / 0.12); }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-panel-head { border-color: #1a1a1a; background: #1a1a1a; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-panel-head .gc-count { color: #fff; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-panel-head .text-muted:not(.gc-btn) { color: #bdbdbd; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-panel-head .gc-tag[data-tone="rest"] { background: rgb(255 255 255 / 0.14); color: #e6e6e6; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-panel-head .gc-btn { background: #fff; color: #111; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-panel-head .gc-btn:hover:not(:disabled) { background: #ffd0e2; }
+.gc-theme[data-game="nte"][data-mode="day"] :is(.divide-line > *, .gc-task, .border-line) { border-color: #e2e2e2; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .text-muted:not(.gc-btn) { color: #555; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel-label { color: #f2f2f2; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-task-title { color: #1a1a1a; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-task-title.line-through { color: #858585; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-check { border-color: #1a1a1a; color: #111; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-tag:not([data-tone]) { background: #1a1a1a; color: #fff; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-tag[data-tone="rest"] { background: #ededed; color: #3b3b3b; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-tag[data-tone="urgent"] { background: #ffd0e2; color: #7a0f3b; box-shadow: inset 0 0 0 1.5px var(--nt-pink); }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-btn { background: #1a1a1a; color: #fff; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-btn:hover:not(:disabled) { background: #333; color: #fff; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel button.border-edge:not(.gc-btn) { border-color: #8a8a8a; color: #1a1a1a; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel button.text-muted:not(.gc-btn) { color: #3b3b3b; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel input { background: #fff; color: #1a1a1a; border-color: #8a8a8a; color-scheme: light; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel input::placeholder { color: #8a8a8a; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-prompt { background: #f4f2ef; border-color: #e2e2e2; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-meter-num:not(.text-urgent) { color: #111; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-meter { background: #e3e0dc; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-meter > i:not([style*="urgent"]) { background: #0d7fd0; }
+/* Endgame rows: black pills on the white box */
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-end-row > button:first-child { background: #1a1a1a; color: #fff; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-end-row > button:first-child:hover:not(:disabled) { background: #2c2c2c; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-end-row > button:first-child .text-muted { color: #bdbdbd; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-end-row > button:first-child .gc-label { color: #bdbdbd; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-end-row > button:first-child .gc-check { border-color: #bdbdbd; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-panel .gc-end-row > button:first-child .text-urgent { color: #ff8ab5; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-end-title { color: #fff; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-end-time:not(.text-urgent) { color: #ff8ab5; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-look { border-color: rgb(0 0 0 / 0.25); background: rgb(255 255 255 / 0.8); }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-look > button { color: #3b3b3b; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-look > button:hover { color: #111; }
+.gc-theme[data-game="nte"][data-mode="day"] .gc-look > button[aria-pressed="true"] { background: #1a1a1a; color: #fff; }
+:root:has(.gc-theme[data-game="nte"][data-mode="day"]) .gc-chip { border-color: rgb(0 0 0 / 0.35); background: rgb(255 255 255 / 0.7); color: #3b3b3b; }
+:root:has(.gc-theme[data-game="nte"][data-mode="day"]) .gc-chip:hover { color: #111; }
+:root:has(.gc-theme[data-game="nte"][data-mode="day"]) .gc-chip:is([aria-pressed="true"], [aria-current="page"]) { border-color: #1a1a1a; background: #1a1a1a; color: #fff; }
+:root:has(.gc-theme[data-game="nte"][data-mode="day"]) .gc-chip:focus-visible { outline-color: #111; }
+
 /* =============================================================================================
    THM-8: Today cards. One GachaCheck voice at rest (shared structure, labels, slanted tags,
    one typeface for numbers), and the card you point at wakes into its game's world: Genshin's night sky

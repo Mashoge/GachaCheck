@@ -9,8 +9,8 @@ const CHANGED = 'gachacheck:gamepagelook'
 export type GameLookChoice = 'auto' | 'day' | 'night'
 export type GameMode = 'day' | 'night'
 
-/** Games whose page has a Day look so far; the others keep their one look and show no switch. */
-export const GAMES_WITH_DAY = new Set(['genshin', 'wuwa'])
+/** Games whose page has a Day look; custom games keep the app's own look and show no switch. */
+export const GAMES_WITH_DAY = new Set(['genshin', 'wuwa', 'nte'])
 
 export const DAY_STARTS = 6
 export const NIGHT_STARTS = 18
