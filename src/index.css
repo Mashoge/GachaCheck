@@ -377,34 +377,40 @@
 .gc-theme[data-game="genshin"] .gc-btn { border-color: transparent; border-radius: 99px; background: var(--gi-cream); color: var(--gi-ink); }
 .gc-theme[data-game="genshin"] .gc-btn:hover:not(:disabled) { background: #fff6e4; color: var(--gi-ink); }
 
-/* Stamina: a cream card, a gold bar with a star at its end. In Day mode (THM-3) every panel is a cream
-   card like this one, so the rules below are shared with it */
-.gc-theme[data-game="genshin"] .gc-panel-stamina { border-color: #dabf86; background: linear-gradient(180deg, #efe9dd, #e6dece); color: var(--gi-ink); }
-.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-panel-head { border-color: rgb(143 107 70 / 0.22); background: none; }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) :is(.gc-label, .gc-panel-label) { color: var(--gi-brown); }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-panel-label::before { background: var(--gi-brown); }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .text-muted { color: #7d7566; }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) :is(.divide-line > *, .border-line) { border-color: rgb(143 107 70 / 0.2); }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-meter-num:not(.text-urgent) { color: var(--gi-ink); }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-btn { background: #ddd2bd; }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-btn:hover:not(:disabled) { background: #d2c5ab; }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-tag[data-tone="rest"] { background: rgb(143 107 70 / 0.14); color: var(--gi-brown); }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-meter { background: #d6cbb6; }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-meter > i:not([style*="urgent"]) { background: linear-gradient(90deg, #e9cf92, #c99a4b); }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-meter > i::after {
+/* Stamina: navy like the other panels at night (a little brighter gold edge), a gold bar with a star at
+   its end in both looks */
+.gc-theme[data-game="genshin"] .gc-panel-stamina { border-color: rgb(218 191 134 / 0.55); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 0 1px rgb(218 191 134 / 0.08); }
+.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-meter-num:not(.text-urgent) { color: var(--gi-cream); }
+.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-meter { background: rgb(224 216 199 / 0.14); }
+.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-meter > i:not([style*="urgent"]) { background: linear-gradient(90deg, #e9cf92, #c99a4b); }
+.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-meter > i::after {
   content: ""; position: absolute; right: -9px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%;
-  background: radial-gradient(circle, #fff6d8 0 28%, #f0b75e 32% 100%); box-shadow: 0 0 0 2px #efe9dd;
+  background: radial-gradient(circle, #fff6d8 0 28%, #f0b75e 32% 100%); box-shadow: 0 0 0 2px #182042;
 }
+/* The "how much now?" prompt on navy: a slightly lighter band */
+.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-prompt { background: rgb(255 255 255 / 0.04); border-color: rgb(218 191 134 / 0.18); }
 
-/* Forms on the cream card (the "how much now?" prompt, Set value): a darker cream band, a light field,
-   an ink pill to save, outlined pills for the rest */
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-prompt { background: #e1d7c3; border-color: rgb(143 107 70 / 0.2); }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) input { background: #f7f2e8; color: var(--gi-ink); border-color: #c4b28a; color-scheme: light; }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) input::placeholder { color: #9a8f7a; }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) button.bg-accent { border-radius: 99px; background: var(--gi-ink); color: var(--gi-cream); }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) button.bg-accent:disabled { opacity: 0.45; }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) button.border-edge { border-radius: 99px; border-color: #b9a77f; color: #5d5038; }
-:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) button.text-muted { color: var(--gi-brown); }
+/* Day mode (THM-3): every panel is a cream page */
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel :is(.gc-label, .gc-panel-label) { color: var(--gi-brown); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-panel-label::before { background: var(--gi-brown); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .text-muted { color: #7d7566; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel :is(.divide-line > *, .border-line) { border-color: rgb(143 107 70 / 0.2); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-meter-num:not(.text-urgent) { color: var(--gi-ink); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-btn { background: #ddd2bd; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-btn:hover:not(:disabled) { background: #d2c5ab; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-tag[data-tone="rest"] { background: rgb(143 107 70 / 0.14); color: var(--gi-brown); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-meter { background: #d6cbb6; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-meter > i::after { box-shadow: 0 0 0 2px #efe9dd; }
+
+/* Forms on a cream page (the "how much now?" prompt, Set value, Change dates): a darker cream band, a
+   light field, an ink pill to save, outlined pills for the rest */
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-prompt { background: #e1d7c3; border-color: rgb(143 107 70 / 0.2); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel input { background: #f7f2e8; color: var(--gi-ink); border-color: #c4b28a; color-scheme: light; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel input::placeholder { color: #9a8f7a; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel button.bg-accent { border-radius: 99px; background: var(--gi-ink); color: var(--gi-cream); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel button.bg-accent:disabled { opacity: 0.45; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel button.border-edge { border-radius: 99px; border-color: #b9a77f; color: #5d5038; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel button.text-muted { color: var(--gi-brown); }
 /* Saving elsewhere on the page (endgame dates): a soft gold pill */
 .gc-theme[data-game="genshin"] button.bg-accent { border-radius: 99px; background: #ecd9a8; color: var(--gi-ink); }
 
@@ -517,6 +523,160 @@
 :root:has(.gc-theme[data-game="genshin"][data-mode="day"]) .gc-chip:is([aria-pressed="true"], [aria-current="page"]) { border-color: #a9864c; background: #fbf6ea; color: #5a3c12; }
 :root:has(.gc-theme[data-game="genshin"][data-mode="day"]) .gc-chip:focus-visible { outline-color: var(--gi-ink, #3b4255); }
 :root:has(.gc-theme[data-mode="day"]) .gc-shell-top { background: var(--color-surface); }
+
+/* --- Wuthering Waves ---
+   Night: slate and charcoal with a cold glow at the horizon and two faint rings, frosted glass panels
+   with hairline corner brackets, a small diamond before each heading, pale-gold numbers, a tick-segmented
+   bar, square ticks, cut-corner tags, white pills, and endgame rows marked with a gold edge.
+   Day: the same shapes on pale frosted glass under a misty sky; dark slate text, dark pills.
+   The glass blur is skipped with Data saver (more opaque panels instead). Our own shapes and free fonts. */
+.gc-theme[data-game="wuwa"] { --gc: #fcfa96; --ww-ink: #f4f6f7; --ww-dim: #a9b3bb; --ww-gold: #fdfdbd; --ww-amber: #fed07a; }
+.gc-theme[data-game="wuwa"] .gc-world {
+  display: block; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(70% 38% at 50% 108%, rgb(150 196 216 / 0.2), transparent 70%),
+    radial-gradient(45% 32% at 12% 0%, rgb(56 108 150 / 0.28), transparent 70%),
+    linear-gradient(170deg, #182b3d 0%, #1b222b 55%, #14171c 100%);
+}
+.gc-theme[data-game="wuwa"] .gc-world::before {
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 86% 26%, transparent 0 219px, rgb(255 255 255 / 0.07) 220px 221px, transparent 222px),
+    radial-gradient(circle at 86% 26%, transparent 0 329px, rgb(255 255 255 / 0.045) 330px 331px, transparent 332px),
+    repeating-linear-gradient(115deg, transparent 0 46px, rgb(255 255 255 / 0.018) 46px 47px);
+}
+.gc-theme[data-game="wuwa"] .gc-title { color: var(--ww-ink); letter-spacing: 0.01em; }
+.gc-theme[data-game="wuwa"] .gc-label { color: #b8c2ca; }
+.gc-theme[data-game="wuwa"] .gc-stat-num { color: var(--ww-gold); }
+.gc-theme[data-game="wuwa"] .text-muted { color: var(--ww-dim); }
+.gc-theme[data-game="wuwa"] .text-accent { color: var(--ww-gold); }
+.gc-theme[data-game="wuwa"] .gc-count { color: var(--ww-ink); }
+:root[data-gamefonts] .gc-theme[data-game="wuwa"] :is(.gc-meter-num, .gc-count) { font-family: "Bodoni Moda", var(--font-display); font-weight: 400; letter-spacing: -0.01em; }
+
+/* Panels: frosted glass, hairline edge, corner brackets */
+.gc-theme[data-game="wuwa"] .gc-panel {
+  position: relative; border-color: rgb(255 255 255 / 0.13); border-radius: 8px;
+  background: rgb(30 36 44 / 0.7); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+.gc-theme[data-game="wuwa"] .gc-panel::before, .gc-theme[data-game="wuwa"] .gc-panel::after { content: ""; position: absolute; width: 10px; height: 10px; pointer-events: none; border: solid rgb(255 255 255 / 0.6); }
+.gc-theme[data-game="wuwa"] .gc-panel::before { left: 4px; top: 4px; border-width: 1px 0 0 1px; }
+.gc-theme[data-game="wuwa"] .gc-panel::after { right: 4px; bottom: 4px; border-width: 0 1px 1px 0; }
+.gc-theme[data-game="wuwa"] .gc-panel .gc-panel-head { border-color: rgb(255 255 255 / 0.1); background: linear-gradient(90deg, rgb(255 255 255 / 0.06), transparent 70%); }
+.gc-theme[data-game="wuwa"] .gc-panel-label { display: flex; align-items: center; gap: 10px; color: #dfe5ea; }
+.gc-theme[data-game="wuwa"] .gc-panel-label::before { content: ""; width: 7px; height: 7px; flex-shrink: 0; background: var(--ww-gold); transform: rotate(45deg); }
+.gc-theme[data-game="wuwa"] :is(.divide-line > *, .gc-task, .border-line) { border-color: rgb(255 255 255 / 0.09); }
+.gc-theme[data-game="wuwa"] .gc-task-title { color: #eef1f3; }
+.gc-theme[data-game="wuwa"] .gc-task-title.line-through { color: #808a93; }
+
+/* Ticks: small squares, pale gold when done */
+.gc-theme[data-game="wuwa"] .gc-check { border-radius: 2px; border-color: #c9d1d7; color: #111; }
+.gc-theme[data-game="wuwa"] .gc-check[data-done] { border-color: var(--ww-gold); background: var(--ww-gold); }
+
+/* Tags with cut corners; white pills for buttons, pale gold to save */
+.gc-theme[data-game="wuwa"] .gc-tag { border-radius: 0; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+.gc-theme[data-game="wuwa"] .gc-tag:not([data-tone]) { background: var(--ww-gold); color: #111; }
+.gc-theme[data-game="wuwa"] .gc-tag[data-tone="rest"] { background: rgb(255 255 255 / 0.1); color: #c9d1d7; }
+.gc-theme[data-game="wuwa"] .gc-btn { border-color: transparent; border-radius: 99px; background: #f4f6f7; color: #111; }
+.gc-theme[data-game="wuwa"] .gc-btn:hover:not(:disabled) { background: #fff; color: #111; }
+.gc-theme[data-game="wuwa"] .gc-panel button.bg-accent { border-radius: 99px; background: var(--ww-gold); color: #111; }
+.gc-theme[data-game="wuwa"] .gc-panel button.border-edge { border-radius: 99px; }
+.gc-theme[data-game="wuwa"] .gc-panel .gc-prompt { background: rgb(255 255 255 / 0.04); border-color: rgb(255 255 255 / 0.1); }
+
+/* Stamina: pale-gold numbers and a tick-segmented bar */
+.gc-theme[data-game="wuwa"] .gc-panel .gc-meter-num:not(.text-urgent) { color: #fff79e; text-shadow: 0 0 20px rgb(255 247 158 / 0.18); }
+.gc-theme[data-game="wuwa"] .gc-panel .gc-meter, .gc-theme[data-game="wuwa"] .gc-panel .gc-meter > i {
+  border-radius: 0;
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px); mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px);
+}
+.gc-theme[data-game="wuwa"] .gc-panel .gc-meter { background: #4b5661; }
+.gc-theme[data-game="wuwa"] .gc-panel .gc-meter > i:not([style*="urgent"]) { background: #fcfa96; }
+
+/* Endgame: a glass row with a gold edge and a cut corner; the time in amber */
+.gc-theme[data-game="wuwa"] .gc-end-row { border-color: transparent; }
+.gc-theme[data-game="wuwa"] .gc-panel .gc-end-row > button:first-child {
+  margin: 6px 14px; width: calc(100% - 28px); background: rgb(255 255 255 / 0.05); box-shadow: inset 3px 0 0 #fcfa96;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+.gc-theme[data-game="wuwa"] .gc-panel .gc-end-row > button:first-child:hover:not(:disabled) { background: rgb(255 255 255 / 0.09); }
+.gc-theme[data-game="wuwa"] .gc-end-title { color: var(--ww-ink); }
+.gc-theme[data-game="wuwa"] .gc-end-time:not(.text-urgent) { color: var(--ww-amber); }
+
+/* The switch, the chips above the page */
+.gc-theme[data-game="wuwa"] .gc-look { border-color: rgb(255 255 255 / 0.22); background: rgb(20 23 28 / 0.6); }
+.gc-theme[data-game="wuwa"] .gc-look > button { color: #c9d1d7; }
+.gc-theme[data-game="wuwa"] .gc-look > button:hover { color: #fff; }
+.gc-theme[data-game="wuwa"] .gc-look > button[aria-pressed="true"] { background: #f4f6f7; color: #111; }
+:root:has(.gc-theme[data-game="wuwa"]) .gc-chip:is([aria-pressed="true"], [aria-current="page"]) { border-color: var(--ww-gold, #fdfdbd); background: rgb(253 253 189 / 0.12); color: #fdfdbd; }
+
+/* ---------- WuWa by day: pale frosted glass under a misty sky ---------- */
+.gc-theme[data-game="wuwa"][data-mode="day"] { --ww-text: #1d2630; --ww-sub: #4f5c68; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-world {
+  background:
+    radial-gradient(50% 40% at 18% 4%, rgb(255 255 255 / 0.75), transparent 70%),
+    radial-gradient(70% 38% at 50% 108%, rgb(140 200 205 / 0.3), transparent 70%),
+    linear-gradient(172deg, #bccfdd 0%, #d8e3ea 38%, #eaeff1 72%, #f2f0ea 100%);
+}
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-world::before {
+  background:
+    radial-gradient(circle at 86% 26%, transparent 0 219px, rgb(27 50 71 / 0.1) 220px 221px, transparent 222px),
+    radial-gradient(circle at 86% 26%, transparent 0 329px, rgb(27 50 71 / 0.07) 330px 331px, transparent 332px),
+    repeating-linear-gradient(115deg, transparent 0 46px, rgb(255 255 255 / 0.25) 46px 47px);
+}
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-title { color: #172230; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-label { color: #3a4754; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-stat-num { color: #5e4a00; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .text-muted { color: var(--ww-sub); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .text-accent { color: #5e4a00; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .text-urgent { color: #a83c0c; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-count { color: var(--ww-text); }
+.gc-theme[data-game="wuwa"][data-mode="day"] :focus-visible { outline-color: var(--ww-text); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-head-btn { border-radius: 99px; background: rgb(255 255 255 / 0.6); color: var(--ww-text); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-head-btn:hover { background: rgb(255 255 255 / 0.85); }
+.gc-theme[data-game="wuwa"][data-mode="day"] header .gc-tag[data-tone="rest"] { background: rgb(255 255 255 / 0.7); color: #3a4754; }
+
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel {
+  border-color: rgb(27 50 71 / 0.16); background: rgb(255 255 255 / 0.6); color: var(--ww-text);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 12px 30px -16px rgb(27 50 71 / 0.4);
+}
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel::before, .gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel::after { border-color: rgb(27 50 71 / 0.55); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel .gc-panel-head { border-color: rgb(27 50 71 / 0.1); background: linear-gradient(90deg, rgb(27 50 71 / 0.06), transparent 70%); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel-label { color: #2b3947; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel-label::before { background: #b8941a; }
+.gc-theme[data-game="wuwa"][data-mode="day"] :is(.divide-line > *, .gc-task, .border-line) { border-color: rgb(27 50 71 / 0.12); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-task-title { color: var(--ww-text); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-task-title.line-through { color: #7c8792; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-check { border-color: #5b6874; color: #fdfdbd; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-check[data-done] { border-color: var(--ww-text); background: var(--ww-text); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-tag:not([data-tone]) { background: var(--ww-text); color: #fdfdbd; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-tag[data-tone="rest"] { background: rgb(27 50 71 / 0.09); color: #3a4754; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-btn { background: var(--ww-text); color: #f4f6f7; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-btn:hover:not(:disabled) { background: #2d3a47; color: #fff; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel button.bg-accent { background: var(--ww-text); color: #fdfdbd; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel button.border-edge:not(.gc-btn) { border-color: #8d99a4; color: var(--ww-text); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel button.text-muted:not(.gc-btn) { color: #3a4754; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel input { background: rgb(255 255 255 / 0.85); color: var(--ww-text); border-color: #9aa6b0; color-scheme: light; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel input::placeholder { color: #7c8792; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel .gc-prompt { background: rgb(27 50 71 / 0.05); border-color: rgb(27 50 71 / 0.1); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel .gc-meter-num:not(.text-urgent) { color: var(--ww-text); text-shadow: none; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel .gc-meter { background: #dfe5ea; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel .gc-meter > i:not([style*="urgent"]) { background: #a07c0a; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel .gc-end-row > button:first-child { background: rgb(255 255 255 / 0.6); box-shadow: inset 3px 0 0 #c9a227; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel .gc-end-row > button:first-child:hover:not(:disabled) { background: rgb(255 255 255 / 0.85); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-end-title { color: var(--ww-text); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-end-time:not(.text-urgent) { color: #6b4e00; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-look { border-color: rgb(27 50 71 / 0.2); background: rgb(255 255 255 / 0.6); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-look > button { color: #3a4754; }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-look > button:hover { color: var(--ww-text); }
+.gc-theme[data-game="wuwa"][data-mode="day"] .gc-look > button[aria-pressed="true"] { background: var(--ww-text); color: #fdfdbd; }
+:root:has(.gc-theme[data-game="wuwa"][data-mode="day"]) .gc-chip { border-color: rgb(27 50 71 / 0.3); background: rgb(255 255 255 / 0.5); color: #3a4754; }
+:root:has(.gc-theme[data-game="wuwa"][data-mode="day"]) .gc-chip:hover { color: #1d2630; }
+:root:has(.gc-theme[data-game="wuwa"][data-mode="day"]) .gc-chip:is([aria-pressed="true"], [aria-current="page"]) { border-color: #1d2630; background: #1d2630; color: #fdfdbd; }
+:root:has(.gc-theme[data-game="wuwa"][data-mode="day"]) .gc-chip:focus-visible { outline-color: #1d2630; }
+
+/* Data saver: no glass blur, the panels a little more solid instead */
+:root[data-saver] .gc-theme[data-game="wuwa"] .gc-panel { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(30 36 44 / 0.92); }
+:root[data-saver] .gc-theme[data-game="wuwa"][data-mode="day"] .gc-panel { background: rgb(250 251 252 / 0.92); }
 
 /* =============================================================================================
    THM-8: Today cards. One GachaCheck voice at rest (shared structure, labels, slanted tags,
