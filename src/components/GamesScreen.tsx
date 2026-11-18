@@ -4,6 +4,8 @@ import { addGameFromPreset, changeServer, deleteGame, loadGames, setPingAt, type
 import { messageOf } from '../lib/errors'
 import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
 import TaskManager from './TaskManager'
+import CharacterPictures from './CharacterPictures'
+import { fetchCharacterImages, type CharacterImage } from '../lib/characterImages'
 import { pingThreshold } from '../lib/stamina'
 import { Button, Card, Input, Notice, Select, useConfirm } from './ui'
 
@@ -14,6 +16,8 @@ export default function GamesScreen() {
   const [error, setError] = useState<string | null>(null)
   const [serverChoice, setServerChoice] = useState<Record<string, string>>({})
   const [openId, setOpenId] = useState<string | null>(null)
+  const [picsOpenId, setPicsOpenId] = useState<string | null>(null)
+  const [images, setImages] = useState<Record<string, CharacterImage[]>>({})
   const confirm = useConfirm()
 
   useEffect(() => {
@@ -28,9 +32,19 @@ export default function GamesScreen() {
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+    // LTR-8: pictures are optional; if they fail to load, the rest of the screen still works
+    fetchCharacterImages()
+      .then((list) => {
+        if (!cancelled) setImages(list)
+      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
+  }, [])
+
+  const refreshImages = useCallback(async () => {
+    setImages(await fetchCharacterImages())
   }, [])
 
   const refresh = useCallback(async () => {
@@ -158,6 +172,16 @@ export default function GamesScreen() {
                 {openId === game.id ? 'Hide tasks' : `Manage tasks (${active.length})`}
               </Button>
               {openId === game.id && <TaskManager game={game} onChanged={refresh} />}
+              <Button
+                variant="link"
+                aria-expanded={picsOpenId === game.id}
+                onClick={() => setPicsOpenId(picsOpenId === game.id ? null : game.id)}
+              >
+                {picsOpenId === game.id ? 'Hide character pictures' : `Character pictures (${images[game.id]?.length ?? 0})`}
+              </Button>
+              {picsOpenId === game.id && (
+                <CharacterPictures gameId={game.id} gameName={game.name} images={images[game.id] ?? []} onChanged={refreshImages} />
+              )}
             </Card>
           )
         })}

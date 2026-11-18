@@ -188,15 +188,56 @@
 .gc-roster:is(:has(a:focus-visible), :active) .gc-roster-motif { opacity: 0.3; }
 .gc-roster-card:has(.gc-roster a:focus-visible) { border-color: color-mix(in oklab, var(--ga) 70%, transparent); }
 
+/* LTR-8: your own character pictures (RosterArt.tsx) on the right, fading into the card. They sit above
+   the giant name, which steps back when a card has pictures, and below the text. */
+.gc-roster-art {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 60%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  translate: 1.5rem 0;
+  transition: opacity 420ms 60ms var(--ease-standard), translate 640ms 60ms var(--ease-standard);
+  -webkit-mask-image: linear-gradient(to left, #000 40%, transparent);
+  mask-image: linear-gradient(to left, #000 40%, transparent);
+}
+.gc-roster-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 600ms var(--ease-standard);
+}
+.gc-roster-art img[data-on] { opacity: 1; }
+/* A light shade over the lower half, where the meter numbers sit */
+.gc-roster-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 25%, rgb(0 0 0 / 0.45));
+}
+@media (hover: hover) {
+  .gc-roster:hover .gc-roster-art { opacity: 0.45; translate: 0 0; }
+  .gc-roster[data-art]:hover .gc-roster-title { opacity: 0.12; }
+  /* Text over a picture gets a soft shadow so it stays readable on any screenshot */
+  .gc-roster[data-art]:hover { text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); }
+}
+.gc-roster:is(:has(a:focus-visible), :active) .gc-roster-art { opacity: 0.45; translate: 0 0; }
+.gc-roster[data-art]:is(:has(a:focus-visible), :active) .gc-roster-title { opacity: 0.12; }
+.gc-roster[data-art]:is(:has(a:focus-visible), :active) { text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); }
+
 /* Less motion: the card still changes colour, but at once, with no flash and nothing moving */
 @media (prefers-reduced-motion: reduce) {
-  .gc-roster-bg, .gc-roster-title, .gc-roster-motif { transition-delay: 0s !important; }
+  .gc-roster-bg, .gc-roster-title, .gc-roster-motif, .gc-roster-art { transition-delay: 0s !important; }
   .gc-roster-flash { display: none; }
   .gc-roster .gc-spin, .gc-roster .gc-drift { animation: none !important; }
 }
 /* High-contrast mode (Windows): drop the decoration and keep the plain card */
 @media (forced-colors: active) {
-  .gc-roster-bg, .gc-roster-flash, .gc-roster-title, .gc-roster-motif { display: none; }
+  .gc-roster-bg, .gc-roster-flash, .gc-roster-title, .gc-roster-motif, .gc-roster-art { display: none; }
 }
 
 @keyframes gc-flash { 0% { opacity: 0; } 25% { opacity: 0.16; } 100% { opacity: 0; } }

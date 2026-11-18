@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { removeGameImages } from './characterImages'
 import { nextCustomTaskSortOrder } from './taskOrdering'
 import { findPreset, findServer, type GamePreset, type PresetServer } from '../data/presets'
 
@@ -120,6 +121,9 @@ export async function setPingAt(meterId: string, pingAt: number | null) {
 }
 
 export async function deleteGame(id: string) {
+  // LTR-8: the picture records go with the game; remove the files too. Best effort: a leftover file
+  // only takes up space, so it never blocks deleting the game.
+  await removeGameImages(id).catch(() => {})
   const { error } = await supabase.from('games').delete().eq('id', id)
   if (error) throw error
 }

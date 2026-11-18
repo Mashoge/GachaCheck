@@ -9,6 +9,8 @@ import { useNow } from '../lib/useNow'
 import { overCapBy } from '../lib/stamina'
 import { SHORT_NAMES } from '../lib/useGames'
 import { RosterMotif } from '../components/RosterMotif'
+import { RosterArt } from '../components/RosterArt'
+import { useCharacterImages } from '../lib/useCharacterImages'
 
 // Small colour cue per game; the only game-specific colour in the neutral look.
 const DOT: Record<string, string> = { genshin: 'bg-game-genshin', wuwa: 'bg-game-wuwa', nte: 'bg-game-nte' }
@@ -18,6 +20,7 @@ export default function TodayPage() {
   const { data, error, loading, addCompletion, removeCompletions, setMeterValue, setSkipped } = useTodayData()
   const now = useNow()
   const today = data ? buildToday(data, now) : null
+  const { images: characterImages } = useCharacterImages() // LTR-8: your own pictures for the roster cards
 
   // Bulk undo state lives above the route switch, so it survives navigation between tabs.
   const { batches, begin, complete, dismiss, dismissPrompt } = useBulkUndo()
@@ -142,13 +145,14 @@ export default function TodayPage() {
                     data-game={card.presetId}
                     className="gc-roster-card flex min-w-0 flex-[1_1_300px] flex-col overflow-hidden transition-colors has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-accent"
                   >
-                    <div className="gc-roster group/open relative isolate flex flex-1 flex-col gap-3 overflow-hidden p-4 transition-colors hover:bg-raised">
+                    <div data-art={characterImages[card.id]?.length ? '' : undefined} className="gc-roster group/open relative isolate flex flex-1 flex-col gap-3 overflow-hidden p-4 transition-colors hover:bg-raised">
                       {/* THM-6 roster layers: decoration only, behind the text */}
                       <span aria-hidden="true" className="gc-roster-bg" />
                       <span aria-hidden="true" className="gc-roster-flash" />
                       <span aria-hidden="true" className="gc-roster-title" style={{ '--len': (SHORT_NAMES[card.presetId] ?? card.name).length } as CSSProperties}>
                         {SHORT_NAMES[card.presetId] ?? card.name}
                       </span>
+                      <RosterArt images={characterImages[card.id] ?? []} />
                       <RosterMotif game={card.presetId} />
                       <span className="flex items-center gap-2">
                         <span aria-hidden="true" className={`size-2.5 rounded-[3px] ${dot(card.presetId)}`} />

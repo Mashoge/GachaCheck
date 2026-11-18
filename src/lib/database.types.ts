@@ -113,6 +113,48 @@ export type Database = {
         }
         Relationships: []
       }
+      // Added by hand to match migration 20261118130000_character_images.sql (LTR-8)
+      character_images: {
+        Row: {
+          created_at: string
+          focus_x: number
+          focus_y: number
+          game_id: string
+          id: string
+          path: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          focus_x?: number
+          focus_y?: number
+          game_id: string
+          id?: string
+          path: string
+          sort_order?: number
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          focus_x?: number
+          focus_y?: number
+          game_id?: string
+          id?: string
+          path?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_images_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       completions: {
         Row: {
           amount: number
