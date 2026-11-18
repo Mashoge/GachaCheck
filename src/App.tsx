@@ -7,13 +7,39 @@ import AppShell from './components/AppShell'
 import BulkUndoProvider from './components/bulkUndo/BulkUndoProvider'
 import { ConfirmProvider, Loading } from './components/ui'
 import { usePwaInstall } from './lib/usePwaInstall'
+import { prefetchAppData } from './lib/appData'
 
-// Each page loads when it's first opened, so the app starts faster on a phone
-const TodayPage = lazy(() => import('./pages/TodayPage'))
-const GamePage = lazy(() => import('./pages/GamePage'))
-const EventsPage = lazy(() => import('./pages/EventsPage'))
-const RemindersPage = lazy(() => import('./pages/RemindersPage'))
-const GamesScreen = lazy(() => import('./components/GamesScreen'))
+// Each page's code is a separate download, so the app starts faster on a phone. Once signed in, the
+// rest (code and data) are fetched in the background while the browser is idle (THM-10), so opening a
+// page for the first time doesn't wait either. Data saver skips that and loads each page when opened.
+const pages = {
+  today: () => import('./pages/TodayPage'),
+  game: () => import('./pages/GamePage'),
+  events: () => import('./pages/EventsPage'),
+  reminders: () => import('./pages/RemindersPage'),
+  games: () => import('./components/GamesScreen'),
+}
+const TodayPage = lazy(pages.today)
+const GamePage = lazy(pages.game)
+const EventsPage = lazy(pages.events)
+const RemindersPage = lazy(pages.reminders)
+const GamesScreen = lazy(pages.games)
+
+function usePrefetchPages(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled || document.documentElement.hasAttribute('data-saver')) return
+    const fetchAll = () => {
+      for (const load of Object.values(pages)) void load().catch(() => {}) // a failed fetch retries when opened
+      prefetchAppData() // and their data, so the first visit to each page is instant too
+    }
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(fetchAll, { timeout: 4000 })
+      return () => window.cancelIdleCallback(id)
+    }
+    const timer = setTimeout(fetchAll, 1500)
+    return () => clearTimeout(timer)
+  }, [enabled])
+}
 
 const page = (element: ReactNode) => <Suspense fallback={<Loading />}>{element}</Suspense>
 
@@ -31,6 +57,8 @@ export default function App() {
     const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next))
     return () => data.subscription.unsubscribe()
   }, [])
+
+  usePrefetchPages(!!session)
 
   if (!ready) return null
   if (!session) return <Login />

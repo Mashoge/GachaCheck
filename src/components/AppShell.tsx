@@ -6,6 +6,9 @@ import type { usePwaInstall } from '../lib/usePwaInstall'
 import { useDataSaver } from '../lib/dataSaver'
 import { forgetPictureLinks } from '../lib/characterImages'
 import { pageTransitionClass } from '../lib/pageTransition'
+import { usePageLoading } from '../lib/pageLoading'
+import { forgetAppData } from '../lib/appData'
+import { LoadingCurtain } from './LoadingCurtain'
 
 type NavItem = { to: string; label: string; icon: ReactNode }
 
@@ -26,6 +29,9 @@ export default function AppShell({ email, pwaInstall }: { email: string; pwaInst
     document.documentElement.toggleAttribute('data-saver', dataSaver.on)
   }, [dataSaver.on])
 
+  // THM-10: game pages open with their flourish, and any page that is loading gets the loading screen
+  const pageLoading = usePageLoading()
+
   // Game pages belong to Today
   const isActive = (to: string) =>
     to === '/' ? pathname === '/' || pathname.startsWith('/game/') : pathname.startsWith(to)
@@ -34,7 +40,7 @@ export default function AppShell({ email, pwaInstall }: { email: string; pwaInst
     <div className="min-h-screen">
       {/* THM-9: the page backdrop (index.css) */}
       <div aria-hidden="true" className="gc-backdrop" />
-      <header className="border-b border-line bg-surface/85 pt-[env(safe-area-inset-top)]">
+      <header className="gc-shell-top relative z-40 border-b border-line bg-surface/85 pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3">
           <div className="flex items-center gap-7">
             <span className="font-display text-xl font-bold">GachaCheck</span>
@@ -60,7 +66,7 @@ export default function AppShell({ email, pwaInstall }: { email: string; pwaInst
                 Install
               </Button>
             )}
-            <Button className="min-h-11" onClick={() => { forgetPictureLinks(); void supabase.auth.signOut() }}>Sign out</Button>
+            <Button className="min-h-11" onClick={() => { forgetPictureLinks(); forgetAppData(); void supabase.auth.signOut() }}>Sign out</Button>
             <span className="sr-only" role="status" aria-live="polite">{status}</span>
           </div>
         </div>
@@ -77,8 +83,9 @@ export default function AppShell({ email, pwaInstall }: { email: string; pwaInst
           </div>
         </ViewTransition>
       </main>
+      <LoadingCurtain pathname={pathname} loading={pageLoading} />
 
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-line bg-surface px-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-1.5 md:hidden">
+      <nav aria-label="Main" className="gc-shell-bottom fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-line bg-surface px-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-1.5 md:hidden">
         {NAV.map((item) => (
           <NavLink
             key={item.to}

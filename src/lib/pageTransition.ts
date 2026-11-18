@@ -4,7 +4,13 @@
 // <ViewTransition> in AppShell), and browsers without them simply switch pages.
 const GAMES = new Set(['genshin', 'wuwa', 'nte'])
 
-export function pageTransitionClass(pathname: string): string {
+/** The game whose page this is ('genshin', 'wuwa' or 'nte'), or null. */
+export function gameOfPath(pathname: string): string | null {
   const game = /^\/game\/([^/]+)/.exec(pathname)?.[1]
-  return game && GAMES.has(game) ? `gc-page-${game}` : 'gc-page'
+  return game && GAMES.has(game) ? game : null
+}
+
+export function pageTransitionClass(pathname: string): string {
+  const game = gameOfPath(pathname)
+  return game ? `gc-page-${game}` : 'gc-page'
 }

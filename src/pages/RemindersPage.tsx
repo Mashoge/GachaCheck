@@ -1,31 +1,15 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { messageOf } from '../lib/errors'
 import { supabase } from '../lib/supabase'
 import { formatDuration, formatWhen } from '../lib/time'
 import { useNow } from '../lib/useNow'
-import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
+import { useShared } from '../lib/useShared'
+import { reminderData, type GameSwitches, type Settings } from '../lib/reminderSettings'
 import { GameIcon } from '../components/GameIcon'
 import { buttonClass, ChevronIcon, Input, Loading, Notice, PageTitle, Select, SheetRow, Switch } from '../components/ui'
 import { useGameIcons } from '../lib/useGameIcons'
 
-type Settings = {
-  user_id: string
-  timezone: string
-  nudge_enabled: boolean
-  nudge_time: string
-  quiet_start: string | null
-  quiet_end: string | null
-  work_start: string | null
-  work_end: string | null
-  work_days: number[]
-  event_reminder_days: number
-  last_reminder_run_at: string | null
-}
-
-type GameSwitches = { id: string; name: string; preset_id: string | null; icon_path: string | null; notify_nudge: boolean; notify_stamina: boolean; notify_events: boolean }
-
-const SETTINGS_COLUMNS = 'user_id, timezone, nudge_enabled, nudge_time, quiet_start, quiet_end, work_start, work_end, work_days, event_reminder_days, last_reminder_run_at'
 // Work days, shown Monday first. Stored as 0 = Sunday ... 6 = Saturday, like a game's weekly reset day.
 const WORK_DAYS = [
   { day: 1, short: 'Mon', long: 'Monday' }, { day: 2, short: 'Tue', long: 'Tuesday' }, { day: 3, short: 'Wed', long: 'Wednesday' },
@@ -36,69 +20,28 @@ const EVENT_DAY_CHOICES = [0, 1, 2, 3, 5, 7]
 const STALE_AFTER_MS = 45 * 60_000 // the schedule runs every 15 minutes
 const hhmm = (time: string | null) => (time ?? '').slice(0, 5)
 
-async function load() {
-  const [settingsRes, gamesRes] = await Promise.all([
-    supabase.from('user_settings').select(SETTINGS_COLUMNS).maybeSingle(),
-    supabase.from('games').select('id, name, preset_id, icon_path, notify_nudge, notify_stamina, notify_events').order('created_at'),
-  ])
-  if (settingsRes.error) throw settingsRes.error
-  if (gamesRes.error) throw gamesRes.error
-  return { settings: settingsRes.data as Settings | null, games: gamesRes.data as GameSwitches[] }
-}
+const NO_GAMES: GameSwitches[] = []
 
 export default function RemindersPage() {
   const now = useNow()
-  const [settings, setSettings] = useState<Settings | null>(null)
-  const [games, setGames] = useState<GameSwitches[]>([])
-  const [loaded, setLoaded] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // THM-10: the shared copy (reminderSettings.ts), so this page opens at once after the first visit
+  const { data, error, setError, refresh: reload } = useShared(reminderData)
+  const settings = data?.settings ?? null
+  const games = data?.games ?? NO_GAMES
+  const loaded = data !== null || error !== null
   const icons = useGameIcons(games)
+  const refresh = useCallback(() => reload().catch(() => {}), [reload])
 
-  const refresh = useCallback(async () => {
-    try {
-      const data = await load()
-      setSettings(data.settings)
-      setGames(data.games)
-      setError(null)
-    } catch (err) {
-      setError(messageOf(err))
-    }
-    setLoaded(true)
-  }, [])
-  useRefreshOnFocus(refresh)
-
-  // Load asynchronously after the effect has completed, and ignore responses after unmount.
-  // The same loader also refreshes the reminder status every five minutes.
+  // The status line also refreshes every five minutes while the page is open
   useEffect(() => {
-    let active = true
-    const refreshWhileMounted = () => {
-      void load()
-        .then((data) => {
-          if (!active) return
-          setSettings(data.settings)
-          setGames(data.games)
-          setError(null)
-        })
-        .catch((err: unknown) => {
-          if (active) setError(messageOf(err))
-        })
-        .finally(() => {
-          if (active) setLoaded(true)
-        })
-    }
-
-    refreshWhileMounted()
-    const id = setInterval(refreshWhileMounted, 5 * 60_000)
-    return () => {
-      active = false
-      clearInterval(id)
-    }
-  }, [])
+    const id = setInterval(() => void refresh(), 5 * 60_000)
+    return () => clearInterval(id)
+  }, [refresh])
 
   // Show the change straight away, save it, and reload if saving fails.
   const saveSettings = async (patch: Partial<Settings>) => {
     if (!settings) return
-    setSettings({ ...settings, ...patch })
+    reminderData.change((d) => (d.settings ? { ...d, settings: { ...d.settings, ...patch } } : d))
     const { error: err } = await supabase.from('user_settings').update(patch).eq('user_id', settings.user_id)
     if (err) {
       setError(messageOf(err))
@@ -107,7 +50,7 @@ export default function RemindersPage() {
   }
 
   const saveGame = async (id: string, patch: Partial<GameSwitches>) => {
-    setGames((list) => list.map((g) => (g.id === id ? { ...g, ...patch } : g)))
+    reminderData.change((d) => ({ ...d, games: d.games.map((g) => (g.id === id ? { ...g, ...patch } : g)) }))
     const { error: err } = await supabase.from('games').update(patch).eq('id', id)
     if (err) {
       setError(messageOf(err))

@@ -1,3 +1,4 @@
+import { createShared } from './shared'
 import { supabase } from './supabase'
 import { removeGameImages } from './characterImages'
 import { nextCustomTaskSortOrder } from './taskOrdering'
@@ -84,6 +85,9 @@ export async function syncOutdatedGames(games: GameSummary[]) {
 }
 
 /** Fetch games, syncing any outdated ones first. */
+/** THM-10: one shared copy of your games for the Games page (shared.ts); refreshed when it opens. */
+export const gamesData = createShared(() => loadGames())
+
 export async function loadGames() {
   const first = await fetchGames()
   if (first.error) throw first.error

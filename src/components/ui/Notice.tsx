@@ -1,3 +1,4 @@
+import { useReportLoading } from '../../lib/pageLoading'
 import type { ReactNode } from 'react'
 import { cx } from './cx'
 
@@ -10,7 +11,12 @@ export function Notice({ tone = 'info', size = 'sm', className, children }: { to
   )
 }
 
-/** "Loading…" while a page fetches; announced politely. */
+/**
+ * "Loading…" while a page fetches; announced politely. Use it for a whole page only: while it is on
+ * screen the page counts as loading, and AppShell covers the wait with its loading screen (THM-10).
+ */
 export function Loading({ children = 'Loading…' }: { children?: ReactNode }) {
-  return <p role="status" className="text-muted">{children}</p>
+  useReportLoading()
+  // Read out by screen readers; shown only where the loading screen is off (gc-loading-text in index.css)
+  return <p role="status" className="gc-loading-text text-muted">{children}</p>
 }

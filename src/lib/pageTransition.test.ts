@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pageTransitionClass } from './pageTransition'
+import { gameOfPath, pageTransitionClass } from './pageTransition'
 
 describe('page entrances (THM-10)', () => {
   it('gives each game page its own entrance', () => {
@@ -12,5 +12,12 @@ describe('page entrances (THM-10)', () => {
     for (const path of ['/', '/games', '/events', '/reminders', '/game/other', '/gamestuff']) {
       expect(pageTransitionClass(path)).toBe('gc-page')
     }
+  })
+
+
+  it('knows which game a page belongs to', () => {
+    expect(gameOfPath('/game/wuwa')).toBe('wuwa')
+    expect(gameOfPath('/game/other')).toBeNull()
+    expect(gameOfPath('/events')).toBeNull()
   })
 })

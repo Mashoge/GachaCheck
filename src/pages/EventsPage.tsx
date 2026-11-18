@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router'
 import { messageOf } from '../lib/errors'
 import {
-  addEvent, addEvents, deleteEvent, fetchEvents, fetchHiddenEvents, fetchShowWebEvents, hideEvent, restoreEvent, setEventDone, setShowWebEvents, updateEvent,
+  addEvent, addEvents, deleteEvent, eventsData, hideEvent, restoreEvent, setEventDone, setShowWebEvents, updateEvent,
   type EventInput, type GameEvent,
 } from '../lib/events'
-import { hiddenFromEvent, hiddenMatch, toHiddenEvents, type HiddenEvent, type HiddenRows } from '../lib/hiddenEvents'
+import { hiddenFromEvent, hiddenMatch, toHiddenEvents, type HiddenEvent } from '../lib/hiddenEvents'
 import { formatWhen } from '../lib/time'
 import { useTodayData, type Game } from '../lib/today'
 import { SHORT_NAMES } from '../lib/useGames'
 import EventImport from './EventImport'
 import { useNow } from '../lib/useNow'
-import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
+import { useShared } from '../lib/useShared'
 import { EventCard, Section, Timeline } from './events/EventDisplay'
 import { EventForm } from './events/EventForm'
 import { GameIcon } from '../components/GameIcon'
@@ -36,56 +36,17 @@ export default function EventsPage() {
   const games = data?.games ?? []
   const icons = useGameIcons(games)
 
-  const [events, setEvents] = useState<GameEvent[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  // THM-10: the shared copy of the event lists (events.ts), so this page opens at once after the first visit
+  const { data: bundle, error, setError, refresh: reload } = useShared(eventsData)
+  const events = bundle?.events ?? null
+  const showWeb = bundle?.showWeb ?? true
+  const hiddenRows = bundle?.hidden ?? null // 'failed' = the rest of the page still works, only the hidden list is missing
   const [filter, setFilter] = useState(readFilter)
   const [form, setForm] = useState<{ mode: 'add' } | { mode: 'import' } | { mode: 'edit'; event: GameEvent } | null>(null)
   const [showDone, setShowDone] = useState(false)
-  const [showWeb, setShowWeb] = useState(true)
-  // null = still loading; 'failed' = the rest of the page still works, only the hidden list is missing
-  const [hiddenRows, setHiddenRows] = useState<HiddenRows | 'failed' | null>(null)
   const [showHidden, setShowHidden] = useState(false)
   const [justHidden, setJustHidden] = useState<HiddenEvent | null>(null)
-
-  const fetchData = useCallback(
-    () => Promise.all([fetchEvents(), fetchShowWebEvents(), fetchHiddenEvents().catch((): 'failed' => 'failed')]),
-    [],
-  )
-
-  const refresh = useCallback(async () => {
-    try {
-      const [list, web, hidden] = await fetchData()
-      setEvents(list)
-      setShowWeb(web)
-      setHiddenRows(hidden)
-      setError(null)
-    } catch (err) {
-      setError(messageOf(err))
-    }
-  }, [fetchData])
-  useRefreshOnFocus(refresh)
-
-  useEffect(() => {
-    let active = true
-    const load = () => {
-      void fetchData()
-        .then(([list, web, hidden]) => {
-          if (!active) return
-          setEvents(list)
-          setShowWeb(web)
-          setHiddenRows(hidden)
-          setError(null)
-        })
-        .catch((err: unknown) => {
-          if (active) setError(messageOf(err))
-        })
-    }
-
-    load()
-    return () => {
-      active = false
-    }
-  }, [fetchData])
+  const refresh = useCallback(() => reload().catch(() => {}), [reload])
 
   const chooseFilter = (value: string) => {
     setFilter(value)
@@ -253,7 +214,7 @@ export default function EventsPage() {
                 label="Show web events (all games)"
                 on={showWeb}
                 onChange={(next) => {
-                  setShowWeb(next)
+                  eventsData.change((b) => ({ ...b, showWeb: next }))
                   void run(() => setShowWebEvents(next))
                 }}
               />

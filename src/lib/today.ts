@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { supabase } from './supabase'
 import { loadGames, type GameSummary } from './games'
 import { messageOf } from './errors'
@@ -6,6 +6,7 @@ import { meterStates, overCapBy, pingThreshold, type MeterState } from './stamin
 import { dailyPeriod, formatDuration, formatWhen, type ResetClock } from './time'
 import { progress } from '../../supabase/functions/_shared/progress.ts'
 import { useRefreshOnFocus } from './useRefreshOnFocus'
+import { createShared } from './shared'
 import { groupCompletionRows, nonResettingTaskIds, type CompletionRow } from './completionHistory'
 
 export type Game = GameSummary
@@ -87,19 +88,21 @@ async function loadToday(): Promise<TodayData> {
   return { games, completions, events: started }
 }
 
+// THM-10: Today, the game pages and Events share one copy of this data (shared.ts), so moving between
+// them shows it at once instead of "Loading…"; each page still loads a fresh copy in the background.
+const todayData = createShared(loadToday)
+/** Forget the shared copy on sign-out, so the next account never sees it. */
+export const forgetTodayData = () => todayData.clear()
+
 export function useTodayData() {
-  const [data, setData] = useState<TodayData | null>(null)
+  const data = useSyncExternalStore(todayData.subscribe, todayData.get)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    loadToday()
-      .then((d) => {
-        if (!cancelled) setData(d)
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(messageOf(err))
-      })
+    todayData.refresh().catch((err: unknown) => {
+      if (!cancelled) setError(messageOf(err))
+    })
     return () => {
       cancelled = true
     }
@@ -107,7 +110,7 @@ export function useTodayData() {
 
   const refresh = useCallback(async () => {
     try {
-      setData(await loadToday())
+      await todayData.refresh()
       setError(null)
     } catch (err) {
       setError(messageOf(err))
@@ -115,10 +118,10 @@ export function useTodayData() {
   }, [])
   useRefreshOnFocus(refresh)
 
-  // Change the local copy right away so ticks feel instant; the server call follows.
+  // Change the shared copy right away so ticks feel instant; the server call follows.
+  const setData = useCallback((fn: (d: TodayData) => TodayData) => todayData.change(fn), [])
   const patchCompletions = useCallback((taskId: string, change: (list: Completion[]) => Completion[]) => {
-    setData((d) => {
-      if (!d) return d
+    todayData.change((d) => {
       const completions = new Map(d.completions)
       completions.set(taskId, change(d.completions.get(taskId) ?? []))
       return { ...d, completions }
@@ -181,8 +184,7 @@ export function useTodayData() {
         ...children.map((c) => ({ id: c.id, current_value: states.find((s) => s.id === c.id)?.value ?? c.current_value })),
         { id: meterId, current_value: Math.max(0, Math.round(value)) },
       ]
-      setData((d) =>
-        d && {
+      setData((d) => ({
           ...d,
           games: d.games.map((g) =>
             g.id !== game.id
@@ -195,7 +197,7 @@ export function useTodayData() {
                   }),
                 },
           ),
-        },
+        }),
       )
       try {
         for (const u of updates) {
@@ -210,14 +212,14 @@ export function useTodayData() {
         await refresh()
       }
     },
-    [refresh],
+    [refresh, setData],
   )
 
   // TOD-7: rest a game until its next daily reset, or bring it back. The local copy changes at once.
   const setSkipped = useCallback(
     async (game: Game, skip: boolean) => {
       const until = skip ? dailyPeriod(clockOf(game), new Date()).end!.toISOString() : null
-      setData((d) => d && { ...d, games: d.games.map((g) => (g.id === game.id ? { ...g, skipped_until: until } : g)) })
+      setData((d) => ({ ...d, games: d.games.map((g) => (g.id === game.id ? { ...g, skipped_until: until } : g)) }))
       try {
         const { error: err } = await supabase.from('games').update({ skipped_until: until }).eq('id', game.id)
         if (err) throw err
@@ -226,7 +228,7 @@ export function useTodayData() {
         await refresh()
       }
     },
-    [refresh],
+    [refresh, setData],
   )
 
   return { data, error, loading: !data && !error, refresh, addCompletion, removeCompletions, setMeterValue, setSkipped }

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { createShared } from './shared'
 import type { HiddenEvent, HiddenRows } from './hiddenEvents'
 
 export type GameEvent = {
@@ -147,3 +148,15 @@ export async function setShowWebEvents(show: boolean) {
   const { error } = await supabase.from('user_settings').update({ show_web_events: show }).eq('user_id', userId)
   if (error) throw error
 }
+
+// THM-10: one shared copy of the Events page's lists (shared.ts), so the page opens at once after the
+// first visit. The hidden list is optional: if it fails, the rest still shows.
+export type EventsBundle = { events: GameEvent[]; showWeb: boolean; hidden: HiddenRows | 'failed' }
+export const eventsData = createShared<EventsBundle>(async () => {
+  const [events, showWeb, hidden] = await Promise.all([
+    fetchEvents(),
+    fetchShowWebEvents(),
+    fetchHiddenEvents().catch((): 'failed' => 'failed'),
+  ])
+  return { events, showWeb, hidden }
+})

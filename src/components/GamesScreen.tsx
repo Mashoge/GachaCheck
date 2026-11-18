@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PRESETS, findPreset, findServer, type GamePreset } from '../data/presets'
-import { addGameFromPreset, changeServer, deleteGame, loadGames, setPingAt, type GameSummary } from '../lib/games'
+import { addGameFromPreset, changeServer, deleteGame, gamesData, setPingAt, type GameSummary } from '../lib/games'
 import { messageOf } from '../lib/errors'
-import { useRefreshOnFocus } from '../lib/useRefreshOnFocus'
+import { useShared } from '../lib/useShared'
 import TaskManager from './TaskManager'
 import CharacterPictures from './CharacterPictures'
 import { ACCEPT, MAX_PER_GAME, fetchCharacterImages, removeGameIcon, setGameIcon, type CharacterImage } from '../lib/characterImages'
@@ -13,11 +13,14 @@ import { formatDuration } from '../lib/time'
 import { Button, ChevronIcon, EditIcon, Input, Loading, Notice, PageTitle, Select, SheetRow, Switch, useConfirm } from './ui'
 import { setDataSaver, useDataSaver } from '../lib/dataSaver'
 
+const NO_GAMES: GameSummary[] = []
+
 export default function GamesScreen() {
-  const [games, setGames] = useState<GameSummary[]>([])
-  const [loading, setLoading] = useState(true)
+  // THM-10: the shared copy of your games (games.ts), so this page opens at once after the first visit
+  const { data: loaded, error, setError, refresh } = useShared(gamesData)
+  const games = loaded ?? NO_GAMES
+  const loading = loaded === null && !error
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [serverChoice, setServerChoice] = useState<Record<string, string>>({})
   const [openId, setOpenId] = useState<string | null>(null)
   const [picsOpenId, setPicsOpenId] = useState<string | null>(null)
@@ -27,16 +30,6 @@ export default function GamesScreen() {
 
   useEffect(() => {
     let cancelled = false
-    loadGames()
-      .then((data) => {
-        if (!cancelled) setGames(data)
-      })
-      .catch((err) => {
-        if (!cancelled) setError(messageOf(err))
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
     // LTR-8: pictures are optional; if they fail to load, the rest of the screen still works
     fetchCharacterImages()
       .then((list) => {
@@ -51,17 +44,6 @@ export default function GamesScreen() {
   const refreshImages = useCallback(async () => {
     setImages(await fetchCharacterImages())
   }, [])
-
-  const refresh = useCallback(async () => {
-    try {
-      setGames(await loadGames())
-      setError(null)
-    } catch (err) {
-      setError(messageOf(err))
-      throw err
-    }
-  }, [])
-  useRefreshOnFocus(refresh)
 
   async function run(id: string, action: () => Promise<void>) {
     setBusyId(id)
