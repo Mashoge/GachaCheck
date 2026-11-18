@@ -300,10 +300,10 @@ export default function GamesScreen() {
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-/** Opens or closes a panel under its row; the chevron turns down while open. */
+/** Opens or closes a panel under its row; the chevron turns down while open. Stays on the right when it wraps. */
 function Toggle({ open, label, gameName, onClick }: { open: boolean; label: string; gameName: string; onClick: () => void }) {
   return (
-    <Button size="sm" aria-expanded={open} aria-label={`${label}, ${gameName}`} onClick={onClick}>
+    <Button size="sm" className="ml-auto" aria-expanded={open} aria-label={`${label}, ${gameName}`} onClick={onClick}>
       {label}
       <span className={`transition-transform ${open ? 'rotate-90' : ''}`}><ChevronIcon size={14} /></span>
     </Button>
@@ -405,7 +405,7 @@ function PingAtField({ id, name, cap, value, disabled, onSave }: {
   }
 
   return (
-    <span className="flex flex-col items-end gap-1">
+    <span className="ml-auto flex flex-col items-end gap-1">
       <span className="flex items-center gap-2 text-sm text-muted">
         <label htmlFor={id} className="gc-label">Ping at</label>
         <Input
