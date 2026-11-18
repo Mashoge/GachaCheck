@@ -155,7 +155,10 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
         {/* Daily, Weekly, Monthly */}
         <div className="flex flex-col gap-6 [grid-area:checklist]">
           {groups.map((group) => {
-            const done = group.items.filter((t) => progressOf(t).doneForNow).length
+            // Counted the same way as Today: optional tasks are listed but not counted (THM-8)
+            const required = group.items.filter((t) => !t.optional)
+            const done = required.filter((t) => progressOf(t).doneForNow).length
+            const optionalCount = group.items.length - required.length
             // A task that is waiting for its stamina value stays visible until that is answered
             const shown = quick ? group.items.filter((t) => !progressOf(t).doneForNow || t.id === askFor) : group.items
             return (
@@ -173,7 +176,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
                         All done
                       </Button>
                     )}
-                    {done} / {group.items.length} done
+                    {done} / {required.length} done{optionalCount > 0 && ` · ${optionalCount} optional`}
                   </span>
                 </div>
                 {shown.map((t) =>

@@ -1,46 +1,27 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CharacterImage } from '../lib/characterImages'
 import { useMedia } from '../lib/useMedia'
 
-// LTR-8 on the THM-6 roster cards: your own character pictures, behind the text on the card's right side.
-// They appear when the card wakes up (CSS in index.css) and take turns every few seconds while it stays
-// awake; each new visit starts with the next character. Decoration only, so hidden from screen readers.
+// LTR-8 on the Today cards: your own character pictures, behind the text on the card's right side.
+// They appear when the card wakes up (TodayCard.tsx, CSS in index.css) and take turns every few seconds
+// while it stays awake; each new visit starts with the next character. Decoration only, so hidden from
+// screen readers.
 const TURN_MS = 3500
 
-export function RosterArt({ images }: { images: CharacterImage[] }) {
-  const ref = useRef<HTMLSpanElement>(null)
+export function RosterArt({ images, awake }: { images: CharacterImage[]; awake: boolean }) {
   const [broken, setBroken] = useState<Set<string>>(() => new Set())
   const shown = images.filter((img) => img.url && !broken.has(img.id))
   const count = shown.length
   const [turn, setTurn] = useState(0)
-  const [awake, setAwake] = useState(false)
+  const [visits, setVisits] = useState(0)
   const still = useMedia('(prefers-reduced-motion: reduce)')
 
-  // Follow the card's own wake-up: mouse hover or keyboard focus inside it
-  useEffect(() => {
-    const card = ref.current?.parentElement
-    if (!card || count === 0) return
-    let visited = false
-    const wake = () => {
-      if (visited) setTurn((t) => t + 1) // a new visit shows the next character
-      visited = true
-      setAwake(true)
-    }
-    const sleep = () => setAwake(false)
-    const enter = (e: PointerEvent) => { if (e.pointerType === 'mouse') wake() }
-    const leave = (e: PointerEvent) => { if (e.pointerType === 'mouse') sleep() }
-    const focusOut = (e: FocusEvent) => { if (!card.contains(e.relatedTarget as Node | null)) sleep() }
-    card.addEventListener('pointerenter', enter)
-    card.addEventListener('pointerleave', leave)
-    card.addEventListener('focusin', wake)
-    card.addEventListener('focusout', focusOut)
-    return () => {
-      card.removeEventListener('pointerenter', enter)
-      card.removeEventListener('pointerleave', leave)
-      card.removeEventListener('focusin', wake)
-      card.removeEventListener('focusout', focusOut)
-    }
-  }, [count])
+  // Each new visit starts with the next character
+  const [wasAwake, setWasAwake] = useState(awake)
+  if (awake !== wasAwake) {
+    setWasAwake(awake)
+    if (awake) setVisits((v) => v + 1)
+  }
 
   // Take turns while awake (not with reduced motion: then the picture just stays)
   useEffect(() => {
@@ -50,9 +31,9 @@ export function RosterArt({ images }: { images: CharacterImage[] }) {
   }, [awake, still, count])
 
   if (count === 0) return null
-  const current = turn % count
+  const current = (Math.max(0, visits - 1) + turn) % count
   return (
-    <span ref={ref} aria-hidden="true" className="gc-roster-art">
+    <span aria-hidden="true" className="gc-roster-art">
       {shown.map((img, i) => (
         <img
           key={img.id}

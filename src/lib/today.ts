@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 import { loadGames, type GameSummary } from './games'
 import { messageOf } from './errors'
 import { meterStates, overCapBy, pingThreshold, type MeterState } from './stamina'
-import { dailyPeriod, formatWhen, type ResetClock } from './time'
+import { dailyPeriod, formatDuration, formatWhen, type ResetClock } from './time'
 import { progress } from '../../supabase/functions/_shared/progress.ts'
 import { useRefreshOnFocus } from './useRefreshOnFocus'
 import { groupCompletionRows, nonResettingTaskIds, type CompletionRow } from './completionHistory'
@@ -256,8 +256,41 @@ export type GameCard = {
   dailyDone: number
   dailyTotal: number
   meter: MeterState | null
-  note: { text: string; at: Date | null; soon: boolean } | null
+  note: { text: string; title: string; at: Date | null; soon: boolean } | null // the soonest endgame not cleared
   skipped: boolean // resting today: left out of daily progress and the "dailies left" row
+  weeklyDone: number
+  weeklyTotal: number
+  overflow: MeterState | null // a meter that fills once the main one is full (WuWa's Waveplate Crystals)
+  meterSoon: boolean // the main meter is at its ping threshold (SUP-3) but not full yet
+  hasEndgame: boolean
+}
+
+// ---- Which number leads a Today card (THM-8) ----
+
+export const DAILY_RUSH_MS = 3 * 3_600_000
+
+/**
+ * The card's big number is usually the stamina meter. In the last 3 hours before the daily reset, with
+ * dailies still left, it becomes the dailies: those rewards are lost at reset, while a capping meter only
+ * wastes refill. A resting game (TOD-7) always shows its meter.
+ */
+export function cardHeadline(card: Pick<GameCard, 'meter' | 'skipped' | 'dailyDone' | 'dailyTotal' | 'resetAt'>, now: Date): 'meter' | 'dailies' {
+  if (!card.meter) return 'dailies'
+  const rush = card.resetAt.getTime() - now.getTime() <= DAILY_RUSH_MS
+  return !card.skipped && card.dailyDone < card.dailyTotal && rush ? 'dailies' : 'meter'
+}
+
+/** The short tag next to the meter's name: when it fills, and whether that needs you soon. */
+export function meterTag(card: Pick<GameCard, 'meter' | 'meterSoon'>, now: Date): { text: string; urgent: boolean } | null {
+  const m = card.meter
+  if (!m) return null
+  if (m.full) {
+    const over = overCapBy(m)
+    return { text: over > 0 ? `Above cap +${over}` : 'Full now', urgent: true }
+  }
+  if (!m.fullAt) return null
+  if (card.meterSoon) return { text: `Caps in ${formatDuration(m.fullAt.getTime() - now.getTime())}`, urgent: true }
+  return { text: `Full ${formatWhen(m.fullAt, now).replace(/^tomorrow\b/, 'tmrw')}`, urgent: false }
 }
 
 const DAY = 86_400_000
@@ -289,8 +322,15 @@ export function buildToday(data: TodayData, now: Date) {
       })
     }
 
+    // Weeklies (THM-8: the card's "This week" line)
+    const weeklies = game.tasks.filter((t) => t.frequency === 'weekly' && counted(t))
+    const weeklyDone = weeklies.filter(doneFor).length
+
     // Stamina: full, or at its ping threshold (SUP-3; default within 10% of cap)
     const meters = meterStates(game.stamina_meters, now)
+    const main = meters.find((m) => !m.isOverflow) ?? null
+    const mainRow = main ? game.stamina_meters.find((r) => r.id === main.id) : undefined
+    const meterSoon = !!main && !main.full && !!mainRow && main.value >= pingThreshold(mainRow)
     for (const m of meters) {
       const threshold = pingThreshold(game.stamina_meters.find((r) => r.id === m.id) ?? m)
       if (m.full) {
@@ -313,7 +353,7 @@ export function buildToday(data: TodayData, now: Date) {
         attention.push({ key: t.id, presetId, gameName: game.name, title: `${t.title} not cleared`, at, urgent: true })
       }
       if (!soonest || (soonest.at && at < soonest.at)) {
-        soonest = { text: `${t.title} not cleared`, at, soon: at.getTime() - now.getTime() < 3 * DAY }
+        soonest = { text: `${t.title} not cleared`, title: t.title, at, soon: at.getTime() - now.getTime() < 3 * DAY }
       }
     }
 
@@ -328,9 +368,13 @@ export function buildToday(data: TodayData, now: Date) {
     cards.push({
       id: game.id, presetId, name: game.name, resetAt: day.end!,
       dailyDone, dailyTotal: dailies.length,
-      meter: meters.find((m) => !m.isOverflow) ?? null,
+      meter: main,
       note: soonest,
       skipped,
+      weeklyDone, weeklyTotal: weeklies.length,
+      overflow: meters.find((m) => m.isOverflow) ?? null,
+      meterSoon,
+      hasEndgame: game.tasks.some((x) => x.category === 'endgame' && isVisible(x)),
     })
   }
 

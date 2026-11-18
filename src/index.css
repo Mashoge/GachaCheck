@@ -102,154 +102,230 @@
   }
 }
 
-/* ---------------------------------------------------------------------------------------------
-   THM-6: Today "roster" cards. On hover (mouse), keyboard focus on the card link, or a press on a
-   touch screen, a game card wakes up in its game's colours: a pale flash, a colour wipe, its name
-   as a giant outline and an original line motif (RosterMotif.tsx). Everything is decoration
-   behind the text, so the numbers stay on top and readable. Original shapes and the app's own
-   fonts only: no official logos, art or game fonts (THM-2).
-   --------------------------------------------------------------------------------------------- */
-.gc-roster-card {
-  --ga: var(--color-accent);     /* the game's colour (the same one as its dot on Today) */
-  --g1: var(--color-raised);     /* background wipe: gradient start */
-  --g2: var(--color-surface);    /*                  gradient end */
-}
-.gc-roster-card[data-game="genshin"] { --ga: var(--color-game-genshin); --g1: #1b2442; --g2: #0e1222; } /* night sky, gold */
-.gc-roster-card[data-game="wuwa"]    { --ga: var(--color-game-wuwa);    --g1: #0f2729; --g2: #0a1213; } /* deep sea, teal */
-.gc-roster-card[data-game="nte"]     { --ga: var(--color-game-nte);     --g1: #2b0c20; --g2: #12070f; } /* neon night, pink */
+/* =============================================================================================
+   THM-8: Today cards. One GachaCheck voice at rest (shared structure, labels, slanted tags,
+   one typeface for numbers), and the card you point at wakes into its game's world: Genshin's night sky
+   and cream pills, WuWa's slate, frost and pale-gold numerals, NTE's charcoal, pink and italic snap.
+   Only one card is awake at a time (TodayCard.tsx sets data-awake on mouse hover, keyboard focus or a
+   press), and nothing on it moves; the big number turns into the game's own numerals once those fonts
+   are loaded (html[data-gamefonts], gameFonts.ts). Styled after each game's menus, drawn with our own
+   shapes and free fonts: no official logos or art. Reduced motion, Data saver and high-contrast mode
+   keep it calm (bottom of this block).
+   ============================================================================================= */
 
-.gc-roster {
-  container-type: inline-size;   /* lets the giant name size itself to this card (cqi units) */
+/* ---------- The GachaCheck voice (page and cards at rest) ---------- */
+.gc-label { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; white-space: nowrap; text-transform: uppercase; color: var(--color-muted); }
+.gc-tag {
+  display: inline-block; padding: 3px 12px; white-space: nowrap;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+  background: color-mix(in oklab, var(--color-accent) 15%, transparent); color: var(--color-accent);
 }
-.gc-roster-bg,
-.gc-roster-flash,
-.gc-roster-title,
-.gc-roster-motif {
-  position: absolute;
-  z-index: -1;                   /* behind the card's text; .gc-roster isolates its own stacking */
-  pointer-events: none;
-}
-.gc-roster-bg {
-  inset: 0;
-  background:
-    radial-gradient(120% 90% at 90% 0%, color-mix(in oklab, var(--ga) 30%, transparent), transparent 60%),
-    linear-gradient(160deg, var(--g1), var(--g2));
-  clip-path: inset(0 100% 0 0);
-  transition: clip-path 420ms var(--ease-standard);
-}
-.gc-roster-flash {
-  inset: 0;
-  background: #fff;
-  opacity: 0;
-}
-.gc-roster-title {
-  right: -0.5rem;
-  top: 50%;
-  translate: 1.5rem -50%;
-  font-family: var(--font-display);
-  font-weight: 700;
-  /* Fills the card's width whatever the name's length (--len = number of letters, set inline) */
-  font-size: min(8rem, calc(145cqi / var(--len, 7)));
-  line-height: 1;
-  letter-spacing: -0.03em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: transparent;
-  -webkit-text-stroke: 1.5px var(--ga);
-  opacity: 0;
-  transition: opacity 360ms 90ms var(--ease-standard), translate 560ms 90ms var(--ease-standard);
-}
-.gc-roster-motif {
-  left: -1.25rem;
-  bottom: -1.25rem;
-  width: 7.5rem;
-  height: 7.5rem;
-  fill: none;
-  stroke: var(--ga);
-  stroke-width: 1.2;
-  opacity: 0;
-  transition: opacity 400ms 140ms var(--ease-standard);
-}
-.gc-roster-motif .gc-pixel-on { fill: var(--ga); fill-opacity: 0.35; }
+.gc-tag[data-tone="urgent"] { background: var(--color-urgent); color: #1b0f08; }
+.gc-tag[data-tone="rest"] { background: #ffffff14; color: var(--color-muted); }
+.gc-slant-bar { height: 8px; background: var(--color-line); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+.gc-slant-bar > i { display: block; height: 100%; background: var(--color-accent); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); transition: width 0.4s var(--ease-standard); }
 
-/* Awake: mouse hover (only on devices that can hover), keyboard focus on the card link, or a press */
-@media (hover: hover) {
-  .gc-roster:hover .gc-roster-bg { clip-path: inset(0 0 0 0); }
-  .gc-roster:hover .gc-roster-flash { animation: gc-flash 380ms ease-out; }
-  .gc-roster:hover .gc-roster-title { opacity: 0.22; translate: 0 -50%; }
-  .gc-roster:hover .gc-roster-motif { opacity: 0.3; }
-  .gc-roster:hover .gc-spin { animation: gc-spin 40s linear infinite; }
-  .gc-roster:hover .gc-drift { animation: gc-drift 6s ease-in-out infinite alternate; }
-  .gc-roster:hover .gc-roster-chevron { color: var(--ga); }
-  .gc-roster-card:has(.gc-roster:hover) { border-color: color-mix(in oklab, var(--ga) 70%, transparent); }
+/* ---------- Card structure ---------- */
+.gc-card { --gc: var(--color-accent); position: relative; isolation: isolate; transition: border-color 0.35s; }
+.gc-card[data-game="genshin"] { --gc: var(--color-game-genshin); }
+.gc-card[data-game="wuwa"]    { --gc: var(--color-game-wuwa); }
+.gc-card[data-game="nte"]     { --gc: var(--color-game-nte); }
+.gc-body { position: relative; isolation: isolate; }
+.gc-skin, .gc-frame, .gc-mark, .gc-sweep, .gc-lines, .gc-spark, .gc-ticker, .gc-roster-motif, .gc-roster-art {
+  position: absolute; pointer-events: none;
 }
-.gc-roster:is(:has(a:focus-visible), :active) .gc-roster-bg { clip-path: inset(0 0 0 0); }
-.gc-roster:is(:has(a:focus-visible), :active) .gc-roster-title { opacity: 0.22; translate: 0 -50%; }
-.gc-roster:is(:has(a:focus-visible), :active) .gc-roster-motif { opacity: 0.3; }
-.gc-roster-card:has(.gc-roster a:focus-visible) { border-color: color-mix(in oklab, var(--ga) 70%, transparent); }
+.gc-skin { inset: 0; z-index: -3; opacity: 0; transition: opacity 0.45s ease; }
+.gc-card .gc-tag:not([data-tone]) { background: color-mix(in oklab, var(--gc) 16%, transparent); color: color-mix(in oklab, var(--gc) 75%, white); }
+.gc-reset, .gc-sub, .gc-endsub, .gc-label, .gc-cap { transition: color 0.35s; }
 
-/* LTR-8: your own character pictures (RosterArt.tsx) on the right, fading into the card. They sit above
-   the giant name, which steps back when a card has pictures, and below the text. */
+.gc-hero { display: flex; align-items: baseline; gap: 6px; font-size: 52px; }
+@media (min-width: 640px) { .gc-hero { font-size: 60px; } }
+.gc-numwrap { display: inline-grid; align-items: end; }
+.gc-num { grid-area: 1 / 1; justify-self: start; font-family: var(--font-display); font-weight: 700; line-height: 1; letter-spacing: -0.03em; transition: color 0.35s, text-shadow 0.35s; }
+.gc-num-game { opacity: 0; }
+.gc-cap { font-family: var(--font-display); font-weight: 600; font-size: 19px; color: var(--color-muted); }
+
+.gc-meter { position: relative; display: block; height: 8px; border-radius: 99px; background: var(--color-line); transition: background 0.35s; }
+.gc-meter > i { position: absolute; inset: 0 auto 0 0; width: var(--p); border-radius: 99px; background: var(--gc); }
+.gc-meter::before, .gc-meter::after { content: ""; position: absolute; opacity: 0; transition: opacity 0.35s; }
+.gc-rule { height: 1px; background: var(--color-line); transition: background 0.35s; }
+.gc-pips { display: flex; gap: 5px; }
+.gc-pips > i { width: 14px; height: 8px; background: #333; transform: skewX(-20deg); transition: background 0.35s, border-color 0.35s, border-radius 0.35s, transform 0.35s; }
+.gc-pips > i[data-on] { background: var(--gc); }
+.gc-val { font-family: var(--font-display); font-weight: 600; transition: color 0.35s; }
+.gc-end { position: relative; transition: color 0.35s; }
+.gc-end::before { content: ""; position: absolute; inset: 0 -16px; z-index: -1; opacity: 0; transition: opacity 0.4s; }
+.gc-foot { transition: border-color 0.35s; }
+.gc-foot button { position: relative; overflow: hidden; transition: background-color 0.35s, color 0.35s, border-color 0.35s, border-radius 0.35s; }
+.gc-ripple { position: absolute; border-radius: 50%; pointer-events: none; scale: 0; opacity: 0.6; background: var(--rip, #fff); animation: gc-ripple 0.55s ease-out forwards; }
+
+/* Your character pictures (LTR-8) and the faint motif sit beside the big number */
+.gc-roster-motif { right: -10px; top: 92px; width: 108px; height: 108px; z-index: -1; fill: none; stroke: var(--gc); stroke-width: 1.2; opacity: 0.09; transition: opacity 0.45s; }
+.gc-roster-motif .gc-pixel-on { fill: var(--gc); fill-opacity: 0.35; }
+.gc-card:has(.gc-roster-art) .gc-roster-motif { display: none; }
 .gc-roster-art {
-  position: absolute;
-  inset: 0 0 0 auto;
-  width: 60%;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0;
-  translate: 1.5rem 0;
-  transition: opacity 420ms 60ms var(--ease-standard), translate 640ms 60ms var(--ease-standard);
-  -webkit-mask-image: linear-gradient(to left, #000 40%, transparent);
-  mask-image: linear-gradient(to left, #000 40%, transparent);
+  inset: 0 0 0 auto; width: 55%; z-index: -2; opacity: 0; translate: 1.5rem 0;
+  transition: opacity 0.45s 0.05s var(--ease-standard), translate 0.6s 0.05s var(--ease-standard);
+  -webkit-mask-image: linear-gradient(to left, #000 35%, transparent), linear-gradient(to bottom, #000 45%, transparent 85%);
+  mask-image: linear-gradient(to left, #000 35%, transparent), linear-gradient(to bottom, #000 45%, transparent 85%);
+  -webkit-mask-composite: source-in; mask-composite: intersect;
 }
-.gc-roster-art img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0;
-  transition: opacity 600ms var(--ease-standard);
-}
+.gc-roster-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.6s var(--ease-standard); }
 .gc-roster-art img[data-on] { opacity: 1; }
-/* A light shade over the lower half, where the meter numbers sit */
-.gc-roster-art::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, transparent 25%, rgb(0 0 0 / 0.45));
-}
-@media (hover: hover) {
-  .gc-roster:hover .gc-roster-art { opacity: 0.45; translate: 0 0; }
-  .gc-roster[data-art]:hover .gc-roster-title { opacity: 0.12; }
-  /* Text over a picture gets a soft shadow so it stays readable on any screenshot */
-  .gc-roster[data-art]:hover { text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); }
-}
-.gc-roster:is(:has(a:focus-visible), :active) .gc-roster-art { opacity: 0.45; translate: 0 0; }
-.gc-roster[data-art]:is(:has(a:focus-visible), :active) .gc-roster-title { opacity: 0.12; }
-.gc-roster[data-art]:is(:has(a:focus-visible), :active) { text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); }
 
-/* Less motion: the card still changes colour, but at once, with no flash and nothing moving */
+/* Resting today (TOD-7): greyed and quiet */
+.gc-card[data-state="resting"] :is(.gc-hero, .gc-meter, .gc-pips, .gc-sub) { opacity: 0.45; filter: grayscale(1); }
+
+/* ---------- Awake: the game takes the spotlight ---------- */
+.gc-card[data-awake] .gc-skin { opacity: 1; }
+.gc-card[data-awake] .gc-roster-motif { opacity: 0.22; }
+.gc-card[data-awake] .gc-roster-art { opacity: 0.5; translate: 0 0; }
+.gc-card[data-awake] .gc-tag { clip-path: inset(0 round 99px); }
+.gc-card[data-awake] .gc-chev { translate: 2px 0; color: var(--gc); }
+.gc-card[data-awake] .gc-body { text-shadow: 0 1px 2px rgb(0 0 0 / 0.35); }
+
+/* Genshin: night sky, gold, tan pills, a star at the meter's end, check circles, a slate pennant, cream button */
+.gc-card[data-game="genshin"] .gc-skin {
+  background:
+    radial-gradient(1.2px 1.2px at 18% 22%, #fffa, transparent), radial-gradient(1px 1px at 64% 14%, #fff9, transparent),
+    radial-gradient(1.3px 1.3px at 86% 48%, #fffb, transparent), radial-gradient(1px 1px at 38% 62%, #fff8, transparent),
+    radial-gradient(1.2px 1.2px at 72% 84%, #fff9, transparent), radial-gradient(70% 40% at 88% 8%, #3b2f6eaa, transparent 70%),
+    linear-gradient(175deg, #1b2443, #121731 75%);
+}
+.gc-card[data-game="genshin"][data-awake] { border-color: #dabf86; }
+.gc-card[data-game="genshin"][data-awake] :is(.gc-reset, .gc-label, .gc-sub, .gc-endsub, .gc-cap) { color: #cfc7b6; }
+.gc-card[data-game="genshin"][data-awake] .gc-tag:not([data-tone]) { background: #d8c5a4; color: #625037; }
+.gc-card[data-game="genshin"][data-awake] .gc-tag[data-tone="urgent"] { background: #f39c4a; color: #2a1606; }
+.gc-card[data-game="genshin"][data-awake] .gc-num { color: #f4f2eb; text-shadow: 0 0 22px #dabf8655; }
+.gc-card[data-game="genshin"][data-awake] .gc-meter { background: #e0d8c722; }
+.gc-card[data-game="genshin"][data-awake] .gc-meter > i { background: linear-gradient(90deg, #e8cf8f, #c0974d); }
+.gc-card[data-game="genshin"] .gc-meter::after {
+  content: "✦"; left: var(--p); top: 50%; translate: -50% -50%; width: 18px; height: 18px; border-radius: 50%;
+  background: #f39c4a; border: 2px solid #fff3d6; color: #fff; font-size: 9px; display: grid; place-items: center;
+}
+.gc-card[data-game="genshin"][data-awake] .gc-meter::after { opacity: 1; }
+.gc-card[data-game="genshin"][data-awake] .gc-rule { background: linear-gradient(90deg, transparent, #dabf86aa, transparent); }
+.gc-card[data-game="genshin"][data-awake] .gc-pips > i { width: 13px; height: 13px; border-radius: 50%; transform: none; background: transparent; border: 2px solid #7a6446; }
+.gc-card[data-game="genshin"][data-awake] .gc-pips > i[data-on] { background: #d8c5a4; border-color: #d8c5a4; }
+.gc-card[data-game="genshin"][data-awake] .gc-val { color: #f39c4a; }
+.gc-card[data-game="genshin"] .gc-end::before { background: #4a5265; clip-path: polygon(0 0, 92% 0, 98% 50%, 92% 100%, 0 100%); }
+.gc-card[data-game="genshin"][data-awake] .gc-end::before { opacity: 1; }
+.gc-card[data-game="genshin"][data-awake] .gc-endtime { color: #f8cb2a; }
+.gc-card[data-game="genshin"][data-awake] .gc-foot { border-color: #ffffff14; background: #121731; }
+.gc-card[data-game="genshin"][data-awake] .gc-foot .gc-main { background: #ece5d8; color: #4a5265; border-color: #ece5d8; border-radius: 99px; }
+.gc-card[data-game="genshin"][data-awake] .gc-spin { animation: gc-spin 30s linear infinite; }
+
+/* WuWa: slate and frost, a hairline frame drawing in, pale-gold numerals, a tick meter, white pills */
+.gc-card[data-game="wuwa"] .gc-skin { background: radial-gradient(90% 35% at 50% 108%, #dfe8ee30, transparent 70%), linear-gradient(170deg, #1b3247, #20242b 70%); }
+.gc-frame { inset: 16px; border: 1px solid #ffffff1c; border-radius: 10px; z-index: -1; opacity: 0; transition: opacity 0.45s, inset 0.55s ease; }
+.gc-frame::before, .gc-frame::after { content: ""; position: absolute; width: 10px; height: 10px; border: solid #fffa; }
+.gc-frame::before { left: -1px; top: -1px; border-width: 1px 0 0 1px; }
+.gc-frame::after { right: -1px; bottom: -1px; border-width: 0 1px 1px 0; }
+.gc-card[data-awake] .gc-frame { opacity: 1; inset: 7px; }
+.gc-spark { color: #fff; opacity: 0; z-index: -1; transition: opacity 0.5s 0.15s; font-size: 12px; }
+.gc-card[data-awake] .gc-spark { opacity: 0.9; }
+.gc-card[data-game="wuwa"][data-awake] { border-color: #56616d; }
+.gc-card[data-game="wuwa"][data-awake] :is(.gc-reset, .gc-label, .gc-sub, .gc-endsub, .gc-cap) { color: #c9d1d7; }
+.gc-card[data-game="wuwa"][data-awake] .gc-tag:not([data-tone]) { background: #fdfdbd; color: #111; }
+.gc-card[data-game="wuwa"][data-awake] .gc-num { color: #fff79e; text-shadow: 0 0 24px #fff79e40; }
+.gc-card[data-game="wuwa"][data-awake] .gc-meter, .gc-card[data-game="wuwa"][data-awake] .gc-meter > i {
+  border-radius: 0;
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px); mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px);
+}
+.gc-card[data-game="wuwa"][data-awake] .gc-meter { background: #4b5661; }
+.gc-card[data-game="wuwa"][data-awake] .gc-meter > i { background: #fcfa96; }
+.gc-card[data-game="wuwa"][data-awake] .gc-rule { background: #ffffff26; }
+.gc-card[data-game="wuwa"][data-awake] .gc-pips > i { width: 12px; height: 12px; transform: none; background: transparent; border: 1.5px solid #ffffffaa; }
+.gc-card[data-game="wuwa"][data-awake] .gc-pips > i[data-on] { background: #fff; }
+.gc-card[data-game="wuwa"][data-awake] .gc-val { color: #fdfdbd; }
+.gc-card[data-game="wuwa"][data-awake] .gc-endtime { color: #fed07a; }
+.gc-card[data-game="wuwa"][data-awake] .gc-foot { border-color: #ffffff1a; background: #20242b; }
+.gc-card[data-game="wuwa"][data-awake] .gc-foot .gc-main { background: #f4f6f7; color: #111; border-color: #f4f6f7; border-radius: 99px; }
+.gc-card[data-game="wuwa"][data-awake] .gc-drift { animation: gc-drift 5s ease-in-out infinite alternate; }
+
+/* NTE: charcoal, a slanted watermark of our own words, a ticker that spells the status, pink, italic snap,
+   a cream pill row and the diagonal pink sweep from the game's transitions */
+.gc-card[data-game="nte"] .gc-skin { background: #1a1a1a; }
+.gc-mark { inset: -30px -60px; z-index: -2; display: flex; flex-direction: column; gap: 4px; rotate: -14deg; font: italic 900 64px/0.9 var(--font-display); color: #ffffff09; white-space: nowrap; opacity: 0; transition: opacity 0.45s; }
+.gc-card[data-awake] .gc-mark { opacity: 1; }
+.gc-ticker {
+  left: 0; right: 0; top: 0; height: 14px; z-index: 2; overflow: hidden; background: #0f1110;
+  font: italic 800 10px/14px var(--font-display); letter-spacing: 0.08em; color: #ff3d88cc; white-space: nowrap;
+  opacity: 0; translate: 0 -14px; transition: opacity 0.3s, translate 0.3s;
+}
+.gc-ticker > span { display: inline-block; padding-left: 8px; }
+.gc-card[data-awake] .gc-ticker { opacity: 1; translate: 0 0; }
+.gc-card[data-awake] .gc-ticker > span { animation: gc-tick 8s linear infinite; }
+.gc-card[data-game="nte"][data-awake] { border-color: #ff3d88; }
+.gc-card[data-game="nte"][data-awake] .gc-tag:not([data-tone]) { background: #2e2e2e; color: #fff; }
+.gc-card[data-game="nte"][data-awake] .gc-tag[data-tone="urgent"] { background: #6f354e; color: #ffd0e2; box-shadow: inset 0 0 0 2px #ff3d88; }
+.gc-card[data-game="nte"][data-awake] .gc-num { color: #fff; }
+.gc-card[data-game="nte"][data-awake] .gc-meter > i { background: #2ca5f9; }
+.gc-card[data-game="nte"][data-awake] .gc-pips > i { transform: none; border-radius: 99px; width: 16px; }
+.gc-card[data-game="nte"][data-awake] .gc-pips > i[data-on] { background: #ff3d88; }
+.gc-card[data-game="nte"][data-awake] .gc-val { font-style: italic; color: #ff3d88; }
+.gc-card[data-game="nte"] .gc-end::before { background: #e7e0da; border-radius: 99px; inset: 0 -6px; }
+.gc-card[data-game="nte"][data-awake] .gc-end::before { opacity: 1; }
+.gc-card[data-game="nte"][data-awake] .gc-end { color: #1a1a1a; text-shadow: none; }
+.gc-card[data-game="nte"][data-awake] .gc-endsub { color: #3b3b3b; }
+.gc-card[data-game="nte"][data-awake] .gc-endtime { font-style: italic; color: #1a1a1a; }
+.gc-card[data-game="nte"][data-awake] .gc-foot { background: #1a1a1a; }
+.gc-card[data-game="nte"][data-awake] .gc-foot .gc-main { background: #d6d6d6; color: #111; border-color: #d6d6d6; border-radius: 99px; }
+.gc-sweep { inset: 0; z-index: 3; background: linear-gradient(135deg, #ff3d88d0, #ff3d8840); clip-path: polygon(0 100%, 0 100%, 0 100%); }
+.gc-lines { inset: 0; z-index: 3; opacity: 0; background: repeating-linear-gradient(135deg, transparent 0 50px, #fff 50px 52px, transparent 52px 130px); }
+.gc-card[data-awake] .gc-sweep { animation: gc-sweep 0.55s ease-out forwards; }
+.gc-card[data-awake] .gc-lines { animation: gc-lines 0.5s 0.3s ease-out; }
+
+/* Motion that tells you something: the meter fills to its value, the daily marks tick in */
+.gc-card[data-awake] .gc-meter > i { animation: gc-fill 0.7s ease-out; }
+.gc-card[data-awake] .gc-pips > i[data-on] { animation: gc-tickin 0.3s ease-out backwards; }
+.gc-card[data-awake] .gc-pips > i[data-on]:nth-child(2) { animation-delay: 0.06s; }
+.gc-card[data-awake] .gc-pips > i[data-on]:nth-child(3) { animation-delay: 0.12s; }
+.gc-card[data-awake] .gc-pips > i[data-on]:nth-child(4) { animation-delay: 0.18s; }
+.gc-card[data-awake] .gc-pips > i[data-on]:nth-child(5) { animation-delay: 0.24s; }
+.gc-card[data-awake] .gc-pips > i[data-on]:nth-child(6) { animation-delay: 0.3s; }
+.gc-card[data-awake] .gc-pips > i[data-on]:nth-child(n + 7) { animation-delay: 0.36s; }
+
+/* ---------- The game's own numerals when awake (mouse devices, fonts loaded, motion allowed) ---------- */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="genshin"] .gc-num-game { font-family: "Nunito"; font-weight: 900; font-size: calc(0.95em * var(--fit, 1)); letter-spacing: -0.01em; filter: blur(6px); transition: opacity 0.45s, filter 0.45s, color 0.35s, text-shadow 0.35s; }
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="genshin"] .gc-num-rest { transition: opacity 0.45s, filter 0.45s, color 0.35s, text-shadow 0.35s; }
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="genshin"][data-awake] .gc-num-rest { opacity: 0; filter: blur(6px); }
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="genshin"][data-awake] .gc-num-game { opacity: 1; filter: none; }
+
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="wuwa"] .gc-num-game { font-family: "Bodoni Moda"; font-weight: 400; font-size: calc(1.07em * var(--fit, 1)); letter-spacing: -0.02em; translate: 0 12px; transition: opacity 0.2s, translate 0.45s, color 0.35s, text-shadow 0.35s; }
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="wuwa"] .gc-num-rest { transition: opacity 0.2s, translate 0.45s, color 0.35s, text-shadow 0.35s; }
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="wuwa"][data-awake] .gc-num-rest { opacity: 0; translate: 0 -12px; }
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="wuwa"][data-awake] .gc-num-game { opacity: 1; translate: 0 0; transition: opacity 0.35s 0.18s, translate 0.5s 0.18s, color 0.35s, text-shadow 0.35s; }
+
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="nte"] .gc-num-game { font-family: "Barlow Condensed"; font-style: italic; font-weight: 900; font-size: calc(1.29em * var(--fit, 1)); line-height: 0.8; letter-spacing: 0.01em; }
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="nte"] :is(.gc-num-rest, .gc-num-game) { transition: opacity 0s linear 0.26s, color 0.35s; }
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="nte"][data-awake] .gc-num-rest { opacity: 0; }
+  :root[data-gamefonts]:not([data-saver]) .gc-card[data-game="nte"][data-awake] .gc-num-game { opacity: 1; animation: gc-pop 0.3s 0.45s ease-out; }
+}
+
+/* ---------- Calm modes ---------- */
+/* Less motion: colours change at once; no sweep, ticker, spin or drift (the global rule above makes the rest instant) */
 @media (prefers-reduced-motion: reduce) {
-  .gc-roster-bg, .gc-roster-title, .gc-roster-motif, .gc-roster-art { transition-delay: 0s !important; }
-  .gc-roster-flash { display: none; }
-  .gc-roster .gc-spin, .gc-roster .gc-drift { animation: none !important; }
+  .gc-sweep, .gc-lines, .gc-ripple { display: none; }
+  .gc-card .gc-ticker > span, .gc-card .gc-spin, .gc-card .gc-drift { animation: none !important; }
 }
-/* THM-7 Data saver: no pictures (they are not even loaded) and no decorative motion. The card still
-   takes its game's colours, at once. */
-:root[data-saver] .gc-roster-art,
-:root[data-saver] .gc-roster-flash { display: none; }
-:root[data-saver] .gc-roster-bg,
-:root[data-saver] .gc-roster-title,
-:root[data-saver] .gc-roster-motif { transition: none !important; }
-:root[data-saver] .gc-roster .gc-spin,
-:root[data-saver] .gc-roster .gc-drift { animation: none !important; }
-
-/* High-contrast mode (Windows): drop the decoration and keep the plain card */
+/* Data saver (THM-7): no pictures (not even loaded) and no decorative motion; the card still takes its colours */
+:root[data-saver] :is(.gc-roster-art, .gc-sweep, .gc-lines, .gc-ripple) { display: none; }
+:root[data-saver] .gc-card *, :root[data-saver] .gc-card *::before, :root[data-saver] .gc-card *::after { animation: none !important; transition-duration: 0s !important; }
+/* High-contrast mode (Windows): the plain card only */
 @media (forced-colors: active) {
-  .gc-roster-bg, .gc-roster-flash, .gc-roster-title, .gc-roster-motif, .gc-roster-art { display: none; }
+  :is(.gc-skin, .gc-frame, .gc-mark, .gc-ticker, .gc-sweep, .gc-lines, .gc-spark, .gc-roster-motif, .gc-roster-art, .gc-ripple) { display: none; }
+  .gc-end::before, .gc-meter::after { display: none; }
 }
 
-@keyframes gc-flash { 0% { opacity: 0; } 25% { opacity: 0.16; } 100% { opacity: 0; } }
 @keyframes gc-spin { to { rotate: 360deg; } }
 @keyframes gc-drift { from { translate: -6px 0; } to { translate: 6px 0; } }
+@keyframes gc-tick { to { translate: -50% 0; } }
+@keyframes gc-fill { from { width: 0; } }
+@keyframes gc-tickin { from { opacity: 0; scale: 0.4; } }
+@keyframes gc-sweep { 0% { clip-path: polygon(0 100%, 0 100%, 0 100%); } 60% { clip-path: polygon(0 100%, 0 -10%, 140% 100%); opacity: 1; } 100% { clip-path: polygon(0 100%, 0 -10%, 140% 100%); opacity: 0; } }
+@keyframes gc-lines { 0% { opacity: 0; translate: -60px 60px; } 30% { opacity: 0.3; } 100% { opacity: 0; translate: 60px -60px; } }
+@keyframes gc-pop { 50% { scale: 1.07; } }
+@keyframes gc-ripple { to { scale: 1; opacity: 0; } }
