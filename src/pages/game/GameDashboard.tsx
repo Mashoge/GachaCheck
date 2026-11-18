@@ -6,12 +6,13 @@ import { dailyPeriod, formatDuration, formatWhen, weeklyPeriod } from '../../lib
 import { clockOf, dailiesLeft, isSkippedNow, isVisible, periodCompletionIds, taskProgress, type Task, type TodayData } from '../../lib/today'
 import { useBulkUndo } from '../../components/bulkUndo/useBulkUndo'
 import { Button, cx } from '../../components/ui'
-import { Check, CountedRow, EndDateEditor, MeterCard, TaskRow } from './GameParts'
+import { Check, CountedRow, EndDateEditor, LookSwitch, MeterCard, TaskRow } from './GameParts'
 import { GameIcon } from '../../components/GameIcon'
 import { useGameIcons } from '../../lib/useGameIcons'
 import { useGameFonts } from '../../lib/gameFonts'
 import { useMedia } from '../../lib/useMedia'
 import { useDataSaver } from '../../lib/dataSaver'
+import { GAMES_WITH_DAY, resolveGameMode, useLookChoice } from '../../lib/gameMode'
 
 type Props = {
   game: TodayData['games'][number]
@@ -32,6 +33,10 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
   const canHover = useMedia('(hover: hover) and (pointer: fine)')
   const dataSaver = useDataSaver()
   useGameFonts(canHover && !dataSaver.on)
+  // THM-3: Day or Night (Auto follows the clock, re-checked as `now` ticks); only games with a Day look
+  const lookChoice = useLookChoice()
+  const hasDay = GAMES_WITH_DAY.has(game.preset_id ?? '')
+  const mode = hasDay ? resolveGameMode(lookChoice, now) : 'night'
   const skipped = isSkippedNow(game, now)
   const clock = clockOf(game)
   const preset = game.preset_id ? findPreset(game.preset_id) : undefined
@@ -106,7 +111,7 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
   // THM-9 (step 3): the page in the Today page's voice. A title with the reset times as numbers, then one
   // panel per section with a spaced label; ticks, bars and tags in the game's colour (.gc-set).
   return (
-    <section data-game={game.preset_id ?? undefined} aria-labelledby="game-title" className="gc-set gc-theme flex flex-col gap-6">
+    <section data-game={game.preset_id ?? undefined} data-mode={mode} aria-labelledby="game-title" className="gc-set gc-theme flex flex-col gap-6">
       {/* THM-11: the game's world behind its page (index.css; only Genshin so far) */}
       <div aria-hidden="true" className="gc-world" />
       <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2">
@@ -117,13 +122,17 @@ export default function GameDashboard({ game, data, now, quick, onTick, onRemove
           <Stat label="Weekly" value={formatDuration(week.end!.getTime() - now.getTime())} />
           {serverLabel && <span className="text-xs text-muted">{serverLabel} server</span>}
         </p>
-        <span className="col-start-3 row-start-1 flex items-center gap-2 sm:row-span-2">
-          {skipped && <span className="gc-tag" data-tone="rest">Resting today</span>}
-          {onSetSkipped && (
-            <Button variant={skipped ? 'link' : 'quiet'} size="sm" onClick={() => onSetSkipped(!skipped)}>
-              {skipped ? 'Undo skip' : 'Skip today'}
-            </Button>
-          )}
+        {/* Phone: the Day/Night switch on top, Skip below; wider screens: side by side, the switch last */}
+        <span className="col-start-3 row-start-1 flex flex-col-reverse items-end gap-1.5 sm:row-span-2 sm:flex-row sm:items-center sm:gap-3">
+          <span className="flex items-center gap-2">
+            {skipped && <span className="gc-tag" data-tone="rest">Resting today</span>}
+            {onSetSkipped && (
+              <Button variant={skipped ? 'link' : 'quiet'} size="sm" className="gc-head-btn" onClick={() => onSetSkipped(!skipped)}>
+                {skipped ? 'Undo skip' : 'Skip today'}
+              </Button>
+            )}
+          </span>
+          {hasDay && <LookSwitch choice={lookChoice} mode={mode} />}
         </span>
         {skipped && (
           <p className="col-span-3 text-xs text-muted">

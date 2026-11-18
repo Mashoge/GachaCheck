@@ -331,7 +331,7 @@
 .gc-world { display: none; }
 
 /* --- Genshin --- */
-.gc-theme[data-game="genshin"] { --gc: #dabf86; --gi-cream: #ece5d8; --gi-sand: #d8c5a4; --gi-ink: #3b4255; --gi-brown: #8f6b46; --gi-dim: #a9a08e; }
+.gc-theme[data-game="genshin"] { --gc: #dabf86; --gi-cream: #ece5d8; --gi-sand: #d8c5a4; --gi-ink: #3b4255; --gi-brown: #765531; --gi-dim: #a9a08e; }
 .gc-theme[data-game="genshin"] .gc-world {
   display: block; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
@@ -377,33 +377,34 @@
 .gc-theme[data-game="genshin"] .gc-btn { border-color: transparent; border-radius: 99px; background: var(--gi-cream); color: var(--gi-ink); }
 .gc-theme[data-game="genshin"] .gc-btn:hover:not(:disabled) { background: #fff6e4; color: var(--gi-ink); }
 
-/* Stamina: a cream card, a gold bar with a star at its end */
+/* Stamina: a cream card, a gold bar with a star at its end. In Day mode (THM-3) every panel is a cream
+   card like this one, so the rules below are shared with it */
 .gc-theme[data-game="genshin"] .gc-panel-stamina { border-color: #dabf86; background: linear-gradient(180deg, #efe9dd, #e6dece); color: var(--gi-ink); }
 .gc-theme[data-game="genshin"] .gc-panel-stamina .gc-panel-head { border-color: rgb(143 107 70 / 0.22); background: none; }
-.gc-theme[data-game="genshin"] .gc-panel-stamina :is(.gc-label, .gc-panel-label) { color: var(--gi-brown); }
-.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-panel-label::before { background: var(--gi-brown); }
-.gc-theme[data-game="genshin"] .gc-panel-stamina .text-muted { color: #7d7566; }
-.gc-theme[data-game="genshin"] .gc-panel-stamina :is(.divide-line > *, .border-line) { border-color: rgb(143 107 70 / 0.2); }
-.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-meter-num:not(.text-urgent) { color: var(--gi-ink); }
-.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-btn { background: #ddd2bd; }
-.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-btn:hover:not(:disabled) { background: #d2c5ab; }
-.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-tag[data-tone="rest"] { background: rgb(143 107 70 / 0.14); color: var(--gi-brown); }
-.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-meter { background: #d6cbb6; }
-.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-meter > i:not([style*="urgent"]) { background: linear-gradient(90deg, #e9cf92, #c99a4b); }
-.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-meter > i::after {
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) :is(.gc-label, .gc-panel-label) { color: var(--gi-brown); }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-panel-label::before { background: var(--gi-brown); }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .text-muted { color: #7d7566; }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) :is(.divide-line > *, .border-line) { border-color: rgb(143 107 70 / 0.2); }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-meter-num:not(.text-urgent) { color: var(--gi-ink); }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-btn { background: #ddd2bd; }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-btn:hover:not(:disabled) { background: #d2c5ab; }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-tag[data-tone="rest"] { background: rgb(143 107 70 / 0.14); color: var(--gi-brown); }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-meter { background: #d6cbb6; }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-meter > i:not([style*="urgent"]) { background: linear-gradient(90deg, #e9cf92, #c99a4b); }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-meter > i::after {
   content: ""; position: absolute; right: -9px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%;
   background: radial-gradient(circle, #fff6d8 0 28%, #f0b75e 32% 100%); box-shadow: 0 0 0 2px #efe9dd;
 }
 
 /* Forms on the cream card (the "how much now?" prompt, Set value): a darker cream band, a light field,
    an ink pill to save, outlined pills for the rest */
-.gc-theme[data-game="genshin"] .gc-panel-stamina .gc-prompt { background: #e1d7c3; border-color: rgb(143 107 70 / 0.2); }
-.gc-theme[data-game="genshin"] .gc-panel-stamina input { background: #f7f2e8; color: var(--gi-ink); border-color: #c4b28a; }
-.gc-theme[data-game="genshin"] .gc-panel-stamina input::placeholder { color: #9a8f7a; }
-.gc-theme[data-game="genshin"] .gc-panel-stamina button.bg-accent { border-radius: 99px; background: var(--gi-ink); color: var(--gi-cream); }
-.gc-theme[data-game="genshin"] .gc-panel-stamina button.bg-accent:disabled { opacity: 0.45; }
-.gc-theme[data-game="genshin"] .gc-panel-stamina button.border-edge { border-radius: 99px; border-color: #b9a77f; color: #5d5038; }
-.gc-theme[data-game="genshin"] .gc-panel-stamina button.text-muted { color: var(--gi-brown); }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) .gc-prompt { background: #e1d7c3; border-color: rgb(143 107 70 / 0.2); }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) input { background: #f7f2e8; color: var(--gi-ink); border-color: #c4b28a; color-scheme: light; }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) input::placeholder { color: #9a8f7a; }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) button.bg-accent { border-radius: 99px; background: var(--gi-ink); color: var(--gi-cream); }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) button.bg-accent:disabled { opacity: 0.45; }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) button.border-edge { border-radius: 99px; border-color: #b9a77f; color: #5d5038; }
+:is(.gc-theme[data-game="genshin"] .gc-panel-stamina, .gc-theme[data-game="genshin"][data-mode="day"] .gc-panel) button.text-muted { color: var(--gi-brown); }
 /* Saving elsewhere on the page (endgame dates): a soft gold pill */
 .gc-theme[data-game="genshin"] button.bg-accent { border-radius: 99px; background: #ecd9a8; color: var(--gi-ink); }
 
@@ -416,6 +417,106 @@
 
 /* The game chips and view toggle above the page, while on Genshin's page */
 :root:has(.gc-theme[data-game="genshin"]) .gc-chip:is([aria-pressed="true"], [aria-current="page"]) { border-color: #dabf86; background: rgb(218 191 134 / 0.16); color: #f0d898; }
+
+/* ---------- THM-3: the Day/Night switch (LookSwitch in GameParts.tsx) ---------- */
+.gc-look { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--color-edge); border-radius: 99px; background: rgb(0 0 0 / 0.25); }
+.gc-look > button {
+  display: inline-grid; place-items: center; min-width: 34px; height: 30px; min-height: 0; padding: 0 9px; border-radius: 99px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--color-muted); transition: color 0.2s, background-color 0.2s;
+}
+.gc-look > button:hover { color: var(--color-ink); }
+.gc-look > button[aria-pressed="true"] { background: var(--color-active); color: var(--color-accent); }
+.gc-look > button[data-now]:not([aria-pressed="true"]) { box-shadow: inset 0 0 0 1px currentColor; } /* Auto: which one applies now */
+@media (max-width: 767px) { .gc-look > button { min-width: 40px; height: 36px; } } /* larger touch targets */
+.gc-theme[data-game="genshin"] .gc-look { border-color: rgb(218 191 134 / 0.4); background: rgb(14 19 41 / 0.6); }
+.gc-theme[data-game="genshin"] .gc-look > button { color: #cfc3a8; }
+.gc-theme[data-game="genshin"] .gc-look > button:hover { color: var(--gi-cream); }
+.gc-theme[data-game="genshin"] .gc-look > button[aria-pressed="true"] { background: var(--gi-cream); color: var(--gi-ink); }
+@media (forced-colors: active) {
+  .gc-look > button[aria-pressed="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  .gc-theme .gc-world { display: none; }
+}
+
+/* ---------- Genshin by day: the Adventurer's Handbook under a summer sky ----------
+   A clear blue sky with soft clouds and a warm sun at the top right, fading to a pale horizon; every
+   panel a cream page with a brown heading band; dark slate text; gold kept for bars and accents; the
+   endgame pennants stay slate. Static like the night look. */
+.gc-theme[data-game="genshin"][data-mode="day"] {
+  --gi-sky-ink: #2c3550; --gi-sky-dim: #3a4560;
+}
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-world {
+  background:
+    radial-gradient(10% 9% at 88% 15%, rgb(255 252 236 / 0.95), rgb(255 238 186 / 0.45) 50%, transparent 78%),
+    radial-gradient(40% 32% at 88% 12%, rgb(255 226 160 / 0.32), transparent 70%),
+    linear-gradient(180deg, #86bde9 0%, #a9d1f0 26%, #cde4f2 54%, #e8ebe3 82%, #efe7d6 100%);
+}
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-world::before {
+  opacity: 0.9;
+  background:
+    radial-gradient(90px 26px at 10% 15%, rgb(255 255 255 / 0.9), transparent 75%),
+    radial-gradient(60px 22px at 15% 12.5%, rgb(255 255 255 / 0.85), transparent 75%),
+    radial-gradient(130px 30px at 20% 17%, rgb(255 255 255 / 0.7), transparent 75%),
+    radial-gradient(110px 28px at 58% 9%, rgb(255 255 255 / 0.75), transparent 75%),
+    radial-gradient(70px 22px at 63% 6.5%, rgb(255 255 255 / 0.8), transparent 75%),
+    radial-gradient(160px 34px at 40% 36%, rgb(255 255 255 / 0.5), transparent 75%),
+    radial-gradient(120px 30px at 88% 30%, rgb(255 255 255 / 0.55), transparent 75%),
+    radial-gradient(220px 40px at 12% 52%, rgb(255 255 255 / 0.4), transparent 75%),
+    radial-gradient(200px 38px at 78% 62%, rgb(255 255 255 / 0.35), transparent 75%);
+  background-size: auto;
+  -webkit-mask: none; mask: none;
+}
+
+/* On the sky: the title, reset times and other text in dark slate */
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-title { color: var(--gi-sky-ink); text-shadow: 0 1px 0 rgb(255 255 255 / 0.55); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-label { color: var(--gi-sky-dim); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-stat-num { color: #5a3c12; }
+.gc-theme[data-game="genshin"][data-mode="day"] .text-muted { color: var(--gi-sky-dim); }
+.gc-theme[data-game="genshin"][data-mode="day"] .text-accent { color: #7a5632; }
+.gc-theme[data-game="genshin"][data-mode="day"] .text-urgent { color: #a84512; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-head-btn { border-radius: 99px; background: rgb(255 255 255 / 0.55); color: var(--gi-sky-ink); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-head-btn:hover { background: rgb(255 255 255 / 0.8); }
+.gc-theme[data-game="genshin"][data-mode="day"] header .gc-tag[data-tone="rest"] { background: rgb(255 255 255 / 0.65); color: #6a4c2c; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-look { border-color: rgb(44 53 80 / 0.25); background: rgb(255 255 255 / 0.55); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-look > button { color: var(--gi-sky-dim); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-look > button:hover { color: var(--gi-sky-ink); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-look > button[aria-pressed="true"] { background: var(--gi-ink); color: var(--gi-cream); }
+.gc-theme[data-game="genshin"][data-mode="day"] :focus-visible { outline-color: var(--gi-ink); }
+
+/* Panels: cream pages with a soft shadow, a brown heading band and brown labels */
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel {
+  border-color: #d6c299; background: linear-gradient(180deg, #f7f3ea, #eee7d9); color: var(--gi-ink);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.8), 0 10px 26px -12px rgb(40 62 110 / 0.4);
+}
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-panel-head {
+  border-color: rgb(143 107 70 / 0.24); background: linear-gradient(90deg, #e7dcc6, #efe7d8 75%);
+}
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel.gc-panel-stamina { border-color: #cfae6c; box-shadow: inset 0 3px 0 #dcbf83, 0 10px 26px -12px rgb(40 62 110 / 0.4); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .text-muted { color: #6b6253; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-task-title { color: var(--gi-ink); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-count { color: var(--gi-ink); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-task-title.line-through { color: #877d69; }
+
+/* Ticks: brown rings, gold when done */
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-check { border-color: #95794a; color: var(--gi-ink); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-check[data-done] { border-color: #d3b273; background: #dcc18a; }
+
+/* Tags: a darker cream with brown text */
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-tag:not([data-tone]) { background: #e4d6b9; color: #5b4628; }
+
+/* Endgame: the slate pennants keep their light text and cream ticks */
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-end-row > button:first-child { color: var(--gi-cream); box-shadow: 0 4px 10px -6px rgb(30 36 55 / 0.6); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-end-row > button:first-child .text-muted { color: #c9c2b3; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-end-row > button:first-child .gc-label { color: #b9ad94; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-panel .gc-end-row > button:first-child .text-urgent { color: #ffb08a; }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-end-row > button:first-child .gc-check { border-color: var(--gi-sand); }
+.gc-theme[data-game="genshin"][data-mode="day"] .gc-end-row > button:first-child .gc-check[data-done] { border-color: var(--gi-sand); background: var(--gi-sand); }
+
+/* Above the page while it's day: the game chips and view toggle on the sky, and a solid top bar */
+:root:has(.gc-theme[data-game="genshin"][data-mode="day"]) .gc-chip { border-color: rgb(44 53 80 / 0.3); background: rgb(255 255 255 / 0.5); color: #3a4560; }
+:root:has(.gc-theme[data-game="genshin"][data-mode="day"]) .gc-chip:hover { color: #1f2740; }
+:root:has(.gc-theme[data-game="genshin"][data-mode="day"]) .gc-chip:is([aria-pressed="true"], [aria-current="page"]) { border-color: #a9864c; background: #fbf6ea; color: #5a3c12; }
+:root:has(.gc-theme[data-game="genshin"][data-mode="day"]) .gc-chip:focus-visible { outline-color: var(--gi-ink, #3b4255); }
+:root:has(.gc-theme[data-mode="day"]) .gc-shell-top { background: var(--color-surface); }
 
 /* =============================================================================================
    THM-8: Today cards. One GachaCheck voice at rest (shared structure, labels, slanted tags,

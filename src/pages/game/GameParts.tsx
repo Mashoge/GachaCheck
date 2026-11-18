@@ -1,8 +1,47 @@
-import { useState, type CSSProperties } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { overCapBy, type MeterRow, type MeterState } from '../../lib/stamina'
 import { zonedTime } from '../../lib/time'
 import type { Task } from '../../lib/today'
-import { Button, Input } from '../../components/ui'
+import { Button, Input, MoonIcon, SunIcon } from '../../components/ui'
+import { setLookChoice, type GameLookChoice, type GameMode } from '../../lib/gameMode'
+
+/**
+ * THM-3: Day, Night or Auto for the game pages. Auto follows your clock; while it's on, the sun or moon
+ * that applies right now is marked faintly. Switching cross-fades the page where the browser can
+ * (not with Data saver or reduced motion).
+ */
+export function LookSwitch({ choice, mode }: { choice: GameLookChoice; mode: GameMode }) {
+  const pick = (next: GameLookChoice) => {
+    if (next === choice) return
+    const calm = document.documentElement.hasAttribute('data-saver') || window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const doc = document as Document & { startViewTransition?: (update: () => void) => unknown }
+    if (calm || !doc.startViewTransition) setLookChoice(next)
+    else doc.startViewTransition(() => flushSync(() => setLookChoice(next)))
+  }
+  const options: { id: GameLookChoice; label: string; hint: string; icon?: ReactNode }[] = [
+    { id: 'day', label: 'Day', hint: 'Day look', icon: <SunIcon size={17} /> },
+    { id: 'night', label: 'Night', hint: 'Night look', icon: <MoonIcon size={16} /> },
+    { id: 'auto', label: 'Auto', hint: 'Auto: Day from 6 AM to 6 PM on your clock' },
+  ]
+  return (
+    <div role="group" aria-label="Page look" className="gc-look">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          aria-pressed={choice === o.id}
+          aria-label={o.icon ? o.label : undefined}
+          title={o.hint}
+          data-now={choice === 'auto' && o.id === mode ? '' : undefined}
+          onClick={() => pick(o.id)}
+        >
+          {o.icon ?? o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 // Ticks, bars and tags take the game's colour on its page (--gc, from .gc-set in GameDashboard)
 export function Check({ done }: { done: boolean }) {
