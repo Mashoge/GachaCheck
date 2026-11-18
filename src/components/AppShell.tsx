@@ -41,7 +41,7 @@ export default function AppShell({ email, pwaInstall }: { email: string; pwaInst
       {/* THM-9: the page backdrop (index.css) */}
       <div aria-hidden="true" className="gc-backdrop" />
       <header className="gc-shell-top relative z-40 border-b border-line bg-surface/85 pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap 2xl:max-w-7xl items-center justify-between gap-3 px-5 py-3">
           <div className="flex items-center gap-7">
             <span className="font-display text-xl font-bold">GachaCheck</span>
             <nav aria-label="Main" className="hidden gap-1 md:flex">
@@ -73,7 +73,7 @@ export default function AppShell({ email, pwaInstall }: { email: string; pwaInst
       </header>
 
       {/* Room for the bottom bar, plus the iPhone home line */}
-      <main className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-6 md:px-5 md:pb-12">
+      <main className="mx-auto w-full min-w-0 max-w-6xl 2xl:max-w-7xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-6 md:px-5 md:pb-12">
         {/* THM-10: navigating animates only the page, in the entrance of the page you are going to. The
             header, bottom bar and backdrop stay put. Router navigations run in React Transitions, which is
             what lets <ViewTransition> animate them; ticking a task and other updates switch instantly. */}

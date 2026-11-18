@@ -10,7 +10,7 @@ import { useGameIcons } from '../lib/useGameIcons'
 import { GameIcon } from './GameIcon'
 import { pingThreshold } from '../lib/stamina'
 import { formatDuration } from '../lib/time'
-import { Button, ChevronIcon, EditIcon, Input, Loading, Notice, PageTitle, Select, SheetRow, Switch, useConfirm } from './ui'
+import { Button, ChevronIcon, EditIcon, IconTag, Input, Loading, Notice, PageTitle, Select, SheetRow, Switch, TagLegend, useConfirm, type TagIconName } from './ui'
 import { setDataSaver, useDataSaver } from '../lib/dataSaver'
 
 const NO_GAMES: GameSummary[] = []
@@ -89,11 +89,19 @@ export default function GamesScreen() {
 
       <div className="grid items-start gap-x-6 gap-y-8 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section aria-labelledby="my-games" className="flex min-w-0 flex-col gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h2 id="my-games" className="text-base font-semibold">My games</h2>
             {!loading && games.length > 0 && (
               <span className="gc-tag" data-tone="rest">{games.length} of {PRESETS.length}</span>
             )}
+            {/* THM-12: the key to the tag icons on the cards (the task list has its own when opened) */}
+            {(() => {
+              const icons: TagIconName[] = [
+                ...(games.some((g) => g.stamina_meters.some((m) => m.fills_when_full_of)) ? ['overflow' as const] : []),
+                ...(games.some((g) => g.tasks.some((t) => !t.archived && t.hidden)) ? ['hidden' as const] : []),
+              ]
+              return icons.length > 0 && <TagLegend icons={icons} className="ml-auto" />
+            })()}
           </div>
           {loading && <Loading />}
           {!loading && games.length === 0 && <Notice>No games yet. Add one from the list.</Notice>}
@@ -163,7 +171,7 @@ export default function GamesScreen() {
                             </div>
                             {/* Overflow meters never ping, so they have no threshold */}
                             {parent ? (
-                              <span className="gc-tag" data-tone="rest">Overflow from {parent.name}</span>
+                              <IconTag icon="overflow" text={parent.name} say={`Overflow from ${parent.name}`} tone="rest" />
                             ) : (
                               <PingAtField
                                 key={`${meter.id}:${meter.ping_at ?? ''}`}
@@ -192,7 +200,7 @@ export default function GamesScreen() {
                         </li>
                       ))}
                       {counts.length === 0 && <li className="text-sm text-muted">None shown</li>}
-                      {hiddenCount > 0 && <li><span className="gc-tag" data-tone="rest">{hiddenCount} hidden</span></li>}
+                      {hiddenCount > 0 && <li><IconTag icon="hidden" text={String(hiddenCount)} say={`${hiddenCount} hidden`} tone="rest" /></li>}
                     </ul>
                     <Toggle open={tasksOpen} onClick={() => setOpenId(tasksOpen ? null : game.id)}
                       label={tasksOpen ? 'Hide tasks' : 'Manage tasks'} gameName={game.name} />

@@ -15,7 +15,7 @@ import { useShared } from '../lib/useShared'
 import { EventCard, Section, Timeline } from './events/EventDisplay'
 import { EventForm } from './events/EventForm'
 import { GameIcon } from '../components/GameIcon'
-import { Button, Card, ChevronIcon, Loading, Notice, PageTitle, Switch, ToggleGroup, cx } from '../components/ui'
+import { Button, Card, ChevronIcon, Loading, Notice, PageTitle, Switch, IconTag, TagLegend, ToggleGroup, cx, type TagIconName } from '../components/ui'
 import { useGameIcons } from '../lib/useGameIcons'
 
 const SOON_MS = 3 * 86_400_000
@@ -95,6 +95,14 @@ export default function EventsPage() {
     if (ok && justHidden?.key === event.key) setJustHidden(null)
     return ok
   }
+
+  // Which tag icons the open cards use, for the legend
+  const shownEvents = [...soon, ...later, ...upcoming]
+  const legendIcons: TagIconName[] = [
+    ...(shownEvents.some((e) => e.source !== 'manual' && e.origin === 'catalog') ? ['official' as const] : []),
+    ...(shownEvents.some((e) => e.source !== 'manual' && e.origin !== 'catalog') ? ['auto' as const] : []),
+    ...(shownEvents.some((e) => e.kind === 'web_event') ? ['web' as const] : []),
+  ]
 
   const card = (e: GameEvent) => (
     <EventCard
@@ -232,6 +240,8 @@ export default function EventsPage() {
             </p>
           )}
 
+          {/* THM-12: the key to the tag icons on the cards below, only for the kinds that are showing */}
+          {legendIcons.length > 0 && <TagLegend icons={legendIcons} className="-mt-2" />}
           {soon.length > 0 && <Section title="Ending soon" hint="Within 3 days" urgent>{soon.map(card)}</Section>}
           {later.length > 0 && <Section title="Current">{later.map(card)}</Section>}
           {upcoming.length > 0 && <Section title="Upcoming">{upcoming.map(card)}</Section>}
@@ -271,8 +281,8 @@ export default function EventsPage() {
                             </span>
                           </span>
                           <span className="flex items-center gap-1.5">
-                            <span className="gc-tag" data-tone="rest">{h.origin === 'catalog' ? 'Official' : 'Imported'}</span>
-                            {h.kind === 'web_event' && <span className="gc-tag" data-tone="rest">Web event</span>}
+                            <IconTag icon={h.origin === 'catalog' ? 'official' : 'imported'} tone="rest" />
+                            {h.kind === 'web_event' && <IconTag icon="web" tone="rest" />}
                           </span>
                           <Button size="sm" onClick={() => void restore(h)} aria-label={`Restore ${h.name}`}>
                             Restore

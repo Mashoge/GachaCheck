@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildToday, cardHeadline, isSkippedNow, meterTag, type Game, type GameCard, type Task, type TodayData } from './today'
+import { buildToday, cardHeadline, isSkippedNow, leftByReset, meterTag, type Game, type GameCard, type Task, type TodayData } from './today'
 
 const now = new Date('2026-11-16T12:00:00+08:00')
 const completedAt = '2026-11-16T08:00:00+08:00'
@@ -203,11 +203,38 @@ describe('which number leads a Today card (THM-8)', () => {
     // in any timezone (CI runs on UTC). new Date(y, monthIndex, d, h, m) is local time.
     const noon = new Date(2026, 10, 16, 12, 0)
     const local = (d: number, h: number, m: number) => ({ ...base, meter: { ...base.meter!, fullAt: new Date(2026, 10, d, h, m) } })
-    expect(meterTag(local(16, 23, 50), noon)).toEqual({ text: 'Full 11:50 PM', urgent: false })
-    expect(meterTag(local(17, 6, 30), noon)).toEqual({ text: 'Full tmrw 6:30 AM', urgent: false })
-    expect(meterTag({ ...base, meterSoon: true }, now)).toEqual({ text: 'Caps in 11h 50m', urgent: true })
-    expect(meterTag({ ...base, meter: { ...base.meter!, value: 200, full: true, fullAt: null } }, now)).toEqual({ text: 'Full now', urgent: true })
-    expect(meterTag({ ...base, meter: { ...base.meter!, value: 230, full: true, fullAt: null } }, now)).toEqual({ text: 'Above cap +30', urgent: true })
+    expect(meterTag(local(16, 23, 50), noon)).toEqual({ text: 'Full 11:50 PM', short: '11:50 PM', urgent: false })
+    expect(meterTag(local(17, 6, 30), noon)).toEqual({ text: 'Full tmrw 6:30 AM', short: 'Tmrw 6:30 AM', urgent: false })
+    expect(meterTag({ ...base, meterSoon: true }, now)).toEqual({ text: 'Caps in 11h 50m', short: 'in 11h 50m', urgent: true })
+    expect(meterTag({ ...base, meter: { ...base.meter!, value: 200, full: true, fullAt: null } }, now)).toEqual({ text: 'Full now', short: 'Now', urgent: true })
+    expect(meterTag({ ...base, meter: { ...base.meter!, value: 230, full: true, fullAt: null } }, now)).toEqual({ text: 'Above cap +30', short: '+30', urgent: true })
     expect(meterTag({ ...base, meter: null }, now)).toBeNull()
+  })
+})
+
+describe('leftByReset', () => {
+  const at = (h: number, m = 0) => new Date(Date.UTC(2026, 10, 19, h, m))
+  it('groups games that reset at the same time, soonest first', () => {
+    const groups = leftByReset([
+      { skipped: false, dailyDone: 0, dailyTotal: 7, resetAt: at(21) }, // NTE, an hour later
+      { skipped: false, dailyDone: 0, dailyTotal: 6, resetAt: at(20) }, // Genshin
+      { skipped: false, dailyDone: 0, dailyTotal: 3, resetAt: at(20, 0) }, // WuWa, same reset
+    ])
+    expect(groups).toEqual([{ at: at(20), left: 9 }, { at: at(21), left: 7 }])
+  })
+
+  it('leaves out resting games and games with nothing left', () => {
+    expect(leftByReset([
+      { skipped: true, dailyDone: 0, dailyTotal: 5, resetAt: at(20) },
+      { skipped: false, dailyDone: 4, dailyTotal: 4, resetAt: at(20) },
+      { skipped: false, dailyDone: 1, dailyTotal: 3, resetAt: at(21) },
+    ])).toEqual([{ at: at(21), left: 2 }])
+  })
+
+  it('treats resets within the same minute as one', () => {
+    expect(leftByReset([
+      { skipped: false, dailyDone: 0, dailyTotal: 1, resetAt: new Date(at(20).getTime() + 5_000) },
+      { skipped: false, dailyDone: 0, dailyTotal: 2, resetAt: at(20) },
+    ])).toEqual([{ at: at(20), left: 3 }])
   })
 })

@@ -1,7 +1,8 @@
+import { useRef } from 'react'
 import { Link } from 'react-router'
 import SpendPrompt from '../components/SpendPrompt'
-import { Button, Card, CheckIcon, Loading, Notice, PageTitle } from '../components/ui'
-import { buildToday, clockOf, dailiesLeft, useTodayData } from '../lib/today'
+import { Button, Card, CheckIcon, Loading, Notice, PageTitle, TagLegend } from '../components/ui'
+import { buildToday, clockOf, dailiesLeft, leftByReset, useTodayData } from '../lib/today'
 import { dailyPeriod, formatClock, formatDuration } from '../lib/time'
 import { useBulkUndo } from '../components/bulkUndo/useBulkUndo'
 import { useNow } from '../lib/useNow'
@@ -11,6 +12,7 @@ import { useCharacterImages } from '../lib/useCharacterImages'
 import { useMedia } from '../lib/useMedia'
 import { useDataSaver } from '../lib/dataSaver'
 import { useGameIcons } from '../lib/useGameIcons'
+import { useEvenRows } from '../lib/useEvenRows'
 
 // Small colour cue per game; the only game-specific colour in the neutral look.
 const DOT: Record<string, string> = { genshin: 'bg-game-genshin', wuwa: 'bg-game-wuwa', nte: 'bg-game-nte' }
@@ -55,13 +57,21 @@ export default function TodayPage() {
 
   }
 
+  // Cards side by side keep their rows in line even when a game's name wraps (THM-12)
+  const cardGrid = useRef<HTMLDivElement>(null)
+  useEvenRows(cardGrid, '[data-name-row]', today?.cards.length ?? 0)
+
   const progress = today?.dailyProgress
   const leftOverall = progress ? progress.total - progress.done : 0
-  // The next reset among the games that still have dailies left (resting games left out)
-  const nextReset = today?.cards
-    .filter((c) => !c.skipped && c.dailyDone < c.dailyTotal)
-    .map((c) => c.resetAt)
-    .sort((a, b) => a.getTime() - b.getTime())[0]
+  // What's left, split by when it resets: games can reset at different hours (NTE an hour after
+  // Genshin and WuWa in Asia), so one "next reset" would only be true for some of them
+  const resets = today ? leftByReset(today.cards) : []
+  const until = (at: Date) => formatDuration(at.getTime() - now.getTime())
+  const leftLabel = leftOverall === 0
+    ? 'All done today'
+    : resets.length <= 1
+      ? `${leftOverall} left${resets[0] ? ` · reset in ${until(resets[0].at)}` : ''}`
+      : resets.map((r, i) => `${r.left}${i === 0 ? ' left' : ''} in ${until(r.at)}`).join(' · ')
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,9 +90,7 @@ export default function TodayPage() {
                 {progress.done}
                 <span className="ml-1.5 font-sans text-sm font-semibold text-muted">of {progress.total} done</span>
               </span>
-              <span className="gc-tag">
-                {leftOverall === 0 ? 'All done today' : `${leftOverall} left${nextReset ? ` · next reset ${formatDuration(nextReset.getTime() - now.getTime())}` : ''}`}
-              </span>
+              <span className="gc-tag">{leftLabel}</span>
             </div>
             <div
               role="progressbar"
@@ -106,13 +114,17 @@ export default function TodayPage() {
         <div className="flex flex-col gap-6">
           {/* Your games come first on wider screens; on a phone the short attention list comes first */}
           <section aria-labelledby="g-h" className="flex flex-col gap-2.5">
-            <h2 id="g-h" className="text-base font-semibold">Your games</h2>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2 id="g-h" className="text-base font-semibold">Your games</h2>
+              {/* THM-12: the key to the stamina tag's icon */}
+              {today.cards.some((c) => c.meter && !c.skipped) && <TagLegend icons={['full']} />}
+            </div>
             {today.cards.length === 0 && (
               <p className="text-muted">
                 No games yet. <Link to="/games" className="inline-flex min-h-11 items-center text-accent underline">Add one</Link>.
               </p>
             )}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div ref={cardGrid} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {today.cards.map((card) => {
                 const left = card.dailyTotal - card.dailyDone
                 const game = data?.games.find((g) => g.id === card.id)

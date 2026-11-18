@@ -38,9 +38,11 @@ export default function EventImport({ games, existing, defaultGameId, now, onCan
   }
 
   return (
-    <Card as="section" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-sm font-semibold">Import a list</h2>
+    <Card as="section" className="gc-set flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        <div className="-mx-5 -mt-5 border-b border-line px-5 py-3.5">
+          <h2 className="gc-label flex items-center"><span aria-hidden="true" className="gc-tick" />Import a list</h2>
+        </div>
         <p className="text-sm text-muted">
           One event per line: <code className="text-ink">Name | ends 2026-12-21 | starts 2026-11-19</code>. The start is optional; a time is optional
           (2026-12-21 03:59). Without a time, an event ends one minute before the daily reset. A line with just a game's name switches the game.
@@ -69,11 +71,11 @@ export default function EventImport({ games, existing, defaultGameId, now, onCan
 
       {lines.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <h3 className="text-xs font-semibold text-muted">
+          <h3 className="gc-label">
             Preview: {ready.length} to add
             {lines.length > ready.length && ` · ${lines.length - ready.length} skipped`}
           </h3>
-          <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
+          <ul className="flex flex-col divide-y divide-line rounded-xl border border-line bg-raised">
             {lines.map((l) => (
               <li key={l.line} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-3 py-2 text-sm">
                 {l.status === 'problem' ? (

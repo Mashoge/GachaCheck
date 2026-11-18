@@ -283,16 +283,39 @@ export function cardHeadline(card: Pick<GameCard, 'meter' | 'skipped' | 'dailyDo
 }
 
 /** The short tag next to the meter's name: when it fills, and whether that needs you soon. */
-export function meterTag(card: Pick<GameCard, 'meter' | 'meterSoon'>, now: Date): { text: string; urgent: boolean } | null {
+/**
+ * The stamina tag on a Today card. `text` is the whole phrase (read out by screen readers and shown on
+ * hover); `short` is what sits beside the "full" icon (THM-12): the time, "Now", "+12" or "in 1h 5m".
+ */
+export function meterTag(card: Pick<GameCard, 'meter' | 'meterSoon'>, now: Date): { text: string; short: string; urgent: boolean } | null {
   const m = card.meter
   if (!m) return null
   if (m.full) {
     const over = overCapBy(m)
-    return { text: over > 0 ? `Above cap +${over}` : 'Full now', urgent: true }
+    return over > 0 ? { text: `Above cap +${over}`, short: `+${over}`, urgent: true } : { text: 'Full now', short: 'Now', urgent: true }
   }
   if (!m.fullAt) return null
-  if (card.meterSoon) return { text: `Caps in ${formatDuration(m.fullAt.getTime() - now.getTime())}`, urgent: true }
-  return { text: `Full ${formatWhen(m.fullAt, now).replace(/^tomorrow\b/, 'tmrw')}`, urgent: false }
+  if (card.meterSoon) {
+    const left = formatDuration(m.fullAt.getTime() - now.getTime())
+    return { text: `Caps in ${left}`, short: `in ${left}`, urgent: true }
+  }
+  const when = formatWhen(m.fullAt, now).replace(/^tomorrow\b/, 'tmrw')
+  return { text: `Full ${when}`, short: when.replace(/^tmrw\b/, 'Tmrw'), urgent: false }
+}
+
+/**
+ * Dailies left, grouped by when they reset (games that share a reset time together), soonest first.
+ * Resting games and games with nothing left are skipped, so the parts add up to the progress total.
+ */
+export function leftByReset(cards: Pick<GameCard, 'skipped' | 'dailyDone' | 'dailyTotal' | 'resetAt'>[]): { at: Date; left: number }[] {
+  const groups = new Map<number, number>()
+  for (const c of cards) {
+    const left = c.dailyTotal - c.dailyDone
+    if (c.skipped || left <= 0) continue
+    const minute = Math.floor(c.resetAt.getTime() / 60_000) * 60_000
+    groups.set(minute, (groups.get(minute) ?? 0) + left)
+  }
+  return [...groups].sort(([a], [b]) => a - b).map(([at, left]) => ({ at: new Date(at), left }))
 }
 
 const DAY = 86_400_000

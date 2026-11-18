@@ -15,7 +15,7 @@ import {
 import { messageOf } from '../lib/errors'
 import { findPreset } from '../data/presets'
 import { moveTaskWithinGroup } from '../lib/taskOrdering'
-import { Button, Input, Notice, Select, Tag } from './ui'
+import { Button, IconTag, Input, Notice, Select, TagLegend, type TagIconName } from './ui'
 
 type Task = GameSummary['tasks'][number]
 
@@ -105,9 +105,9 @@ function SortableTaskRow({
   return (
     <li
       ref={ref as Ref<HTMLLIElement>}
-      className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border bg-raised px-2 py-2 transition-colors ${
-        task.hidden ? 'opacity-50 ' : ''
-      }${isDragging ? 'border-accent opacity-60 shadow-lg ' : isDropTarget ? 'border-accent ' : 'border-transparent '}`}
+      className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-1 py-1.5 transition-colors ${
+        task.hidden ? 'opacity-55 ' : ''
+      }${isDragging ? 'bg-raised opacity-80 shadow-lg ring-1 ring-accent ' : isDropTarget ? 'bg-raised ring-1 ring-accent ' : ''}`}
     >
       <button
         ref={handleRef as Ref<HTMLButtonElement>}
@@ -120,19 +120,20 @@ function SortableTaskRow({
         <GripIcon />
       </button>
 
-      <div className={`min-w-0 space-y-0.5 ${extras ? 'basis-full sm:basis-0 sm:flex-1' : 'flex-1'}`}>
+      {/* On a phone with a target button, the name stays beside its handle and the buttons go below */}
+      <div className={`min-w-0 flex-1 space-y-0.5 ${extras ? 'basis-[calc(100%-3.5rem)] sm:basis-0' : ''}`}>
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span>{task.title}</span>
-          {task.optional && <Tag tone="neutral">Optional</Tag>}
-          {isCustom && <Tag tone="accent">Mine</Tag>}
-          {task.hidden && <span className="text-xs text-muted">Hidden</span>}
+          <span className={task.hidden ? 'text-muted' : undefined}>{task.title}</span>
+          {task.optional && <IconTag icon="optional" tone="rest" />}
+          {isCustom && <IconTag icon="mine" />}
+          {task.hidden && <IconTag icon="hidden" tone="rest" />}
         </div>
         {(task.note || hint) && (
           <p className="text-xs text-muted">{[hint, task.note].filter(Boolean).join(' · ')}</p>
         )}
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-1">
         {showTarget && (
           <label className="flex items-center gap-1.5 text-xs text-muted">
             Target / week
@@ -157,11 +158,11 @@ function SortableTaskRow({
         )}
 
         {isCustom ? (
-          <Button size="md" variant="danger" disabled={disabled} onClick={() => onRemove(task)}>
+          <Button size="sm" variant="quiet" className="hover:!text-urgent" disabled={disabled} onClick={() => onRemove(task)} aria-label={`Remove ${task.title}`}>
             Remove
           </Button>
         ) : (
-          <Button size="md" disabled={disabled} onClick={() => onToggleHidden(task)}>
+          <Button size="sm" variant="quiet" disabled={disabled} onClick={() => onToggleHidden(task)} aria-label={`${task.hidden ? 'Show' : 'Hide'} ${task.title}`}>
             {task.hidden ? 'Show' : 'Hide'}
           </Button>
         )}
@@ -241,6 +242,12 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
 
   const active = game.tasks.filter((t) => !t.archived)
   const preset = findPreset(game.preset_id)
+  // THM-12: the key to the tag icons this list uses
+  const legend: TagIconName[] = [
+    ...(active.some((t) => t.preset_key === null) ? ['mine' as const] : []),
+    ...(active.some((t) => t.optional) ? ['optional' as const] : []),
+    ...(active.some((t) => t.hidden) ? ['hidden' as const] : []),
+  ]
 
   return (
     <div className="space-y-4 border-t border-line pt-4">
@@ -275,13 +282,18 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
         <p className="text-xs text-muted">
           Drag a task by its handle to reorder. For keyboard control, focus the handle and press Space, then use the arrow keys.
         </p>
+        {legend.length > 0 && <TagLegend icons={legend} />}
         {GROUPS.map((group) => {
           const tasks = active.filter(group.match)
           if (tasks.length === 0) return null
           return (
-            <section key={group.id} className="space-y-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">{group.label}</h4>
-              <ul className="space-y-1.5">
+            <section key={group.id} className="space-y-1.5">
+              <h4 className="gc-label flex items-center">
+                <span aria-hidden="true" className="gc-tick" />
+                {group.label}
+                <span className="ml-2 font-display text-xs tracking-normal text-muted">{tasks.length}</span>
+              </h4>
+              <ul className="divide-y divide-line rounded-xl border border-line bg-page/40 px-2">
                 {tasks.map((task, taskIndex) => {
                   const presetTask = preset?.tasks.find((p) => p.key === task.preset_key)
                   const showTarget = task.weekly_target !== null || targetFor === task.id
@@ -322,10 +334,10 @@ export default function TaskManager({ game, onChanged }: TaskManagerProps) {
           e.preventDefault()
           handleAdd()
         }}
-        className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-line p-3"
+        className="flex flex-wrap items-end gap-2 rounded-xl border border-line bg-raised p-3"
       >
-        <div className="flex min-w-[180px] flex-1 flex-col gap-1">
-          <label htmlFor={`new-task-${game.id}`} className="text-xs text-muted">Add your own</label>
+        <div className="flex min-w-[180px] flex-1 flex-col gap-1.5">
+          <label htmlFor={`new-task-${game.id}`} className="gc-label">Add your own</label>
           <Input id={`new-task-${game.id}`} value={title} maxLength={80} placeholder={preset?.taskExample ?? 'e.g. Build a new character'}
             onChange={(e) => setTitle(e.target.value)} />
         </div>

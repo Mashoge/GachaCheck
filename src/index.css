@@ -840,6 +840,13 @@
 }
 .gc-tag[data-tone="urgent"] { background: var(--color-urgent); color: #1b0f08; }
 .gc-tag[data-tone="rest"] { background: #ffffff14; color: var(--color-muted); }
+/* THM-12: icon tags (IconTag.tsx): an icon and short text; an icon-only tag spells out its name when tapped */
+.gc-itag { position: relative; display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; }
+.gc-itag-solo { padding-inline: 10px; cursor: default; }
+.gc-itag-solo:not([data-open]) .gc-itag-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* The key to the icons: small, quiet, one line that wraps */
+.gc-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 11px; color: var(--color-muted); }
+.gc-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .gc-slant-bar { height: 8px; background: var(--color-line); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
 .gc-slant-bar > i { display: block; height: 100%; background: var(--color-accent); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); transition: width 0.4s var(--ease-standard); }
 

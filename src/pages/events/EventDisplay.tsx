@@ -5,7 +5,7 @@ import { clockOf, isVisible, type Game } from '../../lib/today'
 import { PHONE, useMedia } from '../../lib/useMedia'
 import { SHORT_NAMES } from '../../lib/useGames'
 import { GameIcon } from '../../components/GameIcon'
-import { Button, ExternalIcon, buttonClass, cx } from '../../components/ui'
+import { Button, ExternalIcon, IconTag, buttonClass, cx } from '../../components/ui'
 
 const DAY = 86_400_000
 const SOON_MS = 3 * DAY
@@ -55,9 +55,9 @@ export function EventCard({ event, game, iconUrl, now, onEdit, onDone }: {
           <GameIcon presetId={game?.preset_id ?? null} url={iconUrl} size={20} />
           <span className="gc-label">{shortName(game)}</span>
           {event.source !== 'manual' && (
-            event.origin === 'catalog' ? <span className="gc-tag">Official</span> : <span className="gc-tag" data-tone="rest">Auto-added</span>
+            event.origin === 'catalog' ? <IconTag icon="official" /> : <IconTag icon="auto" tone="rest" />
           )}
-          {event.kind === 'web_event' && <span className="gc-tag" data-tone="rest">Web event</span>}
+          {event.kind === 'web_event' && <IconTag icon="web" tone="rest" />}
         </div>
 
         <div className="flex items-start justify-between gap-4">

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { ChevronIcon } from './ui'
+import { ChevronIcon, IconTag } from './ui'
 import { GameIcon } from './GameIcon'
 import { RosterArt } from './RosterArt'
 import { RosterMotif } from './RosterMotif'
@@ -36,7 +36,7 @@ export function TodayCard({ card, now, iconUrl, images, footer, after }: {
 
   // The big number and what goes with it
   let label: string
-  let tag: { text: string; tone: Tone } | null
+  let tag: { text: string; tone: Tone; short?: string } | null
   let num: number
   let cap: string
   let pct: number
@@ -44,7 +44,7 @@ export function TodayCard({ card, now, iconUrl, images, footer, after }: {
   if (headline === 'meter' && m) {
     const t = meterTag(card, now)
     label = m.name
-    tag = card.skipped ? { text: 'Resting · no pings', tone: 'rest' } : t && { text: t.text, tone: t.urgent ? 'urgent' : undefined }
+    tag = card.skipped ? { text: 'Resting · no pings', tone: 'rest' } : t && { text: t.text, short: t.short, tone: t.urgent ? 'urgent' : undefined }
     num = m.value
     cap = `/${m.cap}`
     pct = Math.min(100, (m.value / m.cap) * 100)
@@ -119,8 +119,9 @@ export function TodayCard({ card, now, iconUrl, images, footer, after }: {
         {images.length > 0 && <RosterArt images={images} awake={awake} />}
         <RosterMotif game={card.presetId} />
 
-        {/* Name: the whole body is the link to the game */}
-        <span className="flex items-center gap-2">
+        {/* Name: the whole body is the link to the game. TodayPage evens out this row's height across a
+            row of cards, so a name that wraps (Neverness to Everness) doesn't push its card's rows down. */}
+        <span data-name-row className="flex items-center gap-2">
           <GameIcon presetId={card.presetId} url={iconUrl} size={22} />
           <Link to={`/game/${card.presetId}`} className="min-w-0 flex-1 leading-tight font-semibold after:absolute after:inset-0 focus-visible:outline-none">
             <span className="sr-only">Open </span>
@@ -134,7 +135,10 @@ export function TodayCard({ card, now, iconUrl, images, footer, after }: {
 
         <span className="mt-5 flex items-center justify-between gap-3">
           <span className="gc-label">{label}</span>
-          {tag && <span className="gc-tag" data-tone={tag.tone}>{tag.text}</span>}
+          {/* THM-12: when the meter is full, as an icon and the time; above the card's link so hovering it shows the phrase */}
+          {tag && (tag.short
+            ? <IconTag icon="full" text={tag.short} say={tag.text} tone={tag.tone === 'urgent' ? 'urgent' : undefined} className="relative z-[1]" />
+            : <span className="gc-tag" data-tone={tag.tone}>{tag.text}</span>)}
         </span>
         <span className="gc-hero mt-1.5">
           <span className="gc-numwrap">

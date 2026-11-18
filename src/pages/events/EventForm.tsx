@@ -127,7 +127,7 @@ export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave
 
 
   return (
-    <Card as="section" padding="none">
+    <Card as="section" padding="none" className="gc-set">
       <form
         ref={formRef}
         className="flex flex-col gap-4 p-5"
@@ -136,7 +136,10 @@ export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave
           void submit(false)
         }}
       >
-      <h2 className="text-sm font-semibold">{editing ? 'Edit event' : 'Add event'}</h2>
+      {/* THM-9: the same heading band as the game page panels */}
+      <div className="-mx-5 -mt-5 border-b border-line px-5 py-3.5">
+        <h2 className="gc-label flex items-center"><span aria-hidden="true" className="gc-tick" />{editing ? 'Edit event' : 'Add event'}</h2>
+      </div>
       {official ? (
         <p className="-mt-2 text-xs text-muted">From the official announcements. The name and dates are kept up to date for you; the note and the reminder choice are yours.</p>
       ) : (
@@ -156,24 +159,20 @@ export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave
         </Field>
       </div>
 
-      <section aria-labelledby="event-schedule-title" className="rounded-xl border border-line bg-page p-4">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h3 id="event-schedule-title" className="text-sm font-semibold text-ink">Event schedule</h3>
-            <p className="mt-1 text-xs text-muted">Set when the event opens and when it closes.</p>
-          </div>
-          <span className="rounded-md border border-line bg-surface px-2 py-1 text-xs font-medium text-muted">
-            {zone} server time
-          </span>
+      {/* The schedule: one band with two columns instead of boxes inside boxes */}
+      <section aria-labelledby="event-schedule-title" className="rounded-xl border border-line bg-raised p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 id="event-schedule-title" className="gc-label">Schedule</h3>
+          <span className="gc-tag" data-tone="rest">{zone} server time</span>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-line bg-surface p-3">
-            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
+          <div>
+            <div className="mb-1 flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-ink">Starts</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Optional</span>
+              <span className="gc-tag" data-tone="rest">Optional</span>
             </div>
-            <p className="mb-3 text-xs leading-relaxed text-muted">Leave blank if the event is already running.</p>
+            <p className="mb-2.5 text-xs leading-relaxed text-muted">Leave blank if the event is already running.</p>
             <div className="flex min-w-0 gap-2">
               <Field id="event-start-date" label="Start date" hideLabel className="min-w-0 flex-1">
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} disabled={official} className="w-full min-w-0" />
@@ -184,12 +183,12 @@ export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave
             </div>
           </div>
 
-          <div className="rounded-lg border border-line bg-surface p-3">
-            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="mb-1 flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-ink">Ends</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Required</span>
+              <span className="gc-tag">Required</span>
             </div>
-            <p className="mb-3 text-xs leading-relaxed text-muted">The final date and time players can participate.</p>
+            <p className="mb-2.5 text-xs leading-relaxed text-muted">The final date and time players can take part.</p>
             <div className="flex min-w-0 gap-2">
               <Field id="event-end-date" label="End date" hideLabel className="min-w-0 flex-1">
                 <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} disabled={official} className="w-full min-w-0" />
