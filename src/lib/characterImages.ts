@@ -3,7 +3,8 @@
 // Files go to the private Storage bucket "character-art" under <your user id>/<game id>/, and a row in
 // character_images remembers the game, order and focus point. Pictures are shrunk in the browser first
 // (longest side 1280 px, WebP, or JPEG where the browser cannot write WebP), so each is roughly
-// 100-200 KB and Supabase's free storage lasts. The app shows them through signed links that expire.
+// 100-200 KB and Supabase's free storage lasts. The app shows them through signed links that expire,
+// reused while they last (THM-7) so the same picture is not downloaded again.
 import { supabase } from './supabase'
 
 export const BUCKET = 'character-art'
@@ -11,7 +12,11 @@ export const MAX_PER_GAME = 12 // also enforced by the database
 export const MAX_INPUT_BYTES = 15 * 1024 * 1024 // a big PC screenshot is 2-8 MB
 export const LONG_SIDE = 1280
 export const ACCEPT = 'image/png,image/jpeg,image/webp'
-const LINK_SECONDS = 60 * 60
+// Signed links last 6 hours and are reused until 30 minutes before they expire. The same link means the
+// same address, so the browser shows its saved copy instead of downloading the picture again.
+const LINK_SECONDS = 6 * 60 * 60
+const LINK_MARGIN_MS = 30 * 60_000
+const LINKS_KEY = 'gachacheck.pictureLinks'
 
 export type CharacterImage = {
   id: string
@@ -97,6 +102,38 @@ async function userId() {
   return id
 }
 
+type SavedLink = { url: string; expires: number }
+
+/** A saved link can be reused while it has more than 30 minutes left. */
+export function linkStillGood(link: SavedLink | undefined, now: number) {
+  return !!link && link.expires - now > LINK_MARGIN_MS
+}
+
+// Links are kept on this device so a reload or reopening the app reuses them too
+function loadLinks(): Record<string, SavedLink> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LINKS_KEY) ?? '{}')
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+/** Forget saved links (on sign-out), so nothing that opens your pictures stays on the device. */
+export function forgetPictureLinks() {
+  try {
+    localStorage.removeItem(LINKS_KEY)
+  } catch {
+    // nothing saved
+  }
+}
+function storeLinks(links: Record<string, SavedLink>) {
+  try {
+    localStorage.setItem(LINKS_KEY, JSON.stringify(links))
+  } catch {
+    // Not kept: links are simply made again next time
+  }
+}
+
 /** All your pictures, grouped by game, with signed links. */
 export async function fetchCharacterImages(): Promise<Record<string, CharacterImage[]>> {
   const { data, error } = await supabase
@@ -107,11 +144,21 @@ export async function fetchCharacterImages(): Promise<Record<string, CharacterIm
   if (error) throw error
   if (data.length === 0) return {}
 
-  const { data: links, error: linkError } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrls(data.map((r) => r.path), LINK_SECONDS)
-  if (linkError) throw linkError
-  const urlFor = new Map(links.map((l) => [l.path, l.signedUrl ?? null]))
+  const now = Date.now()
+  const saved = loadLinks()
+  const missing = data.map((r) => r.path).filter((path) => !linkStillGood(saved[path], now))
+  if (missing.length > 0) {
+    const { data: links, error: linkError } = await supabase.storage.from(BUCKET).createSignedUrls(missing, LINK_SECONDS)
+    if (linkError) throw linkError
+    for (const l of links) {
+      if (l.path && l.signedUrl) saved[l.path] = { url: l.signedUrl, expires: now + LINK_SECONDS * 1000 }
+    }
+  }
+  // Keep only links for pictures that still exist
+  const kept: Record<string, SavedLink> = {}
+  for (const r of data) if (saved[r.path]) kept[r.path] = saved[r.path]
+  storeLinks(kept)
+  const urlFor = new Map(Object.entries(kept).map(([path, l]) => [path, l.url]))
 
   const byGame: Record<string, CharacterImage[]> = {}
   for (const r of data) {

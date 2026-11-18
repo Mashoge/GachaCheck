@@ -11,6 +11,8 @@ import { SHORT_NAMES } from '../lib/useGames'
 import { RosterMotif } from '../components/RosterMotif'
 import { RosterArt } from '../components/RosterArt'
 import { useCharacterImages } from '../lib/useCharacterImages'
+import { useMedia } from '../lib/useMedia'
+import { useDataSaver } from '../lib/dataSaver'
 
 // Small colour cue per game; the only game-specific colour in the neutral look.
 const DOT: Record<string, string> = { genshin: 'bg-game-genshin', wuwa: 'bg-game-wuwa', nte: 'bg-game-nte' }
@@ -20,7 +22,11 @@ export default function TodayPage() {
   const { data, error, loading, addCompletion, removeCompletions, setMeterValue, setSkipped } = useTodayData()
   const now = useNow()
   const today = data ? buildToday(data, now) : null
-  const { images: characterImages } = useCharacterImages() // LTR-8: your own pictures for the roster cards
+  // LTR-8: your own pictures for the roster cards. Only where a card can be hovered (phones only see them
+  // for a moment while pressing) and never with Data saver (THM-7), so those devices download nothing.
+  const canHover = useMedia('(hover: hover) and (pointer: fine)')
+  const dataSaver = useDataSaver()
+  const { images: characterImages } = useCharacterImages(canHover && !dataSaver.on)
 
   // Bulk undo state lives above the route switch, so it survives navigation between tabs.
   const { batches, begin, complete, dismiss, dismissPrompt } = useBulkUndo()

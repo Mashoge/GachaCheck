@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_PER_GAME, fileProblem, fitWithin, focusFromPoint, imagePath, nudgeFocus, roomFor } from './characterImages'
+import { MAX_PER_GAME, fileProblem, fitWithin, focusFromPoint, imagePath, linkStillGood, nudgeFocus, roomFor } from './characterImages'
 
 describe('character pictures (LTR-8)', () => {
   it('shrinks the longest side to 1280 px, keeping the shape, and never enlarges', () => {
@@ -43,5 +43,14 @@ describe('character pictures (LTR-8)', () => {
     expect(roomFor(10, 5)).toBe(2)
     expect(roomFor(12, 1)).toBe(0)
     expect(roomFor(13, 1)).toBe(0)
+  })
+
+  it('reuses a signed link until 30 minutes before it expires (THM-7: no repeat downloads)', () => {
+    const now = Date.UTC(2026, 10, 18, 12)
+    expect(linkStillGood({ url: 'u', expires: now + 6 * 3600_000 }, now)).toBe(true)
+    expect(linkStillGood({ url: 'u', expires: now + 31 * 60_000 }, now)).toBe(true)
+    expect(linkStillGood({ url: 'u', expires: now + 30 * 60_000 }, now)).toBe(false)
+    expect(linkStillGood({ url: 'u', expires: now - 1 }, now)).toBe(false)
+    expect(linkStillGood(undefined, now)).toBe(false)
   })
 })

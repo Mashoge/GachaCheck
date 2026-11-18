@@ -7,7 +7,8 @@ import TaskManager from './TaskManager'
 import CharacterPictures from './CharacterPictures'
 import { fetchCharacterImages, type CharacterImage } from '../lib/characterImages'
 import { pingThreshold } from '../lib/stamina'
-import { Button, Card, Input, Notice, Select, useConfirm } from './ui'
+import { Button, Card, Input, Notice, Select, Switch, useConfirm } from './ui'
+import { setDataSaver, useDataSaver } from '../lib/dataSaver'
 
 export default function GamesScreen() {
   const [games, setGames] = useState<GameSummary[]>([])
@@ -220,8 +221,43 @@ export default function GamesScreen() {
         )}
       </section>
 
+      <DeviceSettings />
+
       {error && <Notice tone="error">{error}</Notice>}
     </div>
+  )
+}
+
+// THM-7: settings that belong to this device rather than your account (a phone on mobile data and a PC
+// on Wi-Fi can differ).
+function DeviceSettings() {
+  const { on, choice, browserAsks } = useDataSaver()
+  const why = choice !== null
+    ? null
+    : browserAsks ? 'On because your browser asked to save data.' : 'Follows your browser, which is not asking to save data.'
+  return (
+    <section className="space-y-3" aria-labelledby="device-settings">
+      <h2 id="device-settings" className="text-lg font-semibold">On this device</h2>
+      <Card padding="md" className="space-y-2">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold">Data saver</h3>
+            <p className="text-sm text-muted">
+              Turns off your character pictures and the cards&apos; decorative animation, so GachaCheck stays light on a
+              slow or metered connection. Numbers, countdowns and buttons stay the same.
+            </p>
+          </div>
+          <Switch label="Data saver" on={on} onChange={(next) => setDataSaver(next ? 'on' : 'off')} />
+        </div>
+        {why ? (
+          <p className="text-xs text-muted">{why}</p>
+        ) : (
+          <Button variant="link" size="sm" onClick={() => setDataSaver(null)}>
+            Follow my browser&apos;s setting instead
+          </Button>
+        )}
+      </Card>
+    </section>
   )
 }
 // SUP-3: "Ping me at N" for one meter. Blank = the default (90% of the cap). Saves on Enter or when leaving the field.

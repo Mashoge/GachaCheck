@@ -235,6 +235,16 @@
   .gc-roster-flash { display: none; }
   .gc-roster .gc-spin, .gc-roster .gc-drift { animation: none !important; }
 }
+/* THM-7 Data saver: no pictures (they are not even loaded) and no decorative motion. The card still
+   takes its game's colours, at once. */
+:root[data-saver] .gc-roster-art,
+:root[data-saver] .gc-roster-flash { display: none; }
+:root[data-saver] .gc-roster-bg,
+:root[data-saver] .gc-roster-title,
+:root[data-saver] .gc-roster-motif { transition: none !important; }
+:root[data-saver] .gc-roster .gc-spin,
+:root[data-saver] .gc-roster .gc-drift { animation: none !important; }
+
 /* High-contrast mode (Windows): drop the decoration and keep the plain card */
 @media (forced-colors: active) {
   .gc-roster-bg, .gc-roster-flash, .gc-roster-title, .gc-roster-motif, .gc-roster-art { display: none; }

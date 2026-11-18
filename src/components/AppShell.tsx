@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { Button, EventsIcon, GamesIcon, RemindersIcon, TodayIcon } from './ui'
 import type { usePwaInstall } from '../lib/usePwaInstall'
+import { useDataSaver } from '../lib/dataSaver'
+import { forgetPictureLinks } from '../lib/characterImages'
 
 type NavItem = { to: string; label: string; icon: ReactNode }
 
@@ -16,6 +18,12 @@ const NAV: NavItem[] = [
 export default function AppShell({ email, pwaInstall }: { email: string; pwaInstall: ReturnType<typeof usePwaInstall> }) {
   const { pathname } = useLocation()
   const { canInstall, install, status } = pwaInstall
+  const dataSaver = useDataSaver()
+
+  // THM-7: index.css turns decoration off under html[data-saver]
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-saver', dataSaver.on)
+  }, [dataSaver.on])
 
   // Game pages belong to Today
   const isActive = (to: string) =>
@@ -49,7 +57,7 @@ export default function AppShell({ email, pwaInstall }: { email: string; pwaInst
                 Install
               </Button>
             )}
-            <Button className="min-h-11" onClick={() => void supabase.auth.signOut()}>Sign out</Button>
+            <Button className="min-h-11" onClick={() => { forgetPictureLinks(); void supabase.auth.signOut() }}>Sign out</Button>
             <span className="sr-only" role="status" aria-live="polite">{status}</span>
           </div>
         </div>
