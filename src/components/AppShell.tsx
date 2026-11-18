@@ -31,7 +31,9 @@ export default function AppShell({ email, pwaInstall }: { email: string; pwaInst
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-line bg-surface pt-[env(safe-area-inset-top)]">
+      {/* THM-9: the page backdrop (index.css) */}
+      <div aria-hidden="true" className="gc-backdrop" />
+      <header className="border-b border-line bg-surface/85 pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3">
           <div className="flex items-center gap-7">
             <span className="font-display text-xl font-bold">GachaCheck</span>

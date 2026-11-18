@@ -103,6 +103,35 @@
 }
 
 /* =============================================================================================
+   THM-9: the page backdrop. Instead of flat black, one fixed layer behind every page: a soft glow
+   at the top in the three games' colours (gold, teal, pink) around the app's own lavender, and a
+   fine dot grid that fades out down the page. Pure CSS, nothing to download. Data saver and
+   high-contrast mode keep the plain background.
+   ============================================================================================= */
+.gc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(34% 34% at 14% 6%, color-mix(in oklab, var(--color-game-genshin) 15%, transparent), transparent 72%),
+    radial-gradient(40% 38% at 46% 2%, color-mix(in oklab, var(--color-accent) 17%, transparent), transparent 72%),
+    radial-gradient(34% 34% at 70% 6%, color-mix(in oklab, var(--color-game-wuwa) 12%, transparent), transparent 72%),
+    radial-gradient(30% 32% at 92% 4%, color-mix(in oklab, var(--color-game-nte) 14%, transparent), transparent 72%);
+}
+.gc-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at center, rgb(255 255 255 / 0.055) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 65%);
+  mask-image: linear-gradient(to bottom, #000, transparent 65%);
+}
+:root[data-saver] .gc-backdrop { display: none; }
+@media (forced-colors: active) { .gc-backdrop { display: none; } }
+
+/* =============================================================================================
    THM-8: Today cards. One GachaCheck voice at rest (shared structure, labels, slanted tags,
    one typeface for numbers), and the card you point at wakes into its game's world: Genshin's night sky
    and cream pills, WuWa's slate, frost and pale-gold numerals, NTE's charcoal, pink and italic snap.
