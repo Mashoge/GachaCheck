@@ -949,6 +949,77 @@
 .gc-ecard[data-game="nte"] .gc-emain { border-color: #d6d6d6; border-radius: 99px; background: #d6d6d6; color: #111; }
 .gc-ecard[data-game="nte"] .gc-emain:hover { background: #fff; color: #111; }
 
+/* ---------- EVT-13: the path timeline (EventPath.tsx) ----------
+   One skew leans the whole list (its bottom at the label column, its top further right by
+   height × tan(angle), set as --drift); every piece of text is set upright again with --unskew. The
+   chips keep the lean, so they read as slanted parallelograms. Dates are your local days. */
+.gc-pathbox { position: relative; overflow: hidden; border: 1px solid var(--color-line); border-radius: 1rem; background: var(--color-surface); padding: 26px 0 30px; }
+.gc-path { --label: 138px; --sx: calc(var(--label) + var(--drift, 0px)); position: relative; margin: 0; padding: 0; list-style: none; transform: skewX(var(--skew)); transform-origin: 0 0; }
+.gc-path::before {
+  content: ""; position: absolute; top: 17px; bottom: -30px; left: var(--sx); width: 3px; margin-left: -1.5px;
+  background: linear-gradient(180deg, var(--color-accent), rgb(185 176 255 / 0.35) 60%, transparent);
+}
+.gc-stop { position: relative; min-height: 34px; }
+.gc-rail { position: absolute; left: var(--sx); right: -400px; top: 17px; height: 1px; background: linear-gradient(90deg, rgb(255 255 255 / 0.25), rgb(255 255 255 / 0.08) 70%, transparent); }
+.gc-node {
+  position: absolute; left: var(--sx); top: 17px; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  background: var(--color-page); border: 3px solid var(--color-accent); transform: skewX(var(--unskew));
+}
+.gc-stop[data-soon] .gc-node { border-color: var(--color-urgent); }
+.gc-stop[data-today] .gc-node { width: 20px; height: 20px; margin: -10px 0 0 -10px; background: var(--color-accent); border: 4px solid #2f2a66; box-shadow: 0 0 0 4px rgb(185 176 255 / 0.2); }
+.gc-stop-date { position: absolute; right: calc(100% - var(--sx) + 22px); top: -3px; display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; transform: skewX(var(--unskew)); }
+.gc-stop-wd { font: 600 10px/1.2 var(--font-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-muted); }
+.gc-stop-dt { font: italic 700 22px/1.05 var(--font-display); letter-spacing: -0.01em; color: var(--color-ink); }
+.gc-stop[data-today] .gc-stop-dt { color: var(--color-accent); }
+.gc-stop-note { margin: 0 0 0 calc(var(--sx) + 28px); padding-top: 8px; font-size: 12px; color: var(--color-muted); }
+.gc-stop-note > span { display: inline-block; transform: skewX(var(--unskew)); }
+.gc-stop-month { position: absolute; right: 28px; top: -28px; z-index: 0; pointer-events: none; font: italic 700 92px/1 var(--font-display); letter-spacing: -0.03em; text-transform: uppercase; white-space: nowrap; color: rgb(255 255 255 / 0.03); }
+.gc-stop-items { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 0 0 0 calc(var(--sx) + 28px); padding: 0; list-style: none; max-width: calc(100% - var(--sx) - 40px); }
+.gc-stop-items > li { min-width: 0; max-width: 100%; }
+
+/* Chips: the lean is kept (a parallelogram); their contents are set upright */
+.gc-pchip {
+  position: relative; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 34px; padding: 0 14px 0 8px;
+  font: 600 13px/1 var(--font-sans); white-space: nowrap; color: var(--color-ink); text-align: left;
+}
+.gc-pchip > *, .gc-pchip > .contents > * { transform: skewX(var(--unskew)); }
+.gc-pchip-em { flex: none; display: inline-flex; }
+.gc-pchip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gc-pchip small { font: 500 11px/1 var(--font-sans); opacity: 0.75; }
+.gc-pchip-left { font: 700 11px/1 var(--font-sans); padding: 4px 6px; border-radius: 4px; background: #141414; color: var(--color-urgent); }
+button.gc-pchip { cursor: pointer; transition: filter 0.15s, translate 0.15s; }
+button.gc-pchip:hover { filter: brightness(1.08); translate: 0 -1px; }
+button.gc-pchip:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+/* An event ending: solid in the game's colour, with an arrow tip */
+.gc-pchip[data-kind="end"] { padding-right: 26px; color: #141414; background: var(--gc, var(--color-accent)); clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%); }
+.gc-pchip[data-kind="end"][data-soon] { box-shadow: inset 0 0 0 2px var(--color-urgent); }
+/* An event starting: outlined */
+.gc-pchip[data-kind="start"] { background: var(--color-surface); box-shadow: inset 0 0 0 1.5px var(--gc, var(--color-accent)); }
+/* An endgame reset: dark, with the game's edge */
+.gc-pchip[data-kind="cycle"] { background: var(--color-raised); border-left: 4px solid var(--gc, var(--color-accent)); color: var(--gc-light, var(--color-ink)); }
+.gc-pchip[data-game="genshin"] { --gc: var(--color-game-genshin); --gc-light: #e8cf9b; }
+.gc-pchip[data-game="wuwa"] { --gc: var(--color-game-wuwa); --gc-light: #8ee3df; }
+.gc-pchip[data-game="nte"] { --gc: var(--color-game-nte); --gc-light: #ff9cc6; }
+/* The path's key, beside the heading */
+.gc-pathkey { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 11px; color: var(--color-muted); }
+.gc-pathkey > span { display: inline-flex; align-items: center; gap: 6px; }
+.gc-pathkey i { display: inline-block; width: 22px; height: 12px; transform: skewX(-8deg); }
+.gc-pathkey .k-end { background: #d0d0d0; clip-path: polygon(0 0, 70% 0, 100% 50%, 70% 100%, 0 100%); }
+.gc-pathkey .k-start { box-shadow: inset 0 0 0 1.5px #d0d0d0; }
+.gc-pathkey .k-cycle { background: #2a2a2a; border-left: 4px solid #d0d0d0; }
+@media (max-width: 767px) {
+  .gc-pathbox { padding: 20px 0 24px; }
+  .gc-path { --label: 90px; }
+  .gc-stop-dt { font-size: 16px; }
+  .gc-stop-items { flex-direction: column; align-items: stretch; gap: 6px; max-width: calc(100% - var(--sx) - 18px); }
+  .gc-pchip { width: 100%; height: 32px; font-size: 12px; }
+  .gc-pchip-name { flex: 1; }
+  .gc-stop-month { display: none; }
+}
+@media (forced-colors: active) {
+  .gc-pchip { border: 1px solid CanvasText; }
+}
+
 /* The "Event page" link in each game's accent */
 .gc-ecard[data-game="genshin"] .gc-efoot a { color: #e6c98d; }
 .gc-ecard[data-game="wuwa"] .gc-efoot a { color: #fdfdbd; }

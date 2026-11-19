@@ -5,7 +5,8 @@ import { clockOf, isVisible, type Game } from '../../lib/today'
 import { PHONE, useMedia } from '../../lib/useMedia'
 import { SHORT_NAMES } from '../../lib/useGames'
 import { GameIcon } from '../../components/GameIcon'
-import { Button, ExternalIcon, IconTag, buttonClass, cx } from '../../components/ui'
+import { Button, ExternalIcon, IconTag, ToggleGroup, buttonClass, cx } from '../../components/ui'
+import { EventPath } from './EventPath'
 
 const DAY = 86_400_000
 const SOON_MS = 3 * DAY
@@ -136,7 +137,7 @@ export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDon
 
 // ---- Timeline: one bar per event and per endgame cycle, over the next six weeks (three on a phone) ----
 
-export function Timeline({ games, events, icons = {}, now, onOpen }: { games: Game[]; events: GameEvent[]; icons?: Record<string, string>; now: Date; onOpen: (event: GameEvent) => void }) {
+function TimelineBars({ games, events, icons = {}, now, onOpen }: TimelineProps) {
   // A phone shows fewer weeks so the whole timeline fits the screen without scrolling sideways
   const phone = useMedia(PHONE)
   const beforeDays = phone ? 1 : 2
@@ -169,16 +170,11 @@ export function Timeline({ games, events, icons = {}, now, onOpen }: { games: Ga
     })
     .filter((g) => g.bars.length > 0)
 
-  if (groups.length === 0) return null
+  if (groups.length === 0) return <p className="text-sm text-muted">Nothing in the next {phone ? 3 : 6} weeks.</p>
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
-        <h2 className="flex items-center gap-3 text-base font-semibold">
-          Timeline <span className="gc-tag" data-tone="rest">Next {phone ? 3 : 6} weeks</span>
-        </h2>
-        <span className="text-xs text-muted">Solid bars are events, outlined bars are endgame cycles. A faded edge means it was already running.</span>
-      </div>
+    <div className="flex flex-col gap-2">
+      <span className="text-xs text-muted">Solid bars are events, outlined bars are endgame cycles. A faded edge means it was already running.</span>
       <div
         role="region"
         aria-label="Event and endgame timeline. Scroll horizontally on wider screens."
@@ -260,7 +256,62 @@ export function Timeline({ games, events, icons = {}, now, onOpen }: { games: Ga
           </div>
         </div>
       </div>
-    </section>
+    </div>
   )
 }
 
+
+// ---- Timeline: the path (EVT-13, the default) or the bars, chosen with a switch remembered on this device ----
+
+type TimelineProps = { games: Game[]; events: GameEvent[]; icons?: Record<string, string>; now: Date; onOpen: (event: GameEvent) => void }
+type TimelineView = 'path' | 'bars'
+const VIEW_KEY = 'gachacheck.events.timelineView'
+
+const readView = (): TimelineView => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'bars' ? 'bars' : 'path'
+  } catch {
+    return 'path'
+  }
+}
+
+export function Timeline(props: TimelineProps) {
+  const [view, setView] = useState<TimelineView>(readView)
+  const phone = useMedia(PHONE)
+  const choose = (next: TimelineView) => {
+    setView(next)
+    try {
+      localStorage.setItem(VIEW_KEY, next)
+    } catch {
+      // The choice just isn't remembered on this device
+    }
+  }
+  const hasEndgame = props.games.some((g) => g.tasks.some((t) => t.category === 'endgame' && isVisible(t)))
+  if (props.events.length === 0 && !hasEndgame) return null
+
+  return (
+    <section aria-labelledby="timeline-title" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <h2 id="timeline-title" className="flex items-center gap-3 text-base font-semibold">
+          Timeline <span className="gc-tag" data-tone="rest">Next {view === 'bars' && phone ? 3 : 6} weeks</span>
+        </h2>
+        {view === 'path' && (
+          <p aria-hidden="true" className="gc-pathkey">
+            <span><i className="k-end" />ends</span>
+            <span><i className="k-start" />starts</span>
+            <span><i className="k-cycle" />endgame resets</span>
+          </p>
+        )}
+        <ToggleGroup
+          label="Timeline view"
+          shape="slant"
+          className="ml-auto"
+          value={view}
+          onChange={choose}
+          options={[{ id: 'path', label: 'Path' }, { id: 'bars', label: 'Bars' }]}
+        />
+      </div>
+      {view === 'path' ? <EventPath {...props} /> : <TimelineBars {...props} />}
+    </section>
+  )
+}
