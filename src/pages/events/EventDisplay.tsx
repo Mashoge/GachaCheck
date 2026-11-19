@@ -1,5 +1,7 @@
-import { Children, useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import type { GameEvent } from '../../lib/events'
+import { fullWhen } from '../../lib/eventFacts'
+import type { PathItem } from '../../lib/eventPath'
 import { formatDuration, formatWhen, taskPeriod } from '../../lib/time'
 import { clockOf, isVisible, type Game } from '../../lib/today'
 import { PHONE, useMedia } from '../../lib/useMedia'
@@ -7,6 +9,7 @@ import { SHORT_NAMES } from '../../lib/useGames'
 import { GameIcon } from '../../components/GameIcon'
 import { Button, ExternalIcon, IconTag, ToggleGroup, buttonClass, cx } from '../../components/ui'
 import { EventPath } from './EventPath'
+import { usePreview, type PreviewBind } from './EventPreview'
 
 const DAY = 86_400_000
 const SOON_MS = 3 * DAY
@@ -16,19 +19,6 @@ const shortName = (game: Game | undefined) => (game ? (SHORT_NAMES[game.preset_i
 
 // THM-9 (step 3): sections and cards in the Today page's voice: a count tag beside each heading, and
 // cards with the game's label, slanted tags, a big countdown, a slanted bar and a footer for the buttons.
-export function Section({ title, hint, urgent = false, children }: { title: string; hint?: string; urgent?: boolean; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h2 className="text-base font-semibold">{title}</h2>
-        <span className="gc-tag" data-tone={urgent ? 'urgent' : 'rest'}>{Children.count(children)}</span>
-        {hint && <span className="text-xs text-muted">{hint}</span>}
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{children}</div>
-    </section>
-  )
-}
-
 /**
  * EVT-11: your own picture as the backdrop of the card's top half, fading into the card, so the card
  * keeps its height (cards beside it don't stretch). A private file, through a signed link; loaded only
@@ -47,14 +37,16 @@ function EventPicture({ url }: { url: string }) {
 // EVT-12: each card in its game's own style (index.css, .gc-ecard[data-game]): Genshin's starry navy
 // with gold and cream, WuWa's slate glass with corner brackets and pale gold, NTE's charcoal with pink
 // and blue. Static: no motion, so a page of cards stays calm.
-export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDone }: {
+// EVT-14: `bare` leaves out the buttons, for the preview that shows while the mouse rests on an event
+export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDone, bare = false }: {
   event: GameEvent
   game: Game | undefined
   iconUrl?: string
   pictureUrl?: string
   now: Date
-  onEdit: () => void
-  onDone: (done: boolean) => void
+  onEdit?: () => void
+  onDone?: (done: boolean) => void
+  bare?: boolean
 }) {
   const start = event.starts_at ? new Date(event.starts_at) : null
   const end = new Date(event.ends_at)
@@ -114,7 +106,7 @@ export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDon
         </div>
       </div>
 
-      <div className="gc-efoot flex min-h-12 flex-wrap items-center gap-1.5 border-t px-3 py-1.5">
+      {!bare && <div className="gc-efoot flex min-h-12 flex-wrap items-center gap-1.5 border-t px-3 py-1.5">
         {event.official_url && (
           <a href={event.official_url} target="_blank" rel="noreferrer" className={buttonClass({ variant: 'link', size: 'sm' })}>
             Event page <ExternalIcon size={13} />
@@ -122,7 +114,7 @@ export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDon
         )}
         <span className="ml-auto flex gap-1.5">
           {!upcoming && (
-            <Button size="sm" variant="secondary" className="gc-emain" onClick={() => onDone(!isDone)} aria-label={`${isDone ? 'Not done' : 'Mark done'}: ${event.name}`}>
+            <Button size="sm" variant="secondary" className="gc-emain" onClick={() => onDone?.(!isDone)} aria-label={`${isDone ? 'Not done' : 'Mark done'}: ${event.name}`}>
               {isDone ? 'Not done' : 'Mark done'}
             </Button>
           )}
@@ -130,14 +122,14 @@ export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDon
             Edit
           </Button>
         </span>
-      </div>
+      </div>}
     </article>
   )
 }
 
 // ---- Timeline: one bar per event and per endgame cycle, over the next six weeks (three on a phone) ----
 
-function TimelineBars({ games, events, icons = {}, now, onOpen }: TimelineProps) {
+function TimelineBars({ games, events, icons = {}, now, onOpen, peek }: BarsProps) {
   // A phone shows fewer weeks so the whole timeline fits the screen without scrolling sideways
   const phone = useMedia(PHONE)
   const beforeDays = phone ? 1 : 2
@@ -152,7 +144,7 @@ function TimelineBars({ games, events, icons = {}, now, onOpen }: TimelineProps)
   const groups = games
     .map((game) => {
       const bars: { key: string; label: string; start: number; end: number; openStart?: boolean; event?: GameEvent }[] = []
-      for (const e of events.filter((x) => x.game_id === game.id)) {
+      for (const e of events.filter((x) => x.game_id === game.id && !x.completed_at)) {
         // No start date means it's already running; the bar fades in from the left edge
         const start = e.starts_at ? new Date(e.starts_at).getTime() : from
         bars.push({ key: e.id, label: e.name, start, end: new Date(e.ends_at).getTime(), openStart: !e.starts_at, event: e })
@@ -219,6 +211,7 @@ function TimelineBars({ games, events, icons = {}, now, onOpen }: TimelineProps)
                           <Button
                             variant="quiet"
                             size="sm"
+                            {...peek({ kind: 'event', event: bar.event })}
                             onClick={() => onOpen(bar.event!)}
                             title={title}
                             aria-label={inside ? undefined : bar.label}
@@ -263,7 +256,31 @@ function TimelineBars({ games, events, icons = {}, now, onOpen }: TimelineProps)
 
 // ---- Timeline: the path (EVT-13, the default) or the bars, chosen with a switch remembered on this device ----
 
-type TimelineProps = { games: Game[]; events: GameEvent[]; icons?: Record<string, string>; now: Date; onOpen: (event: GameEvent) => void }
+type TimelineProps = {
+  games: Game[]
+  events: GameEvent[] // done ones included: the path shows them faded, the bars leave them out
+  icons?: Record<string, string>
+  pictures?: Record<string, string> // EVT-11 pictures, for the preview
+  now: Date
+  selectedId?: string // the event whose details are open, marked on the path
+  onOpen: (event: GameEvent) => void
+}
+type BarsProps = TimelineProps & { peek: PreviewBind }
+
+// EVT-14: the preview for an endgame reset: what it is and when it resets
+function ResetPeek({ item, icon, now }: { item: PathItem; icon?: string; now: Date }) {
+  return (
+    <div className="gc-peek-reset" data-game={item.game.preset_id ?? undefined}>
+      <span className="flex items-center gap-2">
+        <GameIcon presetId={item.game.preset_id} url={icon} size={20} />
+        <span className="gc-label">{shortName(item.game)} · endgame</span>
+      </span>
+      <b className="font-display text-base">{item.label}</b>
+      <span className="text-sm">Resets {fullWhen(item.at)}, in {formatDuration(item.at.getTime() - now.getTime())}</span>
+      <span className="text-xs text-muted">Click to open the game page.</span>
+    </div>
+  )
+}
 type TimelineView = 'path' | 'bars'
 const VIEW_KEY = 'gachacheck.events.timelineView'
 
@@ -277,6 +294,14 @@ const readView = (): TimelineView => {
 
 export function Timeline(props: TimelineProps) {
   const [view, setView] = useState<TimelineView>(readView)
+  const { games, icons = {}, pictures = {}, now } = props
+  const preview = usePreview((t) =>
+    t.kind === 'event' ? (
+      <EventCard bare event={t.event} game={games.find((g) => g.id === t.event.game_id)} iconUrl={icons[t.event.game_id]} pictureUrl={pictures[t.event.id]} now={now} />
+    ) : (
+      <ResetPeek item={t.item} icon={icons[t.item.game.id]} now={now} />
+    ),
+  )
   const phone = useMedia(PHONE)
   const choose = (next: TimelineView) => {
     setView(next)
@@ -293,13 +318,13 @@ export function Timeline(props: TimelineProps) {
     <section aria-labelledby="timeline-title" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 id="timeline-title" className="flex items-center gap-3 text-base font-semibold">
-          Timeline <span className="gc-tag" data-tone="rest">Next {view === 'bars' && phone ? 3 : 6} weeks</span>
+          Timeline {view === 'bars' && <span className="gc-tag" data-tone="rest">Next {phone ? 3 : 6} weeks</span>}
         </h2>
         {view === 'path' && (
           <p aria-hidden="true" className="gc-pathkey">
             <span><i className="k-end" />ends</span>
             <span><i className="k-start" />starts</span>
-            <span><i className="k-cycle" />endgame resets</span>
+            <span><i className="k-cycle" />endgame resets (next 6 weeks)</span>
           </p>
         )}
         <ToggleGroup
@@ -311,7 +336,8 @@ export function Timeline(props: TimelineProps) {
           options={[{ id: 'path', label: 'Path' }, { id: 'bars', label: 'Bars' }]}
         />
       </div>
-      {view === 'path' ? <EventPath {...props} /> : <TimelineBars {...props} />}
+      {view === 'path' ? <EventPath {...props} peek={preview.bind} /> : <TimelineBars {...props} peek={preview.bind} />}
+      {preview.node}
     </section>
   )
 }

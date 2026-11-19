@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPath, daysBetween, stopGap } from './eventPath'
+import { buildPath, daysBetween, pathLean, stopGap } from './eventPath'
 import type { GameEvent } from './events'
 import type { Game, Task } from './today'
 
@@ -46,9 +46,21 @@ describe('buildPath', () => {
     expect(path.flatMap((d) => d.items).map((i) => `${i.label}:${i.soon}`)).toEqual(['close:true', 'far:false'])
   })
 
-  it('leaves out what already ended and what is more than six weeks away', () => {
+  it('leaves out what already ended, but keeps events ending months away', () => {
     const path = buildPath(games, [event('gone', 'gi', at(19, 9)), event('far', 'gi', new Date(2027, 1, 1))], now)
-    expect(path).toEqual([])
+    expect(path.flatMap((d) => d.items.map((i) => i.label))).toEqual(['far'])
+  })
+
+  it('keeps a finished event, marked done and never soon', () => {
+    const finished = { ...event('done', 'gi', at(20)), completed_at: at(19, 10).toISOString() }
+    expect(buildPath(games, [finished], now)[0].items[0]).toMatchObject({ label: 'done', done: true, soon: false })
+  })
+
+  it("puts a day's endgame resets after its events", () => {
+    // The reset is 4:00 server time (UTC+8); the event ends an hour later, the same local day in any time zone
+    const reset = endgame('abyss', { frequency: 'dated', cycle_ends_at: '2026-11-30T04:00' } as Partial<Task>)
+    const path = buildPath([game('gi', [reset])], [event('ev', 'gi', new Date(Date.UTC(2026, 10, 29, 21)))], now)
+    expect(path[0].items.map((i) => i.label)).toEqual(['ev', 'abyss'])
   })
 
   it('skips events of games not shown', () => {
@@ -62,6 +74,20 @@ describe('buildPath', () => {
     expect(resets.length).toBe(3) // a two-week mode resets three times in six weeks
     const gaps = resets.slice(1).map((r, i) => Math.round((r.at.getTime() - resets[i].at.getTime()) / 86_400_000))
     expect(gaps).toEqual([14, 14])
+  })
+})
+
+describe('path lean', () => {
+  it('leans fully while the drift stays small', () => {
+    expect(pathLean(300, 8, 64)).toMatchObject({ drift: 42, spine: 8, chip: 0 })
+  })
+
+  it('holds a tall path to the drift limit, the chips making up the rest of the slant', () => {
+    const lean = pathLean(2000, 8, 64)
+    expect(lean.drift).toBe(64)
+    expect(lean.spine).toBeCloseTo(1.833, 2)
+    // Spine and chips together still make the full 8°
+    expect(Math.tan((lean.spine * Math.PI) / 180) + Math.tan((lean.chip * Math.PI) / 180)).toBeCloseTo(Math.tan((8 * Math.PI) / 180), 4)
   })
 })
 

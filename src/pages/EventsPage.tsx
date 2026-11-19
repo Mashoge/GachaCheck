@@ -14,13 +14,16 @@ import { SHORT_NAMES } from '../lib/useGames'
 import EventImport from './EventImport'
 import { useNow } from '../lib/useNow'
 import { useShared } from '../lib/useShared'
-import { EventCard, Section, Timeline } from './events/EventDisplay'
+import { Timeline } from './events/EventDisplay'
+import { EventDetails } from './events/EventDetails'
 import { EventForm } from './events/EventForm'
 import { GameIcon } from '../components/GameIcon'
-import { Button, Card, ChevronIcon, Loading, Notice, PageTitle, Switch, IconTag, TagLegend, ToggleGroup, cx, type TagIconName } from '../components/ui'
+import { Button, Card, ChevronIcon, Loading, Notice, PageTitle, Switch, IconTag, ToggleGroup, cx } from '../components/ui'
 import { useGameIcons } from '../lib/useGameIcons'
+import { useMedia } from '../lib/useMedia'
 
-const SOON_MS = 3 * 86_400_000
+// EVT-14: wide enough for the details panel to sit beside the path; narrower screens get a sheet instead
+const WIDE = '(min-width: 1024px)'
 const FILTER_KEY = 'gachacheck.events.filter'
 const shortName = (game: Game) => SHORT_NAMES[game.preset_id ?? ''] ?? game.name
 
@@ -45,7 +48,9 @@ export default function EventsPage() {
   const hiddenRows = bundle?.hidden ?? null // 'failed' = the rest of the page still works, only the hidden list is missing
   const [filter, setFilter] = useState(readFilter)
   const [form, setForm] = useState<{ mode: 'add' } | { mode: 'import' } | { mode: 'edit'; event: GameEvent } | null>(null)
-  const [showDone, setShowDone] = useState(false)
+  // EVT-14: the event whose details are open (its id, so the details follow the latest copy of it)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const wide = useMedia(WIDE)
   const [showHidden, setShowHidden] = useState(false)
   const [justHidden, setJustHidden] = useState<HiddenEvent | null>(null)
   const refresh = useCallback(() => reload().catch(() => {}), [reload])
@@ -80,13 +85,10 @@ export default function EventsPage() {
   const activeFilter = filter !== 'all' && games.some((g) => g.id === filter) ? filter : 'all'
   const shownGames = activeFilter === 'all' ? games : games.filter((g) => g.id === activeFilter)
 
+  // EVT-14: every event that hasn't ended, done or not, all on the path (done ones faded)
   const live = (events ?? []).filter((e) => new Date(e.ends_at) > now && (activeFilter === 'all' || e.game_id === activeFilter))
-  const done = live.filter((e) => e.completed_at)
-  const open = live.filter((e) => !e.completed_at)
-  const upcoming = open.filter((e) => e.starts_at && new Date(e.starts_at) > now).sort((a, b) => a.starts_at!.localeCompare(b.starts_at!) || a.name.localeCompare(b.name))
-  const running = open.filter((e) => !e.starts_at || new Date(e.starts_at) <= now)
-  const soon = running.filter((e) => new Date(e.ends_at).getTime() - now.getTime() <= SOON_MS)
-  const later = running.filter((e) => new Date(e.ends_at).getTime() - now.getTime() > SOON_MS)
+  // The details close by themselves if their event ends, is hidden or is filtered out
+  const selected = selectedId ? (live.find((e) => e.id === selectedId) ?? null) : null
 
   const hidden = hiddenRows && hiddenRows !== 'failed' ? toHiddenEvents(hiddenRows, games, showWeb, now) : []
   const shownHidden = hidden.filter((e) => activeFilter === 'all' || e.game_id === activeFilter)
@@ -102,27 +104,6 @@ export default function EventsPage() {
     if (ok && justHidden?.key === event.key) setJustHidden(null)
     return ok
   }
-
-  // Which tag icons the open cards use, for the legend
-  const shownEvents = [...soon, ...later, ...upcoming]
-  const legendIcons: TagIconName[] = [
-    ...(shownEvents.some((e) => e.source !== 'manual' && e.origin === 'catalog') ? ['official' as const] : []),
-    ...(shownEvents.some((e) => e.source !== 'manual' && e.origin !== 'catalog') ? ['auto' as const] : []),
-    ...(shownEvents.some((e) => e.kind === 'web_event') ? ['web' as const] : []),
-  ]
-
-  const card = (e: GameEvent) => (
-    <EventCard
-      key={e.id}
-      event={e}
-      game={gameOf(e)}
-      iconUrl={icons[e.game_id]}
-      pictureUrl={pictures[e.id]}
-      now={now}
-      onEdit={() => setForm({ mode: 'edit', event: e })}
-      onDone={(isDone) => void run(() => setEventDone(e, isDone))}
-    />
-  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -243,30 +224,42 @@ export default function EventsPage() {
 
       {events !== null && data && games.length > 0 && (
         <>
-          {open.length === 0 && (
+          {live.length === 0 && (
             <p className="rounded-2xl border border-dashed border-line px-4 py-3 text-sm text-muted">
               No events to track{activeFilter === 'all' ? '' : ' for this game'}. Add one with the end date the game shows, and it will count down here, on Today
               and in your reminders.
             </p>
           )}
 
-          {/* THM-12: the key to the tag icons on the cards below, only for the kinds that are showing */}
-          {legendIcons.length > 0 && <TagLegend icons={legendIcons} className="-mt-2" />}
-          {soon.length > 0 && <Section title="Ending soon" hint="Within 3 days" urgent>{soon.map(card)}</Section>}
-          {later.length > 0 && <Section title="Current">{later.map(card)}</Section>}
-          {upcoming.length > 0 && <Section title="Upcoming">{upcoming.map(card)}</Section>}
-
-          <Timeline games={shownGames} events={open} icons={icons} now={now} onOpen={(e) => setForm({ mode: 'edit', event: e })} />
-
-          {done.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <Button size="sm" className="self-start" onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>
-                {showDone ? 'Hide' : 'Show'} finished ({done.length})
-                <span className={cx('transition-transform', showDone && 'rotate-90')}><ChevronIcon size={14} /></span>
-              </Button>
-              {showDone && <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{done.map(card)}</div>}
-            </div>
-          )}
+          {/* EVT-14: the path is the page. Clicking an event opens its details: beside the path on a wide
+              screen, as a sheet from the bottom on a narrower one. */}
+          <div className={cx('gc-eventsbody', selected && wide && 'gc-eventsbody-split')}>
+            <Timeline
+              games={shownGames}
+              events={live}
+              icons={icons}
+              pictures={pictures}
+              now={now}
+              selectedId={selected?.id}
+              onOpen={(e) => setSelectedId((id) => (id === e.id && wide ? null : e.id))}
+            />
+            {selected && (
+              <EventDetails
+                event={selected}
+                game={gameOf(selected)}
+                iconUrl={icons[selected.game_id]}
+                pictureUrl={pictures[selected.id]}
+                now={now}
+                docked={wide}
+                onClose={() => setSelectedId(null)}
+                onEdit={() => {
+                  setSelectedId(null)
+                  setForm({ mode: 'edit', event: selected })
+                }}
+                onDone={(isDone) => void run(() => setEventDone(selected, isDone))}
+              />
+            )}
+          </div>
 
           {shownHidden.length > 0 && (
             <div className="flex flex-col gap-3">
