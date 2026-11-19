@@ -201,6 +201,7 @@ export type Database = {
           id: string
           name: string
           note: string | null
+          picture_path: string | null
           remind: boolean
           source: string
           starts_at: string | null
@@ -216,6 +217,7 @@ export type Database = {
           id?: string
           name: string
           note?: string | null
+          picture_path?: string | null
           remind?: boolean
           source?: string
           starts_at?: string | null
@@ -231,6 +233,7 @@ export type Database = {
           id?: string
           name?: string
           note?: string | null
+          picture_path?: string | null
           remind?: boolean
           source?: string
           starts_at?: string | null
@@ -479,6 +482,7 @@ export type Database = {
           event_id: string
           hidden: boolean
           note: string | null
+          picture_path: string | null
           remind: boolean
           updated_at: string
           user_id: string
@@ -488,6 +492,7 @@ export type Database = {
           event_id: string
           hidden?: boolean
           note?: string | null
+          picture_path?: string | null
           remind?: boolean
           updated_at?: string
           user_id?: string
@@ -497,6 +502,7 @@ export type Database = {
           event_id?: string
           hidden?: boolean
           note?: string | null
+          picture_path?: string | null
           remind?: boolean
           updated_at?: string
           user_id?: string
@@ -572,6 +578,7 @@ export type Database = {
           official_url: string | null
           origin: string | null
           own_event_id: string | null
+          picture_path: string | null
           remind: boolean | null
           source: string | null
           starts_at: string | null

@@ -70,6 +70,11 @@ export function iconPath(userId: string, gameId: string, id: string, type: strin
   return `${userId}/${gameId}/icon-${id}.${type === 'image/jpeg' ? 'jpg' : 'webp'}`
 }
 
+/** EVT-11: an event picture lives in the game's folder, named event-<id> (the database checks both). */
+export function eventPicturePath(userId: string, gameId: string, id: string, type: string) {
+  return `${userId}/${gameId}/event-${id}.${type === 'image/jpeg' ? 'jpg' : 'webp'}`
+}
+
 /** Why a chosen file cannot be used, or null if it can. */
 export function fileProblem(file: { type: string; size: number; name: string }) {
   if (!ACCEPT.split(',').includes(file.type)) return `${file.name} is not a PNG, JPEG or WebP picture.`
@@ -230,6 +235,30 @@ export async function removeGameImages(gameId: string) {
   const { data, error } = await bucket.list(folder, { limit: 100 })
   if (error || !data?.length) return
   await bucket.remove(data.map((f) => `${folder}/${f.name}`))
+}
+
+// ---------- event pictures (EVT-11) ----------
+
+/** Signed links for event pictures, by path. A failure means the cards simply show no picture. */
+export async function fetchPictureLinks(paths: string[]): Promise<Record<string, string>> {
+  if (paths.length === 0) return {}
+  return Object.fromEntries(await signPaths(paths))
+}
+
+/** Shrink and upload a picture for an event of this game; returns its path (not yet saved on the event). */
+export async function uploadEventPicture(gameId: string, file: File): Promise<string> {
+  const problem = fileProblem(file)
+  if (problem) throw new Error(problem)
+  const blob = await shrinkImage(file)
+  const path = eventPicturePath(await userId(), gameId, crypto.randomUUID(), blob.type)
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type, cacheControl: '31536000' })
+  if (error) throw error
+  return path
+}
+
+/** Remove a picture file (after the event no longer points at it). A leftover file is only wasted space. */
+export async function removePictureFile(path: string | null | undefined) {
+  if (path) await supabase.storage.from(BUCKET).remove([path])
 }
 
 // ---------- game icons (LTR-8, second half) ----------

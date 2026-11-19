@@ -3,6 +3,7 @@ import { findPreset, findServer } from '../../data/presets'
 import type { EventInput, GameEvent } from '../../lib/events'
 import { minuteBefore, serverParts, toInstant } from '../../lib/eventTime'
 import type { HiddenEvent } from '../../lib/hiddenEvents'
+import { ACCEPT, fileProblem } from '../../lib/characterImages'
 import type { Game } from '../../lib/today'
 import { Button, Card, Field, Input, Select, Switch, useConfirm } from '../../components/ui'
 
@@ -20,9 +21,75 @@ type FormProps = {
   findHidden?: (input: EventInput) => HiddenEvent | null
   /** Puts a hidden event back. Returns false if it failed. */
   onRestore?: (event: HiddenEvent) => Promise<boolean>
+  /** EVT-11: the event's picture (signed link; missing with Data saver or while loading) */
+  pictureUrl?: string
+  /** EVT-11: adds or replaces (a file) or removes (null) the event's picture at once. Returns false if it failed. */
+  onPicture?: (file: File | null) => Promise<boolean>
 }
 
-export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDelete, findHidden, onRestore }: FormProps) {
+/**
+ * EVT-11: your own picture for an event, like a screenshot of its banner. Saved at once, like a game
+ * icon: shrunk in the browser and kept in your private folder, so only you see it.
+ */
+function PictureField({ url, hasPicture, onPicture }: { url?: string; hasPicture: boolean; onPicture: (file: File | null) => Promise<boolean> }) {
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [broken, setBroken] = useState<string | null>(null) // a link that failed to load: no preview
+  const [busy, setBusy] = useState<'adding' | 'removing' | null>(null)
+  const [problem, setProblem] = useState<string | null>(null)
+
+  const change = async (file: File | null) => {
+    if (file) {
+      const why = fileProblem(file)
+      if (why) return setProblem(why)
+    }
+    setProblem(null)
+    setBusy(file ? 'adding' : 'removing')
+    await onPicture(file)
+    setBusy(null)
+  }
+
+  return (
+    <section aria-labelledby="event-picture-title" className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-raised p-3">
+      {url && broken !== url && (
+        <img src={url} alt="Your picture for this event" onError={() => setBroken(url)} className="aspect-[21/9] h-14 shrink-0 rounded-md object-cover" />
+      )}
+      <div className="min-w-[12rem] flex-1">
+        <h3 id="event-picture-title" className="gc-label">Picture</h3>
+        <p className="mt-1 text-xs text-muted">
+          {hasPicture
+            ? 'Shown across the top of the card. Only you can see it.'
+            : 'Your own picture for the card, like a screenshot of the event. Only you can see it.'}
+        </p>
+      </div>
+      <input
+        ref={fileInput}
+        type="file"
+        accept={ACCEPT}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="sr-only"
+        onChange={(e) => {
+          const file = e.target.files?.[0] ?? null
+          e.target.value = '' // choosing the same file again still counts
+          if (file) void change(file)
+        }}
+      />
+      <span className="flex gap-1.5">
+        <Button type="button" size="sm" variant="secondary" disabled={!!busy} onClick={() => fileInput.current?.click()}>
+          {busy === 'adding' ? 'Adding…' : hasPicture ? 'Change picture' : 'Add picture'}
+        </Button>
+        {hasPicture && (
+          <Button type="button" size="sm" variant="quiet" disabled={!!busy} onClick={() => void change(null)}>
+            {busy === 'removing' ? 'Removing…' : 'Remove'}
+          </Button>
+        )}
+      </span>
+      {problem && <p role="alert" className="w-full text-xs text-urgent">{problem}</p>}
+    </section>
+  )
+}
+
+export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave, onDelete, findHidden, onRestore, pictureUrl, onPicture }: FormProps) {
   const first = games.find((g) => g.id === (editing?.game_id ?? defaultGameId)) ?? games[0]
   const initialEnd = editing ? serverParts(editing.ends_at, first.timezone) : { date: '', time: minuteBefore(first.daily_reset_time) }
   const initialStart = editing?.starts_at ? serverParts(editing.starts_at, first.timezone) : { date: '', time: '10:00' }
@@ -209,6 +276,12 @@ export function EventForm({ games, editing, defaultGameId, now, onCancel, onSave
         <Switch label="Remind me on Discord before it ends" on={remind} onChange={setRemind} />
         <span>Remind me on Discord before it ends</span>
       </div>
+
+      {editing && onPicture ? (
+        <PictureField url={pictureUrl} hasPicture={!!editing.picture_path} onPicture={onPicture} />
+      ) : (
+        <p className="text-xs text-muted">Once it’s saved, you can give it your own picture from Edit.</p>
+      )}
 
       {problem && <p className="text-sm text-urgent">{problem}</p>}
       {added > 0 && !problem && <p className="text-sm text-muted">Added {added} {added === 1 ? 'event' : 'events'}. Enter the next one, or close.</p>}

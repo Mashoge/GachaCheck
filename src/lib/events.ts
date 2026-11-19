@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { createShared } from './shared'
+import { removePictureFile, uploadEventPicture } from './characterImages'
 import type { HiddenEvent, HiddenRows } from './hiddenEvents'
 
 export type GameEvent = {
@@ -16,11 +17,12 @@ export type GameEvent = {
   kind: 'event' | 'web_event'
   official_url: string | null
   catalog_event_id: string | null
+  picture_path: string | null // EVT-11: your own picture for it (a private file), or null
 }
 
 export type EventInput = Pick<GameEvent, 'game_id' | 'name' | 'starts_at' | 'ends_at' | 'note' | 'remind'>
 
-const COLUMNS = 'id, game_id, name, starts_at, ends_at, note, remind, completed_at, source, origin, kind, official_url, catalog_event_id'
+const COLUMNS = 'id, game_id, name, starts_at, ends_at, note, remind, completed_at, source, origin, kind, official_url, catalog_event_id, picture_path'
 
 /**
  * Events that haven't ended yet, soonest end first. Ended ones simply stop being loaded.
@@ -59,7 +61,7 @@ export async function addEvents(inputs: EventInput[]) {
 }
 
 // Your own marks on a shared catalog event. Only the fields given are changed.
-async function saveCatalogMark(event: GameEvent, marks: { completed_at?: string | null; hidden?: boolean; remind?: boolean; note?: string | null }) {
+async function saveCatalogMark(event: GameEvent, marks: { completed_at?: string | null; hidden?: boolean; remind?: boolean; note?: string | null; picture_path?: string | null }) {
   if (!event.catalog_event_id) throw new Error('This event is missing its catalog link. Reload and try again.')
   const userId = await currentUserId()
   const { error } = await supabase
@@ -125,6 +127,36 @@ export async function restoreEvent(event: HiddenEvent) {
 
 export async function deleteEvent(event: GameEvent) {
   const { error } = await supabase.from('events').delete().eq('id', event.id)
+  if (error) throw error
+  await removePictureFile(event.picture_path)
+}
+
+/**
+ * EVT-11: give an event your own picture (shrunk, uploaded to your private folder), replacing any old
+ * one. On an official event it is saved with your own marks, keeping the done mark and reminder choice
+ * the list shows (a first mark would otherwise reset a done mark carried over from your own copy).
+ */
+export async function setEventPicture(event: GameEvent, file: File) {
+  const path = await uploadEventPicture(event.game_id, file)
+  try {
+    await savePicturePath(event, path)
+  } catch (err) {
+    await removePictureFile(path)
+    throw err
+  }
+  await removePictureFile(event.picture_path)
+}
+
+export async function removeEventPicture(event: GameEvent) {
+  await savePicturePath(event, null)
+  await removePictureFile(event.picture_path)
+}
+
+async function savePicturePath(event: GameEvent, path: string | null) {
+  if (event.origin === 'catalog') {
+    return saveCatalogMark(event, { picture_path: path, completed_at: event.completed_at, remind: event.remind })
+  }
+  const { error } = await supabase.from('events').update({ picture_path: path }).eq('id', event.id)
   if (error) throw error
 }
 

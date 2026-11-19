@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_PER_GAME, centerSquare, fileProblem, fitWithin, focusFromPoint, iconPath, imagePath, linkStillGood, nudgeFocus, roomFor } from './characterImages'
+import { centerSquare, eventPicturePath, fileProblem, fitWithin, focusFromPoint, iconPath, imagePath, linkStillGood, MAX_PER_GAME, nudgeFocus, roomFor } from './characterImages'
 
 describe('character pictures (LTR-8)', () => {
   it('shrinks the longest side to 1280 px, keeping the shape, and never enlarges', () => {
@@ -63,5 +63,12 @@ describe('character pictures (LTR-8)', () => {
   it('names icon files so the database accepts them as icons (icon-…)', () => {
     expect(iconPath('u1', 'g1', 'abc', 'image/webp')).toBe('u1/g1/icon-abc.webp')
     expect(iconPath('u1', 'g1', 'abc', 'image/jpeg')).toBe('u1/g1/icon-abc.jpg')
+  })
+})
+
+describe('eventPicturePath (EVT-11)', () => {
+  it('files an event picture in the game folder as event-<id>, the shape the database accepts', () => {
+    expect(eventPicturePath('u1', 'g1', 'abc', 'image/webp')).toBe('u1/g1/event-abc.webp')
+    expect(eventPicturePath('u1', 'g1', 'abc', 'image/jpeg')).toBe('u1/g1/event-abc.jpg')
   })
 })

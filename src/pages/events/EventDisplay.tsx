@@ -1,4 +1,4 @@
-import { Children, type ReactNode } from 'react'
+import { Children, useState, type ReactNode } from 'react'
 import type { GameEvent } from '../../lib/events'
 import { formatDuration, formatWhen, taskPeriod } from '../../lib/time'
 import { clockOf, isVisible, type Game } from '../../lib/today'
@@ -28,10 +28,27 @@ export function Section({ title, hint, urgent = false, children }: { title: stri
   )
 }
 
-export function EventCard({ event, game, iconUrl, now, onEdit, onDone }: {
+/**
+ * EVT-11: your own picture across the top of the card (a private file, through a signed link). Loaded
+ * only when the card scrolls near; if the link fails, the card simply has no picture. Decoration: the
+ * event's name is right below it. Faded once the event is done.
+ */
+function EventPicture({ url, dim }: { url: string; dim: boolean }) {
+  const [broken, setBroken] = useState(false)
+  if (broken) return null
+  return (
+    <div className="aspect-[21/9] overflow-hidden border-b border-line bg-raised">
+      <img src={url} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)}
+        className={cx('size-full object-cover', dim && 'opacity-45 grayscale')} />
+    </div>
+  )
+}
+
+export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDone }: {
   event: GameEvent
   game: Game | undefined
   iconUrl?: string
+  pictureUrl?: string
   now: Date
   onEdit: () => void
   onDone: (done: boolean) => void
@@ -50,6 +67,7 @@ export function EventCard({ event, game, iconUrl, now, onEdit, onDone }: {
       data-game={game?.preset_id ?? undefined}
       className={cx('gc-set flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-surface', urgent ? 'border-urgent' : 'border-line')}
     >
+      {pictureUrl && <EventPicture key={pictureUrl} url={pictureUrl} dim={isDone} />}
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <GameIcon presetId={game?.preset_id ?? null} url={iconUrl} size={20} />

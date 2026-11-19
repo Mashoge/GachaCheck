@@ -2,9 +2,11 @@ import { useCallback, useState } from 'react'
 import { Link } from 'react-router'
 import { messageOf } from '../lib/errors'
 import {
-  addEvent, addEvents, deleteEvent, eventsData, hideEvent, restoreEvent, setEventDone, setShowWebEvents, updateEvent,
-  type EventInput, type GameEvent,
+  addEvent, addEvents, deleteEvent, eventsData, hideEvent, removeEventPicture, restoreEvent, setEventDone, setEventPicture,
+  setShowWebEvents, updateEvent, type EventInput, type GameEvent,
 } from '../lib/events'
+import { useDataSaver } from '../lib/dataSaver'
+import { useEventPictures } from '../lib/useEventPictures'
 import { hiddenFromEvent, hiddenMatch, toHiddenEvents, type HiddenEvent } from '../lib/hiddenEvents'
 import { formatWhen } from '../lib/time'
 import { useTodayData, type Game } from '../lib/today'
@@ -47,6 +49,11 @@ export default function EventsPage() {
   const [showHidden, setShowHidden] = useState(false)
   const [justHidden, setJustHidden] = useState<HiddenEvent | null>(null)
   const refresh = useCallback(() => reload().catch(() => {}), [reload])
+  // EVT-11: your own event pictures (not loaded with Data saver)
+  const saver = useDataSaver()
+  const pictures = useEventPictures(events ?? [], !saver.on)
+  // The event being edited, as it is now in the list (a picture just added shows its new state)
+  const editingEvent = form?.mode === 'edit' ? ((events ?? []).find((e) => e.id === form.event.id) ?? form.event) : null
 
   const chooseFilter = (value: string) => {
     setFilter(value)
@@ -110,6 +117,7 @@ export default function EventsPage() {
       event={e}
       game={gameOf(e)}
       iconUrl={icons[e.game_id]}
+      pictureUrl={pictures[e.id]}
       now={now}
       onEdit={() => setForm({ mode: 'edit', event: e })}
       onDone={(isDone) => void run(() => setEventDone(e, isDone))}
@@ -162,7 +170,9 @@ export default function EventsPage() {
         <EventForm
           key={form.mode === 'edit' ? form.event.id : 'new'}
           games={games}
-          editing={form.mode === 'edit' ? form.event : null}
+          editing={editingEvent}
+          pictureUrl={editingEvent ? pictures[editingEvent.id] : undefined}
+          onPicture={editingEvent ? (file) => run(() => (file ? setEventPicture(editingEvent, file) : removeEventPicture(editingEvent))) : undefined}
           defaultGameId={activeFilter !== 'all' ? activeFilter : games[0].id}
           now={now}
           onCancel={() => setForm(null)}
