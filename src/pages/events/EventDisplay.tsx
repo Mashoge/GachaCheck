@@ -29,21 +29,23 @@ export function Section({ title, hint, urgent = false, children }: { title: stri
 }
 
 /**
- * EVT-11: your own picture across the top of the card (a private file, through a signed link). Loaded
- * only when the card scrolls near; if the link fails, the card simply has no picture. Decoration: the
- * event's name is right below it. Faded once the event is done.
+ * EVT-11: your own picture as the backdrop of the card's top half, fading into the card, so the card
+ * keeps its height (cards beside it don't stretch). A private file, through a signed link; loaded only
+ * when the card scrolls near; if it fails, the card simply has none. Decoration: the name is on top.
  */
-function EventPicture({ url, dim }: { url: string; dim: boolean }) {
+function EventPicture({ url }: { url: string }) {
   const [broken, setBroken] = useState(false)
   if (broken) return null
   return (
-    <div className="aspect-[21/9] overflow-hidden border-b border-line bg-raised">
-      <img src={url} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)}
-        className={cx('size-full object-cover', dim && 'opacity-45 grayscale')} />
+    <div aria-hidden="true" className="gc-ephoto">
+      <img src={url} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />
     </div>
   )
 }
 
+// EVT-12: each card in its game's own style (index.css, .gc-ecard[data-game]): Genshin's starry navy
+// with gold and cream, WuWa's slate glass with corner brackets and pale gold, NTE's charcoal with pink
+// and blue. Static: no motion, so a page of cards stays calm.
 export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDone }: {
   event: GameEvent
   game: Game | undefined
@@ -65,10 +67,13 @@ export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDon
   return (
     <article
       data-game={game?.preset_id ?? undefined}
-      className={cx('gc-set flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-surface', urgent ? 'border-urgent' : 'border-line')}
+      data-urgent={urgent ? '' : undefined}
+      data-done={isDone ? '' : undefined}
+      data-photo={pictureUrl ? '' : undefined}
+      className="gc-set gc-ecard relative isolate flex min-w-0 flex-col overflow-hidden rounded-2xl border"
     >
-      {pictureUrl && <EventPicture key={pictureUrl} url={pictureUrl} dim={isDone} />}
-      <div className="flex flex-1 flex-col gap-3 p-4">
+      {pictureUrl && <EventPicture key={pictureUrl} url={pictureUrl} />}
+      <div className="gc-ebody flex flex-1 flex-col gap-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <GameIcon presetId={game?.preset_id ?? null} url={iconUrl} size={20} />
           <span className="gc-label">{shortName(game)}</span>
@@ -80,7 +85,7 @@ export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDon
 
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h3 className={cx('font-display text-lg font-semibold leading-snug', isDone && 'text-muted line-through')}>{event.name}</h3>
+            <h3 className={cx('gc-ename font-display text-lg font-semibold leading-snug', isDone && 'line-through')}>{event.name}</h3>
             {event.note && <p className="mt-1 text-sm text-muted">{event.note}</p>}
           </div>
           {isDone ? (
@@ -88,7 +93,7 @@ export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDon
           ) : (
             <p className="flex shrink-0 flex-col items-end">
               <span className="gc-label">{upcoming ? 'Starts in' : 'Ends in'}</span>
-              <span className={cx('mt-1 font-display text-2xl font-bold leading-none whitespace-nowrap', urgent && 'text-urgent')}>
+              <span className="gc-enum mt-1 font-display text-2xl font-bold leading-none whitespace-nowrap">
                 {formatDuration(upcoming ? start.getTime() - now.getTime() : left)}
               </span>
             </p>
@@ -98,7 +103,7 @@ export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDon
         <div className="mt-auto flex flex-col gap-2">
           {passed !== null && !isDone && (
             <div aria-hidden="true" className="gc-slant-bar">
-              <i style={{ width: `${passed}%`, background: urgent ? 'var(--color-urgent)' : 'var(--gc)' }} />
+              <i style={{ width: `${passed}%` }} />
             </div>
           )}
           <p className="text-xs text-muted">
@@ -108,7 +113,7 @@ export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDon
         </div>
       </div>
 
-      <div className="flex min-h-12 flex-wrap items-center gap-1.5 border-t border-line px-3 py-1.5">
+      <div className="gc-efoot flex min-h-12 flex-wrap items-center gap-1.5 border-t px-3 py-1.5">
         {event.official_url && (
           <a href={event.official_url} target="_blank" rel="noreferrer" className={buttonClass({ variant: 'link', size: 'sm' })}>
             Event page <ExternalIcon size={13} />
@@ -116,7 +121,7 @@ export function EventCard({ event, game, iconUrl, pictureUrl, now, onEdit, onDon
         )}
         <span className="ml-auto flex gap-1.5">
           {!upcoming && (
-            <Button size="sm" variant="secondary" onClick={() => onDone(!isDone)} aria-label={`${isDone ? 'Not done' : 'Mark done'}: ${event.name}`}>
+            <Button size="sm" variant="secondary" className="gc-emain" onClick={() => onDone(!isDone)} aria-label={`${isDone ? 'Not done' : 'Mark done'}: ${event.name}`}>
               {isDone ? 'Not done' : 'Mark done'}
             </Button>
           )}

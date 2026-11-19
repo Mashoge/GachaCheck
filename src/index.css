@@ -847,6 +847,117 @@
 /* The key to the icons: small, quiet, one line that wraps */
 .gc-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 11px; color: var(--color-muted); }
 .gc-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+
+/* ---------- EVT-12: event cards in their game's style (EventCard in EventDisplay.tsx) ----------
+   The page stays the app's own; each card wears its game's look, like the game pages (THM-11) but
+   quieter and static. Text colours are checked for contrast on each background. */
+.gc-ecard { border-color: var(--color-line); background: var(--color-surface); }
+.gc-ecard .gc-efoot { border-color: var(--color-line); }
+.gc-ecard .gc-slant-bar > i { background: var(--gc); }
+.gc-ecard[data-urgent] { border-color: var(--color-urgent); }
+.gc-ecard[data-urgent] .gc-slant-bar > i { background: var(--color-urgent); }
+.gc-ecard[data-urgent] .gc-enum { color: var(--color-urgent); }
+.gc-ecard[data-done] :is(.gc-ename, .gc-enum) { color: var(--color-muted); }
+
+/* Your picture: the backdrop of the top part of the card, fading out downwards, dimmed so the name and
+   countdown on top stay readable */
+.gc-ephoto { position: absolute; inset: 0 0 auto; height: 80%; z-index: -1; pointer-events: none; }
+.gc-ephoto img {
+  width: 100%; height: 100%; object-fit: cover; object-position: center 30%; opacity: 0.75;
+  -webkit-mask: linear-gradient(180deg, #000 0%, #000 35%, transparent 100%); mask: linear-gradient(180deg, #000 0%, #000 35%, transparent 100%);
+}
+.gc-ephoto::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(8 8 12 / 0.55), rgb(8 8 12 / 0.35) 45%, transparent); }
+.gc-ecard[data-done] .gc-ephoto img { opacity: 0.35; filter: grayscale(1); }
+.gc-ecard[data-photo] .gc-ebody :is(.gc-ename, .gc-enum, .gc-label, .text-muted) { text-shadow: 0 1px 2px rgb(0 0 0 / 0.85), 0 0 14px rgb(0 0 0 / 0.6); }
+.gc-ecard[data-photo] .gc-ebody .gc-label { color: #e6e6e6; }
+
+/* Genshin: a starry navy card, gold hairline, cream pills, a gold bar, a faint four-point star */
+.gc-ecard[data-game="genshin"] {
+  border-color: rgb(218 191 134 / 0.32);
+  background:
+    radial-gradient(1.2px 1.2px at 18% 22%, #fff9, transparent), radial-gradient(1px 1px at 64% 14%, #fff8, transparent),
+    radial-gradient(1.2px 1.2px at 86% 48%, #fffa, transparent), radial-gradient(1px 1px at 38% 70%, #fff7, transparent),
+    radial-gradient(70% 45% at 92% 0%, #3b2f6e99, transparent 70%),
+    linear-gradient(175deg, #1b2443, #121731 75%);
+}
+.gc-ecard[data-game="genshin"]::after {
+  content: ""; position: absolute; top: 14px; right: 14px; width: 54px; height: 54px; z-index: -1; pointer-events: none; opacity: 0.09;
+  background: #dabf86; clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+}
+.gc-ecard[data-game="genshin"][data-photo]::after { display: none; }
+.gc-ecard[data-game="genshin"] .gc-ename { color: #ece5d8; }
+.gc-ecard[data-game="genshin"] .gc-enum { color: #f4f2eb; }
+.gc-ecard[data-game="genshin"] :is(.gc-label, .text-muted) { color: #c9c0ad; }
+.gc-ecard[data-game="genshin"] .gc-tag:not([data-tone]) { background: #d8c5a4; color: #5b4a30; }
+.gc-ecard[data-game="genshin"] .gc-tag[data-tone="rest"] { background: rgb(216 197 164 / 0.14); color: #d8c5a4; }
+.gc-ecard[data-game="genshin"] .gc-slant-bar { background: #e0d8c726; }
+.gc-ecard[data-game="genshin"]:not([data-urgent]) .gc-slant-bar > i { background: linear-gradient(90deg, #e8cf8f, #c0974d); }
+.gc-ecard[data-game="genshin"] .gc-efoot { border-color: rgb(218 191 134 / 0.16); background: #10152c; }
+.gc-ecard[data-game="genshin"] .gc-emain { border-color: #ece5d8; border-radius: 99px; background: #ece5d8; color: #3b4255; }
+.gc-ecard[data-game="genshin"] .gc-emain:hover { background: #fff; color: #3b4255; }
+
+/* WuWa: slate glass, corner brackets, pale-gold numbers, a segmented bar, white pills */
+.gc-ecard[data-game="wuwa"] {
+  border-color: #ffffff21; border-radius: 12px;
+  background: radial-gradient(90% 35% at 50% 108%, #dfe8ee24, transparent 70%), linear-gradient(170deg, #1b3247, #20242b 70%);
+}
+.gc-ecard[data-game="wuwa"]::before, .gc-ecard[data-game="wuwa"]::after {
+  content: ""; position: absolute; width: 10px; height: 10px; z-index: 1; pointer-events: none; border: solid rgb(255 255 255 / 0.55);
+}
+.gc-ecard[data-game="wuwa"]::before { left: 7px; top: 7px; border-width: 1px 0 0 1px; }
+.gc-ecard[data-game="wuwa"]::after { right: 7px; bottom: 7px; border-width: 0 1px 1px 0; }
+.gc-ecard[data-game="wuwa"] .gc-ename { color: #f4f6f7; }
+.gc-ecard[data-game="wuwa"] .gc-enum { color: #fff79e; }
+.gc-ecard[data-game="wuwa"]:not([data-photo]) .gc-enum { text-shadow: 0 0 22px rgb(255 247 158 / 0.22); }
+.gc-ecard[data-game="wuwa"] :is(.gc-label, .text-muted) { color: #b8c2ca; }
+.gc-ecard[data-game="wuwa"] .gc-tag { border-radius: 0; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+.gc-ecard[data-game="wuwa"] .gc-tag:not([data-tone]) { background: #fdfdbd; color: #111; }
+.gc-ecard[data-game="wuwa"] .gc-tag[data-tone="rest"] { background: rgb(255 255 255 / 0.1); color: #c9d1d7; }
+.gc-ecard[data-game="wuwa"] .gc-slant-bar, .gc-ecard[data-game="wuwa"] .gc-slant-bar > i {
+  clip-path: none; -webkit-mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px); mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px);
+}
+.gc-ecard[data-game="wuwa"] .gc-slant-bar { background: #4b5661; }
+.gc-ecard[data-game="wuwa"]:not([data-urgent]) .gc-slant-bar > i { background: #fcfa96; }
+.gc-ecard[data-game="wuwa"] .gc-efoot { border-color: #ffffff1a; background: #1c2027; }
+.gc-ecard[data-game="wuwa"] .gc-emain { border-color: #f4f6f7; border-radius: 99px; background: #f4f6f7; color: #111; }
+.gc-ecard[data-game="wuwa"] .gc-emain:hover { background: #fff; color: #111; }
+
+/* NTE: charcoal with halftone dots, a pink slanted mark, italic numbers, a blue slanted bar */
+.gc-ecard[data-game="nte"] {
+  border-color: #353535;
+  background:
+    radial-gradient(circle at center, rgb(255 255 255 / 0.06) 1.1px, transparent 1.5px) 0 0 / 12px 12px,
+    #1a1a1a;
+}
+.gc-ecard[data-game="nte"]::before {
+  content: ""; position: absolute; left: 0; top: 18px; width: 5px; height: 22px; z-index: 1; pointer-events: none;
+  background: #ff3d88; transform: skewY(-18deg);
+}
+.gc-ecard[data-game="nte"]::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(115deg, transparent 72%, rgb(255 61 136 / 0.09) 72% 78%, transparent 78% 80%, rgb(255 61 136 / 0.06) 80% 82%, transparent 82%);
+}
+.gc-ecard[data-game="nte"] .gc-ename { color: #f5f5f5; }
+.gc-ecard[data-game="nte"] .gc-enum { color: #fff; font-style: italic; }
+.gc-ecard[data-game="nte"] :is(.gc-label, .text-muted) { color: #b3b3b3; }
+.gc-ecard[data-game="nte"] .gc-tag { clip-path: none; border-radius: 99px; font-style: italic; }
+.gc-ecard[data-game="nte"] .gc-tag:not([data-tone]) { background: #2e2e2e; color: #fff; }
+.gc-ecard[data-game="nte"] .gc-tag[data-tone="rest"] { background: rgb(255 255 255 / 0.08); color: #bdbdbd; }
+.gc-ecard[data-game="nte"] .gc-slant-bar { background: #333; }
+.gc-ecard[data-game="nte"]:not([data-urgent]) .gc-slant-bar > i { background: #2ca5f9; }
+.gc-ecard[data-game="nte"] .gc-efoot { border-color: #2c2c2c; background: #141414; }
+.gc-ecard[data-game="nte"] .gc-emain { border-color: #d6d6d6; border-radius: 99px; background: #d6d6d6; color: #111; }
+.gc-ecard[data-game="nte"] .gc-emain:hover { background: #fff; color: #111; }
+
+/* The "Event page" link in each game's accent */
+.gc-ecard[data-game="genshin"] .gc-efoot a { color: #e6c98d; }
+.gc-ecard[data-game="wuwa"] .gc-efoot a { color: #fdfdbd; }
+.gc-ecard[data-game="nte"] .gc-efoot a { color: #ff8ab5; }
+
+/* Urgent keeps the app's orange edge and countdown on every game; a done card fades back */
+.gc-ecard[data-game][data-urgent] { border-color: var(--color-urgent); }
+.gc-ecard[data-game][data-urgent] .gc-enum { color: var(--color-urgent); }
+.gc-ecard[data-game][data-done] :is(.gc-ename, .gc-enum) { color: #9a9a9a; }
 .gc-slant-bar { height: 8px; background: var(--color-line); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
 .gc-slant-bar > i { display: block; height: 100%; background: var(--color-accent); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); transition: width 0.4s var(--ease-standard); }
 
