@@ -10,6 +10,7 @@ import { useGameIcons } from '../lib/useGameIcons'
 import { GameIcon } from './GameIcon'
 import { pingThreshold } from '../lib/stamina'
 import { formatDuration } from '../lib/time'
+import { SyncHelper } from './SyncHelper'
 import { Button, ChevronIcon, EditIcon, IconTag, Input, Loading, Notice, PageTitle, Select, SheetRow, Switch, TagLegend, useConfirm, type TagIconName } from './ui'
 import { setDataSaver, useDataSaver } from '../lib/dataSaver'
 
@@ -281,6 +282,8 @@ export default function GamesScreen() {
             )}
           </section>
 
+          {/* STA-5: only for a Genshin game, the one game HoYoLAB's notes can update */}
+          {games.some((g) => g.preset_id === 'genshin') && <SyncHelper />}
           <DeviceSettings />
         </div>
       </div>

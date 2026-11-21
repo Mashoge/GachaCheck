@@ -333,6 +333,25 @@ export type Database = {
         }
         Relationships: []
       }
+      // Added by hand to match migration 20261120100000_sync_keys.sql (STA-5). Signed-in users may read
+      // these columns of their own keys and delete them; the fingerprint (key_hash) is never readable.
+      sync_keys: {
+        Row: {
+          created_at: string
+          id: string
+          key_hint: string
+          label: string
+          last_result: Json | null
+          last_used_at: string | null
+        }
+        Insert: {
+          id?: never
+        }
+        Update: {
+          id?: never
+        }
+        Relationships: []
+      }
       stamina_meters: {
         Row: {
           cap: number
@@ -600,6 +619,15 @@ export type Database = {
       sync_game_preset: {
         Args: { p_game_id: string; p_preset: Json }
         Returns: boolean
+      }
+      // Added by hand to match migration 20261120100000_sync_keys.sql (STA-5)
+      create_sync_key: {
+        Args: { p_label: string }
+        Returns: string
+      }
+      sync_genshin: {
+        Args: { p_key: string; p_resin: number; p_full_in: number | null; p_commissions: boolean }
+        Returns: Json
       }
     }
     Enums: {
