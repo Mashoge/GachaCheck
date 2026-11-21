@@ -84,7 +84,36 @@ async function ask(question, { secret = false, fallback = '' } = {}) {
   r.muted = false
   if (answer === null) throw new Error('Setup stopped before it was finished. Nothing was saved.')
   if (!process.stdin.isTTY) process.stdout.write('\n')
-  return answer.trim() || fallback
+  const text = cleanAnswer(answer)
+  // A hidden answer shows nothing on screen, so say that something arrived (how much, never what)
+  if (secret && text) console.log(`  (received ${text.length} characters)`)
+  // A visible question must never get a helper key: it would be on screen (and in any screenshot)
+  if (!secret && /gcs_[0-9a-f]{16,}/.test(text)) {
+    throw new Error('That looks like your helper key, typed where it shows on screen. Treat it as seen: cancel it on the Games page, make a new one, run setup again, and paste it only at the hidden "Helper key" question. Nothing was saved.')
+  }
+  return text || fallback
+}
+
+/** Drops what a terminal can wrap around a paste (bracketed-paste marks, control keys) and outer spaces. */
+function cleanAnswer(text) {
+  return String(text).replace(/\x1b\[20[01]~/g, '').replace(/[\x00-\x1f\x7f]/g, '').trim()
+}
+
+/**
+ * Windows terminals sometimes don't deliver Ctrl+V into a hidden question. If the answer came back empty,
+ * offer what's on the clipboard when it looks right (shown only as its first and last 4 characters).
+ */
+async function orClipboard(answer, looksRight, what) {
+  if (answer || !WINDOWS) return answer
+  let clip = ''
+  try {
+    clip = cleanAnswer(execFileSync('powershell', ['-NoProfile', '-Command', 'Get-Clipboard -Raw'], { encoding: 'utf8', timeout: 10_000 }))
+  } catch {
+    return answer
+  }
+  if (!looksRight(clip)) return answer
+  const yes = await ask(`Nothing was pasted. Use the ${what} on your clipboard (${maskSecret(clip)})? Y/n`)
+  return /^n/i.test(yes) ? answer : clip
 }
 
 // ---------- HoYoLAB and GachaCheck ----------
@@ -127,11 +156,18 @@ async function setup() {
   const old = existsSync(CONFIG) ? loadConfig() : {}
   const env = existsSync(join(REPO, '.env.local')) ? readEnv(readFileSync(join(REPO, '.env.local'), 'utf8')) : {}
 
+  console.log('If a question shows a value in [brackets], just press Enter to keep it.\n')
   const supabaseUrl = await ask('GachaCheck address (your VITE_SUPABASE_URL)', { fallback: old.supabaseUrl ?? env.VITE_SUPABASE_URL ?? '' })
+  if (!/^https:\/\/[^\s/]+\/?$/.test(supabaseUrl)) throw new Error('The GachaCheck address looks like https://<project>.supabase.co (your VITE_SUPABASE_URL). Nothing was saved.')
   const publishableKey = await ask('GachaCheck publishable key (your VITE_SUPABASE_PUBLISHABLE_KEY)', { fallback: old.publishableKey ?? env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '' })
   console.log('\nThe helper key: on the GachaCheck Games page, under Automatic updates, click "Make a helper key" and copy it.')
-  const helperKey = await ask('Helper key (gcs_…; not shown as you paste)', { secret: true, fallback: old.helperKey ?? '' })
-  if (!/^gcs_[0-9a-f]{64}$/.test(helperKey)) throw new Error('That is not a helper key. It starts with gcs_ and is 68 characters long.')
+  const isKey = (text) => /^gcs_[0-9a-f]{64}$/.test(text)
+  const typed = await ask('Helper key (gcs_…; hidden as you paste; right-click pastes too)', { secret: true, fallback: old.helperKey ?? '' })
+  // A key pasted with a little extra around it still counts
+  const helperKey = (await orClipboard(typed, isKey, 'helper key')).match(/gcs_[0-9a-f]{64}/)?.[0] ?? ''
+  if (!isKey(helperKey)) {
+    throw new Error(`That is not a helper key (got ${typed.length} characters; a key starts with gcs_ and is 68 long). Try pasting with a right-click. Nothing was saved.`)
+  }
 
   const uid = await ask('\nYour Genshin UID (in-game, bottom right of the Paimon menu)', { fallback: old.uid ?? '' })
   if (!serverFor(uid)) throw new Error('That UID is not on HoYoLAB\'s servers (America, Europe, Asia or TW/HK/MO).')
@@ -142,7 +178,11 @@ Your HoYoLAB cookies. They stay on this PC and are sent only to HoYoLAB. Never p
   2. Press F12, open the Application tab (Storage in Firefox), then Cookies > https://www.hoyolab.com
   3. Copy the values of ltuid_v2 and ltoken_v2 (and ltmid_v2 if it's there).`)
   const cookies = { ...(old.cookies ?? {}) }
-  const first = await ask('ltuid_v2 (or paste a whole cookie line)', { secret: true, fallback: cookies.ltuid_v2 ?? '' })
+  const first = await orClipboard(
+    await ask('ltuid_v2 (or paste a whole cookie line)', { secret: true, fallback: cookies.ltuid_v2 ?? '' }),
+    (text) => Boolean(pickCookies(text).ltoken_v2),
+    'HoYoLAB cookie line',
+  )
   const line = pickCookies(first)
   if (line.ltuid_v2 && line.ltoken_v2) Object.assign(cookies, line)
   else {
