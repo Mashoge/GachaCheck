@@ -1147,6 +1147,10 @@ dialog.gc-sheet::backdrop { background: rgb(0 0 0 / 0.6); }
 .gc-val { font-family: var(--font-display); font-weight: 600; transition: color 0.35s; }
 .gc-end { position: relative; transition: color 0.35s; }
 .gc-end::before { content: ""; position: absolute; inset: 0 -16px; z-index: -1; opacity: 0; transition: opacity 0.4s; }
+/* STA-7: spend and set on a Today card. Frosted, so they stay readable over your character pictures and
+   each game's awake skin. */
+.gc-quick > button, .gc-quick [role="status"] > span { background: rgb(12 13 18 / 0.55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.gc-quick [role="status"] > span { padding: 2px 4px 2px 10px; border-radius: 0.6rem; }
 .gc-foot { transition: border-color 0.35s; }
 .gc-foot button { position: relative; overflow: hidden; transition: background-color 0.35s, color 0.35s, border-color 0.35s, border-radius 0.35s; }
 .gc-ripple { position: absolute; border-radius: 50%; pointer-events: none; scale: 0; opacity: 0.6; background: var(--rip, #fff); animation: gc-ripple 0.55s ease-out forwards; }

@@ -15,13 +15,14 @@ const RIPPLE: Record<string, string> = { genshin: '#f3d48f', wuwa: '#ffffff', nt
 
 type Tone = 'urgent' | 'rest' | undefined
 
-export function TodayCard({ card, now, iconUrl, images, footer, after }: {
+export function TodayCard({ card, now, iconUrl, images, footer, after, meterActions }: {
   card: GameCard
   now: Date
   iconUrl?: string
   images: CharacterImage[]
   footer: ReactNode
   after?: ReactNode // opens over the card's bottom, above the footer
+  meterActions?: ReactNode // STA-7: spend and set, right under the meter
 }) {
   const ref = useRef<HTMLElement>(null)
   const awake = useAwake(ref)
@@ -149,12 +150,17 @@ export function TodayCard({ card, now, iconUrl, images, footer, after }: {
         </span>
         <span aria-hidden="true" className="gc-meter mt-2.5" style={{ '--p': `${pct}%` } as CSSProperties}><i /></span>
         <span className="gc-sub mt-2 text-xs text-muted">{sub}</span>
+        {headline === 'meter' && meterActions}
 
         <span aria-hidden="true" className="gc-rule mt-3.5 mb-2.5" />
         {meterRow ? (
-          <Row label={m.name}>
-            <span className="gc-val ml-auto shrink-0 whitespace-nowrap">{m.value}/{m.cap}</span>
-          </Row>
+          <>
+            <Row label={m.name}>
+              <span className="gc-val ml-auto shrink-0 whitespace-nowrap">{m.value}/{m.cap}</span>
+            </Row>
+            {/* When the dailies lead, the meter's buttons sit with its row */}
+            {meterActions && <div className="-mt-2 mb-1">{meterActions}</div>}
+          </>
         ) : headline === 'meter' && card.dailyTotal > 0 && (
           <Row label="Dailies">
             {card.dailyTotal <= MAX_PIPS && (

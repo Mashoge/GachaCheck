@@ -1,6 +1,7 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import SpendPrompt from '../components/SpendPrompt'
+import { MeterQuick } from '../components/MeterQuick'
 import { Button, Card, CheckIcon, Loading, Notice, PageTitle, TagLegend } from '../components/ui'
 import { buildToday, clockOf, dailiesLeft, leftByReset, useTodayData } from '../lib/today'
 import { dailyPeriod, formatClock, formatDuration } from '../lib/time'
@@ -17,6 +18,9 @@ import { useEvenRows } from '../lib/useEvenRows'
 // Small colour cue per game; the only game-specific colour in the neutral look.
 const DOT: Record<string, string> = { genshin: 'bg-game-genshin', wuwa: 'bg-game-wuwa', nte: 'bg-game-nte' }
 const dot = (presetId: string) => DOT[presetId] ?? 'bg-muted'
+// STA-7: how long a spend from a Today card can be undone
+const UNDO_MS = 8000
+const DEFAULT_SPENDS = [20, 40, 60]
 
 export default function TodayPage() {
   const { data, error, loading, addCompletion, removeCompletions, setMeterValue, setSkipped } = useTodayData()
@@ -34,6 +38,44 @@ export default function TodayPage() {
 
   // Bulk undo state lives above the route switch, so it survives navigation between tabs.
   const { batches, begin, complete, dismiss, dismissPrompt } = useBulkUndo()
+
+  // STA-7: spend or set a meter from its card. `setting` is the card whose Set box is open; `spent` is what
+  // each card just spent (and its value before), while it can still be undone.
+  const [setting, setSetting] = useState<string | null>(null)
+  const [spent, setSpent] = useState<Record<string, { amount: number; before: number; at: number }>>({})
+  const undoTimers = useRef(new Map<string, number>())
+  const spendCount = useRef(0) // tells one spend from the next, so an old timer can't clear a newer one
+  useEffect(() => {
+    const timers = undoTimers.current
+    return () => timers.forEach((t) => window.clearTimeout(t))
+  }, [])
+  const forget = (cardId: string, at?: number) => {
+    window.clearTimeout(undoTimers.current.get(cardId))
+    setSpent((s) => {
+      if (!s[cardId] || (at !== undefined && s[cardId].at !== at)) return s
+      const rest = { ...s }
+      delete rest[cardId]
+      return rest
+    })
+  }
+  const spend = (cardId: string, amount: number) => {
+    const game = data?.games.find((g) => g.id === cardId)
+    const meter = today?.cards.find((c) => c.id === cardId)?.meter
+    if (!game || !meter) return
+    void setMeterValue(game, meter.id, Math.max(0, meter.value - amount))
+    const at = ++spendCount.current
+    window.clearTimeout(undoTimers.current.get(cardId))
+    setSpent((s) => ({ ...s, [cardId]: { amount, before: meter.value, at } }))
+    undoTimers.current.set(cardId, window.setTimeout(() => forget(cardId, at), UNDO_MS))
+  }
+  const undoSpend = (cardId: string) => {
+    const game = data?.games.find((g) => g.id === cardId)
+    const meter = today?.cards.find((c) => c.id === cardId)?.meter
+    const last = spent[cardId]
+    if (!game || !meter || !last) return
+    void setMeterValue(game, meter.id, last.before)
+    forget(cardId)
+  }
 
   const tickAll = async (gameId: string, meterId: string | null) => {
     const game = data?.games.find((g) => g.id === gameId)
@@ -172,6 +214,30 @@ export default function TodayPage() {
                     }}
                     onSkip={() => dismissPrompt(card.id, mine.operationId)}
                   />
+                ) : setting === card.id && card.meter ? (
+                  // STA-7: "Set": what the game shows now, filled in with the current number
+                  <SpendPrompt
+                    meter={card.meter}
+                    initial={card.meter.value}
+                    skipLabel="Cancel"
+                    onSave={(v) => {
+                      if (game) void setMeterValue(game, card.meter!.id, v)
+                      forget(card.id)
+                      setSetting(null)
+                    }}
+                    onSkip={() => setSetting(null)}
+                  />
+                ) : null
+                const row = game?.stamina_meters.find((x) => x.id === card.meter?.id)
+                const meterActions = card.meter ? (
+                  <MeterQuick
+                    meter={card.meter}
+                    spends={row?.spend_presets?.length ? row.spend_presets : DEFAULT_SPENDS}
+                    undo={spent[card.id]?.amount ?? null}
+                    onSpend={(n) => spend(card.id, n)}
+                    onSet={() => setSetting(card.id)}
+                    onUndo={() => undoSpend(card.id)}
+                  />
                 ) : null
                 return (
                   <TodayCard
@@ -182,6 +248,7 @@ export default function TodayPage() {
                     images={characterImages[card.id] ?? []}
                     footer={footer}
                     after={after}
+                    meterActions={meterActions}
                   />
                 )
               })}
